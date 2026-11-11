@@ -43,7 +43,7 @@ public:
 	double calc_inner_volume() const {
 		d3 a = { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
 		d3 b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
-		return vec_dot(vec_cross(b, a), v1) / 6.;
+		return vec_dot(vec_cross(a, b), v1) / 6.;
 	};
 	d3 calc_center() const {
 		return { (v1[0] + v2[0] + v3[0]) / 3., (v1[1] + v2[1] + v3[1]) / 3., (v1[2] + v2[2] + v3[2]) / 3. };
@@ -59,9 +59,9 @@ void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 
 void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim);
 double calc_d_i(const d3& p_t, const WFN& wavy);
 double calc_d_norm_term(const d3& p_t, const WFN& wavy);
-//Hirshfeld surface of mol inside env (weight 0.5 of the spherical-atom densities); raises opts.radius to 2.5 A
-// orthogonal empty grid on the box of wfn's atoms + opts.radius, as opts' MinMax/NbSteps
+//Orthogonal empty grid on the box of wfn's atoms + opts.radius, as opts' MinMax/NbSteps
 cube box_cube(WFN& wfn, properties_options& opts);
+//Hirshfeld surface of mol inside env (weight 0.5 of the spherical-atom densities); raises opts.radius to 2.5 A
 //weight_out, when given, receives the weight grid the surface was cut from (for surface_curvature)
 std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log, cube* weight_out = nullptr);
 //Shape index (-1 concave ... +1 convex) and curvedness (2/pi ln sqrt((k1^2 + k2^2) / 2), k in 1/Angstrom) at every

@@ -9,53 +9,62 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Reading:                                 "nh3bh3.gbw" done!
 Number of atoms in Wavefunction file: 8 Number of MOs: 98
+[RGBI] Roby, Mol. Phys. 27 (1974) 81, DOI 10.1080/00268977400100071
+[RGBI] Gould et al., Theor. Chem. Acc. 119 (2008) 275, DOI 10.1007/s00214-007-0282-x
 Calculating ANOs for all atoms...                  ...done!
 ANO fallback summary: no atom-level fallbacks were needed.
 Calculating Population for all atoms...            ...done.
 
-Total Population: 17.8264
+Total Population: 17.8439
 
 [      Calculating Atomic Populations     ]
 [-----------------------------------------] 100% 
-Population of atom 0: 9.35504
-Population of atom 1: 8.46492
-Population of atom 2: 1.78531
-Population of atom 3: 1.78681
-Population of atom 4: 1.40863
-Population of atom 5: 1.40758
-Population of atom 6: 1.78402
-Population of atom 7: 1.40628
-Atomic projector population outside selected ANO cutoff of atom 0: 2.07839
-Atomic projector population outside selected ANO cutoff of atom 1: 3.32373
-Atomic projector population outside selected ANO cutoff of atom 2: 0.631287
-Atomic projector population outside selected ANO cutoff of atom 3: 0.629603
-Atomic projector population outside selected ANO cutoff of atom 4: 1.07983
-Atomic projector population outside selected ANO cutoff of atom 5: 1.07872
-Atomic projector population outside selected ANO cutoff of atom 6: 0.631998
-Atomic projector population outside selected ANO cutoff of atom 7: 1.07916
+Population of atom 0: 9.37278
+Population of atom 1: 8.46659
+Population of atom 2: 1.78683
+Population of atom 3: 1.78683
+Population of atom 4: 1.40883
+Population of atom 5: 1.40872
+Population of atom 6: 1.78681
+Population of atom 7: 1.40912
+Atomic projector population outside selected ANO cutoff of atom 0: 2.07545
+Atomic projector population outside selected ANO cutoff of atom 1: 3.33744
+Atomic projector population outside selected ANO cutoff of atom 2: 0.629639
+Atomic projector population outside selected ANO cutoff of atom 3: 0.629643
+Atomic projector population outside selected ANO cutoff of atom 4: 1.08004
+Atomic projector population outside selected ANO cutoff of atom 5: 1.07965
+Atomic projector population outside selected ANO cutoff of atom 6: 0.629593
+Atomic projector population outside selected ANO cutoff of atom 7: 1.08106
 [       Calculating Bond Populations      ]
+Bond population between atom 1 and atom 2: 16.5748
+[------Bond population between atom 1 and atom 5: 9.53687
+[------------Bond population between atom 1 and atom 6: 9.537
+[------------------Bond population between atom 1 and atom 8: 9.53655
+[-----------------------Bond population between atom 2 and atom 3: 8.76432
+[-----------------------------Bond population between atom 2 and atom 4: 8.76437
+[-----------------------------------Bond population between atom 2 and atom 7: 8.76442
 [-----------------------------------------] 100% 
 
 Roby-Gould Bond Indices (RGBI) Analysis
 ----------------------------------------------
 Number of electrons in system:         18
-Number of electrons in Roby Analysis:  17.8264
-Number of cutoff electrons:            0.155343
-Number after cutoff projection:        17.9817
-Percentage of electrons accounted for: 99.04 %
-Percentage after cutoff projection:    99.9 %
+Number of electrons in Roby Analysis:  17.8439
+Number of cutoff electrons:            0.156137
+Number after cutoff projection:        18
+Percentage of electrons accounted for: 99.13 %
+Percentage after cutoff projection:    100 %
 ----------------------------------------------
 
 
 Atom Nr        Els       n_A     n_B    n_AB    s_AB    Cov.    Ion.    Tot.   Pyth.   Arak.
 --------------------------------------------------------------------------------------------
-   0 -   1    N -  B   9.355   8.465  16.558   1.262   0.981   0.560   1.130  75.426  66.981
-   0 -   4    N -  H   9.355   1.409   9.519   1.245   0.888   0.330   0.947  87.848  77.332
-   0 -   5    N -  H   9.355   1.408   9.519   1.243   0.887   0.330   0.946  87.846  77.330
-   0 -   7    N -  H   9.355   1.406   9.518   1.243   0.886   0.330   0.946  87.790  77.276
-   1 -   2    B -  H   8.465   1.785   8.763   1.487   0.923   0.008   0.923  99.992  99.425
-   1 -   3    B -  H   8.465   1.787   8.763   1.489   0.924   0.007   0.924  99.994  99.500
-   1 -   6    B -  H   8.465   1.784   8.762   1.487   0.922   0.009   0.922  99.990  99.359
+   0 -   1    N -  B   9.373   8.467  16.575   1.265   0.981   0.570   1.135  74.763  66.493
+   0 -   4    N -  H   9.373   1.409   9.537   1.245   0.888   0.330   0.947  87.838  77.322
+   0 -   5    N -  H   9.373   1.409   9.537   1.244   0.888   0.330   0.947  87.839  77.323
+   0 -   7    N -  H   9.373   1.409   9.537   1.245   0.888   0.330   0.947  87.835  77.319
+   1 -   2    B -  H   8.467   1.787   8.764   1.489   0.924   0.007   0.924  99.994  99.497
+   1 -   3    B -  H   8.467   1.787   8.764   1.489   0.924   0.007   0.924  99.994  99.497
+   1 -   6    B -  H   8.467   1.787   8.764   1.489   0.924   0.007   0.924  99.994  99.498
 --------------------------------------------------------------------------------------------
 
 
@@ -67,11 +76,11 @@ Groups defined:
 ----------------------------------------------
 
 Group populations:
-  Population of G0 (NH3)                9.87287
-  Population of G1 (BH3)                9.34682
+  Population of G0 (NH3)                9.89072
+  Population of G1 (BH3)                9.34882
 ----------------------------------------------
 
 Group             n_G1    n_G2  n_G1G2  s_G1G2    Cov.    Ion.    Tot.   Pyth.   Arak.
 ------------------------------------------------------------------------------------------
-G0 - G1          9.873   9.347  14.938   4.281   1.086   1.327   1.715  40.120  43.669
+G0 - G1          9.891   9.349  14.959   4.280   1.088   1.336   1.723  39.847  43.491
 ------------------------------------------------------------------------------------------

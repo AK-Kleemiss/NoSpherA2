@@ -23,6 +23,7 @@ add_library(
 )
 
 nosphera2_enable_optimizations(NoSpherA2Dll)
+nosphera2_isa_check(NoSpherA2Dll DLL)
 
 add_library(
     NoSpherA2::Dll
@@ -66,6 +67,26 @@ set_target_properties(
     PROPERTIES
         OUTPUT_NAME "NoSpherA2"
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
+        #beside the NoSpherA2 launcher, which loads it from there, and in the packaged bin
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
+#Linux: export the entry points only. Everything else default-visible is interposable in a .so, so GCC's
+#LTO would not inline or internalise the core as it does in an executable; this also keeps the static
+#BLAS/TBB/OpenMP copies out of the dynamic symbol table, as Olex2 holds its own
+if(LINUX)
+    target_link_options(NoSpherA2Dll PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+    set_property(TARGET NoSpherA2Dll APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+elseif(APPLE)
+    #the same two names (Mach-O prefixes an underscore); without it the dylib exported ~8,800 symbols
+    target_link_options(NoSpherA2Dll PRIVATE "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/exports_macos.txt")
+    set_property(TARGET NoSpherA2Dll APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/exports_macos.txt")
+endif()
+
 nosphera2_copy_runtime_libraries(NoSpherA2Dll)
+
+if(NOSPHERA2_USE_HIP)
+    #see app/CMakeLists.txt: the kernels carry their own fat binaries, the C++ linker is all that is needed
+    set_target_properties(NoSpherA2Dll PROPERTIES LINKER_LANGUAGE CXX)
+endif()

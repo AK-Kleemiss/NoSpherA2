@@ -1,3 +1,12 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
 Bond between 0 (8) and 1 (6) with distance 2.71151 and svdW 2.57003
 No bond between 0 and 2 with distance 3.88799 and svdW 1.71965
 No bond between 0 and 3 with distance 3.92168 and svdW 1.71965

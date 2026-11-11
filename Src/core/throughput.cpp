@@ -20,9 +20,7 @@ struct Row {
 	long long calls = 0;
 };
 
-//A mutex rather than atomics: two doubles and a counter have to move together or a row can
-//report work without the time that produced it. Contended once per kernel launch, which is
-//nothing next to the launch itself.
+//A mutex, not atomics: two doubles and a counter must move together or a row reports work without its time.
 std::mutex g_mutex;
 std::vector<Row> g_rows;
 bool g_enabled = false;

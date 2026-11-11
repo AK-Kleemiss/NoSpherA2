@@ -9,10 +9,9 @@
 
 ## Build/Test Ground Truth
 
-- Linux quick build: `cmake --preset linux-gcc && cmake --build --preset linux-gcc`.
-- Windows quick build: `cmake --preset windows-msvc-release-full && cmake --build --preset windows-msvc-release-full`.
-- CMake presets exist for OCC-focused workflows, e.g. `linux-occ-gcc`, `macos-release-*`, `windows-clang-cl`.
-- Windows/OCC integration validation: build `Windows\Tests\Tests.vcxproj` with `SolutionDir` pointing at `Windows\`, then run `vstest.console.exe Windows\x64\Release\Tests.dll /Platform:x64`.
+- Linux quick build: `cmake --preset release-linux && cmake --build --preset release-linux`.
+- Windows quick build (from an x64 VS dev shell): `cmake --preset release-windows && cmake --build --preset release-windows`.
+- Windows/OCC integration validation: configure with `-DNOSPHERA2_BUILD_TESTS=ON` and run `ctest --preset release-windows`.
 - OCC uses shared oneTBB at runtime. Artifacts must include `tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`; do not add `tbbmalloc_proxy`.
 
 ## Prompting Rules For This Repo
@@ -34,5 +33,5 @@
 
 - Diff parsers that call `float(line)` can fail when one line has multiple values.
 - Boolean-like workflow/action inputs are stringly typed; avoid truthiness mistakes in conditions.
-- On Windows, architecture/toolchain context matters (x64 dev shell for clang-cl preset flows).
-- `alanine_integrated_occ` should pass in the VS test suite. It runs as a subprocess and should not be debugged by reintroducing static/proxy TBB.
+- On Windows, architecture/toolchain context matters (use an x64 VS dev shell before configuring).
+- `alanine_integrated_occ` runs in-process in the gtest binary and should not be debugged by reintroducing static/proxy TBB.

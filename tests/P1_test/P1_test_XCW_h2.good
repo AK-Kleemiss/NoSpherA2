@@ -7,31 +7,30 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                            "P1_test_NA2.cif" done!
+Reading:                                "P1_test.cif" done!
 Reading:                              "P1_subset.hkl" done!
 Nr of reflections read from file: 402
 Number of symmetry operations: 1
 Nr of reflections to be used: 402
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 402
-XCW orbital basis set: sto-3g-basis
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
+XCW orbital basis set: sto-3g-basis
+Screened out 1802 unique pairs of mu, nu (33.64%) 
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 93098 grid points.
-Total number of grid points after pruning: 93092
+GridManager: Generated total of 80442 grid points.
+Total number of grid points after pruning: 80442
 AO values calculated for all grids.
-Screened out 1798 unique pairs of mu, nu (33.57%) 
-Skipped evaluation of 8004222 grids (16.16%) 
-More detailed output in XCW.log file...
-XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
-____________________________________________________________________________________
- Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
-								(Eh)			(a. u.)		(a. u.)
-____________________________________________________________________________________
-0.00000		10.5060		5.4968		0.02502		-1961.923538820		0.000		-1961.923538820		10.3187		0.02538
-0.01000		6.2865		4.0130		0.02264		-1961.744817998		0.063		-1961.681953386		6.1753		0.02300
-WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
-0.02000		5.3178		3.6665		0.02178		-1961.584448539		0.106		-1961.478092643		5.2241		0.02215
-WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
+XCW grid transform: Fourier-Bessel, L 12, 193 table nodes, 6 prototypes
+More detailed output in SCF.log file...
+XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is the square of this weighted quantity, not the classical GooF^2.
+____________________________________________________________________________________________________________________________
+ Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		wR2		wR2(all)
+									(%)			(Eh)				(a. u.)			(a. u.)
+____________________________________________________________________________________________________________________________
+ 0.00000	109.9694		5.6325		0.02510		-1961.925585145		0.000			-1961.925585145		106.0976		0.02553		0.04965		0.04966
+ 0.01000	35.7092		3.9685		0.02241		-1961.749731836		0.357			-1961.392640262		34.4716		0.02279		0.03498		0.03500
+ 0.02000	25.3332		3.6007		0.02143		-1961.601777889		0.507			-1961.095113365		24.4616		0.02178		0.03174		0.03175
+XCW final model: lambda 0.02000 R1 0.02143 wR2 0.03174 R1(all) 0.02178 wR2(all) 0.03175 GooF 3.6007 scale 5.235338 weight sigma
 Finished XCW fitting procedure.

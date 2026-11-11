@@ -267,7 +267,8 @@ namespace
 		return run_app((int)args.size(), argv.data());
 	}
 
-	//the numbers after the n-th '|' of the first line in text that starts with prefix
+	//the numbers after the n-th '|' of the first line in text that starts with prefix; bars = 0 reads
+	//everything after the prefix, for tables without bars
 	vec row_after_bars(const std::string &text, const std::string &prefix, const int bars)
 	{
 		std::istringstream lines(text);
@@ -276,7 +277,7 @@ namespace
 		{
 			if (line.rfind(prefix, 0) != 0)
 				continue;
-			size_t pos = 0;
+			size_t pos = bars ? 0 : prefix.size();
 			for (int b = 0; b < bars; b++)
 				pos = line.find('|', pos) + 1;
 			std::string tail = line.substr(pos);
@@ -367,7 +368,8 @@ TEST(PropertiesCoverageSpinTests, SpinDensityCubeIsAlphaMinusBeta)
 	Calc_S_Rho(t, w, log, nodate);
 	const std::string console = capture_end();
 	EXPECT_NE(console.find("Calculating Values"), std::string::npos);
-	EXPECT_NE(log.str().find("Time to calculate Values: 0 s"), std::string::npos);
+	//the seconds are wall time: a loaded CI runner needed a second or more for these 27 points, so only the line is checked
+	EXPECT_NE(log.str().find("Time to calculate Values: "), std::string::npos);
 	EXPECT_NEAR(t.get_value(1, 1, 1), 0.75, 1e-12);
 }
 
@@ -464,8 +466,8 @@ TEST(PropertiesCoverageDipoleTests, DipoleMomentsDebugTableOfH2)
 	std::filesystem::remove_all(dir);
 }
 
-//alpha = (mu(+E) - mu(-E)) / 2E: seven copies of the same wavefunction give a zero tensor and a
-//neutral Hirshfeld charge on each hydrogen
+//alpha = (mu(+E) - mu(-E)) / 2E: seven copies of the same wavefunction give a zero tensor, alpha_p and
+//alpha_c alike, and a neutral hydrogen in every partition and boundary mode
 TEST(PropertiesCoverageDipoleTests, PolarizabilitiesOfSevenIdenticalWavefunctionsVanish)
 {
 	ScopedGlobals guard;
@@ -485,19 +487,37 @@ TEST(PropertiesCoverageDipoleTests, PolarizabilitiesOfSevenIdenticalWavefunction
 	const std::string console = capture_end();
 	const std::string text = log.str();
 	EXPECT_NE(console.find("Properties calculation done!"), std::string::npos);
-	EXPECT_NE(text.find("Starting calculation of Polarizabilities"), std::string::npos);
-	const size_t table = text.find("Polarizabilities:");
-	ASSERT_NE(table, std::string::npos);
-	for (const char *prefix : { "  0 (H) |", "  1 (H) |" })
+	EXPECT_NE(text.find("Partitioning field 6 of 6..."), std::string::npos);
+	//the one bond, with density at its bond point
+	const size_t bonds = text.find("Bond graph (zero field)");
+	ASSERT_NE(bonds, std::string::npos);
+	const vec bond = row_after_bars(text.substr(bonds), "    H1    H2", 0);
+	ASSERT_EQ(bond.size(), 2u);
+	EXPECT_GT(bond[1], 0.0);
+	for (const char *block : { "Becke, frozen", "TFVC, frozen", "Hirshfeld, frozen", "MBIS, frozen", "EMBIS, frozen",
+							   "Becke, moving", "TFVC, moving", "Hirshfeld, moving", "MBIS, moving", "EMBIS, moving" })
 	{
-		const vec charge = row_after_bars(text.substr(table), prefix, 1);
-		ASSERT_GE(charge.size(), 1u);
-		EXPECT_NEAR(charge[0], 0.0, 2e-2);
-		const vec alpha = row_after_bars(text.substr(table), prefix, 2);
-		ASSERT_EQ(alpha.size(), 9u);
-		for (const double a : alpha)
-			EXPECT_NEAR(a, 0.0, 1e-10);
+		SCOPED_TRACE(block);
+		const size_t at = text.find(std::string("\n") + block + " boundary\n");
+		ASSERT_NE(at, std::string::npos);
+		//Q, the six tensor elements, iso, iso_p, iso_c
+		for (const char *prefix : { "    H1", "    H2", "   sum" })
+		{
+			const vec row = row_after_bars(text.substr(at), prefix, 0);
+			ASSERT_EQ(row.size(), 10u);
+			EXPECT_NEAR(row[0], 0.0, 2e-2);
+			for (size_t c = 1; c < row.size(); c++)
+				EXPECT_NEAR(row[c], 0.0, 1e-10);
+		}
 	}
+	//plotting table: one row per boundary mode, scheme and atom
+	std::ifstream dat(dir / "polarizabilities.dat");
+	ASSERT_TRUE(dat.good());
+	int rows = 0;
+	for (std::string line; std::getline(dat, line);)
+		rows += !line.empty() && line[0] != '#';
+	EXPECT_EQ(rows, 20);
+	dat.close();
 	std::filesystem::remove_all(dir);
 }
 

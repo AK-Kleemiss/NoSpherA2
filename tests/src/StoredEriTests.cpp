@@ -1,13 +1,9 @@
-//The stored two-electron integrals against OCC's direct Fock build: the same matrix to
-//working precision when every pair is kept, and still when the Schwarz screen drops the
-//pairs between two distant molecules; the screened contraction of a density difference
-//reproduces the full build to the screening threshold; and the device contraction, where a
-//device is there, matches the CPU one.
 #include "pch.h"
 #include <gtest/gtest.h>
 
 #include "core/basis_set.h"
 #include "core/stored_eri.h"
+#include "core/tuning.h"
 #if defined(NOSPHERA2_USE_GPU)
 #include "core/itensor_gpu.h"
 #endif
@@ -56,7 +52,6 @@ namespace
 
 	double max_abs(const occ::Mat& m) { return m.cwiseAbs().maxCoeff(); }
 
-	//Stored against direct, full builds of the converged density
 	void expect_full_build(const scf_case& c, const stored_eri& eri, const double tol, const char* what) {
 		const occ::Mat F_direct = direct_fock(c, c.converged), F_stored = eri.fock(c.converged);
 		const double diff = max_abs(F_direct - F_stored);
@@ -105,6 +100,23 @@ TEST(StoredEriTests, UnrestrictedMatchesTheDirectBuild)
 	expect_incremental(c, eri, 1e-9, "methyl def2-SVP UHF");
 }
 
+//-tune NOSPHERA2_ERI_DYNAMIC changes only the summation order: J and K agree with the fixed cyclic order to round-off
+TEST(StoredEriTests, DynamicScheduleMatchesTheStaticOne)
+{
+	const scf_case c = run(two_waters, "def2-SVP", occ::qm::SpinorbitalKind::Restricted);
+	stored_eri eri;
+	ASSERT_TRUE(eri.build(*c.hf, 0, std::cout));
+	occ::Mat J, K, Js, Ks;
+	eri.JK(c.converged.D, Js, Ks);
+	set_tuning("NOSPHERA2_ERI_DYNAMIC", "1");
+	eri.JK(c.converged.D, J, K);
+	set_tuning("NOSPHERA2_ERI_DYNAMIC", nullptr);
+	const double dj = max_abs(J - Js) / max_abs(Js), dk = max_abs(K - Ks) / max_abs(Ks);
+	std::cout << "dynamic against static: max |dJ| / |J| " << dj << ", max |dK| / |K| " << dk << std::endl;
+	EXPECT_LT(dj, 1e-12);
+	EXPECT_LT(dk, 1e-12);
+}
+
 TEST(StoredEriTests, BudgetRefusesWhatDoesNotFit)
 {
 	const scf_case c = run(water, "sto-3g", occ::qm::SpinorbitalKind::Restricted);
@@ -113,6 +125,43 @@ TEST(StoredEriTests, BudgetRefusesWhatDoesNotFit)
 	EXPECT_FALSE(eri.build(*c.hf, 8, log));
 	EXPECT_FALSE(static_cast<bool>(eri));
 	EXPECT_NE(log.str().find("do not fit"), std::string::npos);
+}
+
+//save_eri/read_eri: the file gives back every array build() made, bit for bit, and a basis on another geometry is refused
+TEST(StoredEriTests, SavedIntegralsReadBackExactlyAndOnlyForTheirBasis)
+{
+	const scf_case c = run(two_waters, "def2-SVP", occ::qm::SpinorbitalKind::Restricted);
+	stored_eri built, read;
+	ASSERT_TRUE(built.build(*c.hf, 0, std::cout));
+	const auto path = std::filesystem::temp_directory_path() / "nos_stored_eri_test.bin";
+	ASSERT_TRUE(built.save(path, *c.hf));
+	std::ostringstream log;
+	ASSERT_TRUE(read.load(path, *c.hf, 0, log)) << log.str();
+	EXPECT_NE(log.str().find("read from"), std::string::npos) << log.str();
+	ASSERT_EQ(read.npairs(), built.npairs());
+	EXPECT_EQ(read.nbf(), built.nbf());
+	EXPECT_EQ(read.pair_a(), built.pair_a());
+	EXPECT_EQ(read.pair_b(), built.pair_b());
+	EXPECT_EQ(read.first_pair(), built.first_pair());
+	EXPECT_EQ(read.pair_index(), built.pair_index());
+	EXPECT_EQ(read.schwarz(), built.schwarz());
+	EXPECT_EQ(std::memcmp(read.data(), built.data(), built.bytes()), 0);
+	const occ::Mat D = c.converged.D;
+	occ::Mat Jb, Kb, Jr, Kr;
+	built.JK(D, Jb, Kb);
+	read.JK(D, Jr, Kr);
+	EXPECT_EQ((Jb - Jr).cwiseAbs().maxCoeff(), 0.0);
+	EXPECT_EQ((Kb - Kr).cwiseAbs().maxCoeff(), 0.0);
+	//water alone: other atoms, other pairs
+	const scf_case w = run(water, "def2-SVP", occ::qm::SpinorbitalKind::Restricted);
+	std::ostringstream refused;
+	EXPECT_FALSE(read.load(path, *w.hf, 0, refused));
+	EXPECT_FALSE(static_cast<bool>(read));
+	EXPECT_NE(refused.str().find("holds no two-electron integrals of this basis"), std::string::npos) << refused.str();
+	//a file cut short is refused, not half read
+	std::filesystem::resize_file(path, std::filesystem::file_size(path) - 8);
+	EXPECT_FALSE(read.load(path, *c.hf, 0, refused));
+	std::filesystem::remove(path);
 }
 
 #if defined(NOSPHERA2_USE_GPU)

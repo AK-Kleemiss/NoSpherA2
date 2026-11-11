@@ -1,10 +1,7 @@
 #pragma once
-// Streamed tscb writer. The file is reflection-major, so a block of reflections can be
-// written and forgotten; nothing later depends on anything earlier and we never seek back.
-// One writer thread in drain() is the only thread that touches out_; mutex_ guards
-// pending_, next_id_, done_, failed_ and error_.
-// Peak memory is queue_depth * scatterers * reflections-per-block * 16 bytes, so submit()
-// blocking on a full queue is that bound, not an inefficiency.
+// Streamed tscb writer: the file is reflection-major, so each block is written once, never seeking back. Only the
+// drain() thread touches out_; mutex_ guards pending_, next_id_, done_, failed_ and error_. submit() blocks on a
+// full queue, bounding memory at queue_depth * scatterers * reflections-per-block * 16 bytes.
 #include "pch.h"
 #include "tsc_block.h"
 
@@ -123,7 +120,7 @@ private:
 				}                     // mutex released here, before the slow part
 				space_.notify_one();  // a slot freed: a waiting producer may proceed
 
-				block_type::write_tscb_reflection_block(out_, next.idx, next.sf);
+				block_type::write_tscb_reflection_block(out_, next.idx, next.sf, buffer_);
 			}
 		}
 		catch (...)
@@ -137,6 +134,7 @@ private:
 	}
 
 	std::ofstream out_;                     // only the writer thread touches this
+	std::vector<char> buffer_;              // ... and this, the file-order copy of one block
 	std::size_t queue_depth_;               // how many blocks may be resident
 	std::map<std::size_t, item> pending_;   // ordered by id, so order is restored
 	std::size_t next_id_ = 0;               // the id the writer will accept next

@@ -22,8 +22,8 @@ $cases = @(
 
 foreach ($c in $cases) {
     foreach ($mode in @("cpu", "gpu")) {
-        $a = @("-do_XCW", "-cif", "P1_test_NA2.cif", "-hkl", "P1_test.hkl",
-               "-anom_disp", "anom_disp.txt", "-XCW_settings", "test_settings.txt") + $c.args
+        $a = @("-do_XCW", "-cif", "P1_test.cif", "-hkl", "P1_test.hkl",
+               "-XCW_settings", "test_settings.txt") + $c.args
         if ($mode -eq "gpu") { $a += "-gpu_itensor" }
         $sw = [Diagnostics.Stopwatch]::StartNew()
         & $exe @a 2>&1 | Out-Null

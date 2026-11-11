@@ -4,17 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 
-//GPU path for the SALTED descriptor combination. equicomb is 73% of predict() on a
-//642-atom protein with the v7 model, and it was measured on 21 Aug to be bound by the
-//multiply count rather than by gathering, which is the property that makes a port pay.
-//
-//The device reproduces the CPU walk exactly: for each atom and each shell triple
-//(n1, n2, il) it contracts the Wigner-weighted v1 block against the v2 block over the
-//surviving m pairs, applies the complex-to-real transform, accumulates the normalisation
-//sum over every feature, and writes only the sparsified ones.
-//
-//Returns false if no device is present or the problem will not fit, and the caller keeps
-//the CPU loop.
+//GPU SALTED equicomb, the CPU walk exactly: per atom and selected shell triple (n1, n2, il) the
+//Wigner-weighted v1 block is contracted with v2 over the surviving m pairs and made real. Only the
+//nfps sparsified features are built. The per-atom norm is contracted on the device from density
+//matrices built once per descriptor set, so the host does no per-lambda work beyond the transfers.
 
 struct salted_gpu_problem {
 	int natoms = 0;
@@ -23,7 +16,7 @@ struct salted_gpu_problem {
 	int llmax = 0;
 	int lam = 0;
 	int l21 = 0;              //2 * lam + 1
-	int featsize = 0;         //nrad1 * nrad2 * llmax
+	int shells = 0;           //nrad1 * nrad2 * llmax; vfps entries past it are zero features
 	int nfps = 0;             //sparsified output features
 	bool v2_is_conj_of_v1 = false;
 
@@ -50,8 +43,10 @@ struct salted_gpu_problem {
 	const double* c2r_re = nullptr;
 	const double* c2r_im = nullptr;
 	const int* c2r_cnt = nullptr;
-	//sel[ifeat] is the output slot for that shell triple, or -1
-	const int* sel = nullptr;
+	const int* vfps = nullptr;           //[nfps] shell triple (n1*nrad2+n2)*llmax+il per output slot
+	//[l21*l21] K = c2r^T conj(c2r) and G = c2r^T c2r, which turn the density matrices into the norm
+	const double *K_re = nullptr, *K_im = nullptr, *G_re = nullptr, *G_im = nullptr;
+	double* normfact = nullptr;          //[natoms] out: 1/|feature vector| over all shells, 0 if empty
 
 	double* p = nullptr;                 //[natoms * l21 * nfps], the caller's buffer
 };
@@ -61,7 +56,7 @@ NOSPHERA2_GPU_API_BEGIN
 bool salted_gpu_available();
 void salted_gpu_clear_cache();
 
-//Runs the whole lambda block. Returns false if the caller should fall back to the CPU.
-bool salted_gpu_equicomb(const salted_gpu_problem& prob, int* empty_environments);
+//Whole lambda block; false means fall back to the CPU.
+bool salted_gpu_equicomb(const salted_gpu_problem& prob);
 
 NOSPHERA2_GPU_API_END

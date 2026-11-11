@@ -7,33 +7,34 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                            "P1_test_NA2.cif" done!
+Reading:                                "P1_test.cif" done!
 Reading:                                "P1_test.hkl" done!
 Nr of reflections read from file: 3215
 Number of symmetry operations: 1
 Nr of reflections to be used: 3215
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3215
-XCW orbital basis set: sto-3g-basis
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
+XCW orbital basis set: sto-3g-basis
+Screened out 1802 unique pairs of mu, nu (33.64%) 
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 93098 grid points.
-Total number of grid points after pruning: 93092
+GridManager: Generated total of 80442 grid points.
+Total number of grid points after pruning: 80442
 AO values calculated for all grids.
-Screened out 1798 unique pairs of mu, nu (33.57%) 
-Skipped evaluation of 64013865 grids (16.16%) 
-More detailed output in XCW.log file...
-XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
-____________________________________________________________________________________
- Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		A^2 (halt)
-								(Eh)			(a. u.)		(a. u.)
-____________________________________________________________________________________
-0.00000		9.7541		4.8274		0.02461		-1961.923538820		0.000		-1961.923538820		9.6437		0.02515		189.4354
-0.01000		6.1852		3.7047		0.02368		-1961.776389235		0.062		-1961.714537435		6.1162		0.02422		138.9066
-0.02000		5.5880		3.5119		0.02352		-1961.677162407		0.112		-1961.565401475		5.5260		0.02405		150.4979
+XCW grid transform: Fourier-Bessel, L 12, 193 table nodes, 6 prototypes
+More detailed output in SCF.log file...
+XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is the square of this weighted quantity, not the classical GooF^2.
+____________________________________________________________________________________________________________________________
+ Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		wR2		wR2(all)		A^2 (halt)
+									(%)			(Eh)				(a. u.)			(a. u.)
+____________________________________________________________________________________________________________________________
+ 0.00000	101.8506		5.0170		0.02505		-1961.925585145		0.000			-1961.925585145		99.5614		0.02559		0.05309		0.05312		198.4893
+ 0.01000	38.1419		3.7731		0.02374		-1961.760145899		0.381			-1961.378726936		37.2995		0.02428		0.03993		0.03996		121.9396
+ 0.02000	30.2513		3.5440		0.02343		-1961.648760981		0.605			-1961.043735973		29.5875		0.02396		0.03751		0.03753		122.4655
 ____________________________________________________________________________
-Recommended halting lambda* = 0.01000 (A^2=138.9066) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+Recommended halting lambda* = 0.01000 (A^2=121.9396) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+XCW final model: lambda 0.02000 R1 0.02343 wR2 0.03751 R1(all) 0.02396 wR2(all) 0.03753 GooF 3.5440 scale 5.225846 weight sigma
 Finished XCW fitting procedure.

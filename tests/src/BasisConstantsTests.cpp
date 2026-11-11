@@ -532,6 +532,58 @@ TEST(BasisConstantsLibraryTests, WriteOccJsonRoundTripsThroughOccReader)
 	}
 }
 
+TEST(BasisConstantsLibraryTests, JsonOverridesReplaceOneElementAndKeepTheFallback)
+{
+	const auto path = temp_file("BasisConstants_overrides.json",
+		R"({"elements":{"78":{"electron_shells":[{"function_type":"gto_spherical","angular_momentum":[2],"exponents":["2.0","0.5"],"coefficients":[["0.8","0.2"],["0.1","0.9"]]}]}}})");
+	const auto b = BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path);
+	std::filesystem::remove(path);
+	const auto base = BasisSetLibrary::get_basis_set("sto-3g");
+	ASSERT_TRUE(b->has_element(78));
+	ASSERT_EQ((*b)[77].size(), 4u);
+	EXPECT_DOUBLE_EQ((*b)[77][0].exp, 2.0);
+	EXPECT_DOUBLE_EQ((*b)[77][2].coefficient, 0.1);
+	EXPECT_EQ((*b)[77][0].shell, 0);
+	EXPECT_EQ((*b)[77][2].shell, 1);
+	ASSERT_EQ((*b)[0].size(), (*base)[0].size());
+	for (int p = 0; p < static_cast<int>((*base)[0].size()); p++)
+		EXPECT_DOUBLE_EQ((*b)[0][p].coefficient, (*base)[0][p].coefficient);
+	const std::vector<occ::core::Atom> atoms{ { 78, 0.0, 0.0, 0.0 }, { 1, 0.0, 0.0, 2.0 } };
+	const auto ao = b->to_AOBasis(atoms);
+	EXPECT_EQ(ao.nbf(), 11u);
+	WFN w;
+	w.push_back_atom("Pt", 0.0, 0.0, 0.0, 78);
+	w.push_back_atom("H", 0.0, 0.0, 2.0, 1);
+	load_basis_into_WFN(w, b, false, true);
+	EXPECT_EQ(w.get_atom(0).get_basis_set_size(), 4);
+	EXPECT_EQ(w.get_atom(1).get_basis_set_size(), 3);
+}
+
+TEST(BasisConstantsLibraryTests, JsonOverridesSplitCombinedAngularMomentumShells)
+{
+	const auto path = temp_file("BasisConstants_sp_overrides.json",
+		R"({"elements":{"6":{"electron_shells":[{"function_type":"gto","angular_momentum":[0,1],"exponents":[2.0,0.5],"coefficients":[[0.8,0.2],[0.1,0.9]]}]}}})");
+	const auto b = BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path);
+	std::filesystem::remove(path);
+	ASSERT_EQ((*b)[5].size(), 4u);
+	EXPECT_EQ((*b)[5][0].type, 0);
+	EXPECT_EQ((*b)[5][2].type, 1);
+	EXPECT_EQ((*b)[5][2].shell, 1);
+	EXPECT_DOUBLE_EQ((*b)[5][2].coefficient, 0.1);
+}
+
+TEST(BasisConstantsLibraryTests, JsonOverridesRejectEcpAndMalformedContractions)
+{
+	const auto path = temp_file("BasisConstants_bad_overrides.json",
+		R"({"elements":{"78":{"ecp_electrons":60,"electron_shells":[{"function_type":"gto","angular_momentum":[0],"exponents":[1.0],"coefficients":[[1.0]]}]}}})");
+	EXPECT_THROW(BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path), std::runtime_error);
+	std::ofstream(path) << R"({"elements":{"78":{"electron_shells":[{"function_type":"gto","angular_momentum":[0],"exponents":[1.0,0.5],"coefficients":[[1.0]]}]}}})";
+	EXPECT_THROW(BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path), std::runtime_error);
+	std::ofstream(path) << R"({"elements":{}})";
+	EXPECT_THROW(BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path), std::runtime_error);
+	std::filesystem::remove(path);
+}
+
 //to_AOBasis builds one spherical shell per library shell: H2 is two s functions, C adds 2s and 2p
 TEST(BasisConstantsLibraryTests, ToAOBasisCountsShellsAndFunctions)
 {
@@ -561,7 +613,7 @@ TEST(BasisConstantsLibraryTests, LoadBasisDecontractedVersusContracted)
 	WFN dec(e_origin::NOT_YET_DEFINED);
 	dec.push_back_atom("H", 0.0, 0.0, 0.0, 1);
 	dec.push_back_atom("C", 0.0, 0.0, 1.5, 6);
-	EXPECT_EQ(load_basis_into_WFN(dec, b), 3 + 6 + 9);
+	EXPECT_EQ(load_basis_into_WFN(dec, b, true), 3 + 6 + 9);
 	EXPECT_EQ(dec.get_atom_basis_set_size(0), 3);
 	EXPECT_EQ(dec.get_atom_basis_set_size(1), 9);
 	EXPECT_EQ(dec.get_atom(1).get_shellcount_size(), 9u);
@@ -735,7 +787,7 @@ TEST(BasisConstantsLibraryTests, GenerateAuxWfnCombinesSeveralSets)
 	orb.push_back_atom("H", 0.0, 0.0, 0.0, 1);
 	orb.push_back_atom("He", 0.0, 0.0, 2.0, 2);
 	std::vector<std::shared_ptr<BasisSet>> sets{ a, b };
-	const WFN aux = generate_aux_wfn(orb, sets);
+	const WFN aux = generate_aux_wfn(orb, sets, true);
 	EXPECT_EQ(a->get_name(), "a_plus_b");
 	ASSERT_EQ(aux.get_atom_basis_set_size(0), 2);
 	ASSERT_EQ(aux.get_atom_basis_set_size(1), 1);
@@ -746,6 +798,30 @@ TEST(BasisConstantsLibraryTests, GenerateAuxWfnCombinesSeveralSets)
 	EXPECT_NEAR(aux.get_atom_basis_set_entry(1, 0).get_exponent(), 0.7, 1e-15);
 	EXPECT_EQ(aux.get_atom_basis_set_entry(1, 0).get_type(), 2);
 	EXPECT_EQ(aux.get_atom_label(1), "He");
+}
+
+//the fitted density carries the charge of the density it fits: a neutral aux wavefunction leaves an
+//anion's electron count short of the fit by exactly the charge
+TEST(BasisConstantsLibraryTests, GenerateAuxWfnKeepsChargeAndMultiplicity)
+{
+	std::shared_ptr<BasisSet> set = std::make_shared<BasisSet>();
+	set->set_name("a");
+	set->set_count_for_element(0, 1);
+	set->add_owned_primitive({ 0, 0, 2.0, 0.3, 0 });
+
+	WFN orb(e_origin::NOT_YET_DEFINED);
+	orb.push_back_atom("H", 0.0, 0.0, 0.0, 1);
+	orb.set_charge(-2);
+	orb.set_multi(3);
+	std::vector<std::shared_ptr<BasisSet>> sets{ set };
+	//no orbitals: the stored charge is all there is
+	EXPECT_EQ(generate_aux_wfn(orb, sets).get_charge(), -2);
+	EXPECT_EQ(generate_aux_wfn(orb, sets).get_multi(), 3u);
+
+	//with orbitals the occupations win: files that leave the charge at 0 are the common case
+	orb.push_back_MO(1, 2.0, -0.5);
+	orb.set_charge(0);
+	EXPECT_EQ(generate_aux_wfn(orb, sets).get_charge(), -1);
 }
 
 //the tonto-style turbomole fixture shipped with the NiP3 test: every atom of an element gets the

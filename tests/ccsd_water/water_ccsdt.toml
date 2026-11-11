@@ -1,0 +1,9 @@
+threads = 2
+
+[scf]
+input = "water.xyz"
+method = "ccsd(t)"
+basis = "cc-pvdz"
+multiplicity = 1
+spherical = true
+ccsd_frozen_core = 0

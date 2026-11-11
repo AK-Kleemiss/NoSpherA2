@@ -2,9 +2,8 @@
 #include <cmath>
 #include "spherical_harmonic.h"
 
-//The fitted density at one point from a flattened auxiliary basis. One text for the CPU loop
-//in SALTED_utilities.cpp and the kernel in aux_density_gpu.cu, so the two cannot drift; only
-//spherical_harmonic.h is included so the .cu stays parseable by nvcc and hipcc.
+//Fitted density at one point from a flattened auxiliary basis, one text for the CPU loop and
+//aux_density_gpu.cu so they cannot drift; include nothing nvcc or hipcc cannot parse.
 namespace aux_density
 {
 	//Value with its three derivatives, so constants::spherical_harmonic differentiates itself:
@@ -24,10 +23,11 @@ namespace aux_density
 	//diffuse primitive is below 1e-20 and their shell range; shells carry l, the primitive range
 	//and the offset of their 2l+1 coefficients; primitives the exponent and the normalised
 	//contraction coefficient. The 1e-10 radial cutoff is the one calc_aux_density always had.
+	//sh_r2 (optional, see aux_density_table::sh_r2) skips a shell before its exponentials where that cutoff is certain
 	AUX_HD inline double at(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs)
+		const double* pr_exp, const double* pr_norm, const double* coefs, const double* sh_r2 = nullptr)
 	{
 		double dens = 0.0;
 		for (int a = 0; a < n_at; a++) {
@@ -35,6 +35,7 @@ namespace aux_density
 			if (r2 > r2_max[a]) continue;
 			const double r = sqrt(r2), ux = dx / r, uy = dy / r, uz = dz / r;
 			for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+				if (sh_r2 && r2 > sh_r2[s]) continue;
 				double radial = 0.0, rl = 1.0;
 				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) radial += exp(-pr_exp[p] * r2) * pr_norm[p];
 				for (int i = 0; i < sh_l[s]; i++) rl *= r;
@@ -53,7 +54,7 @@ namespace aux_density
 	AUX_HD inline double at_deriv(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap, const double* sh_r2 = nullptr)
 	{
 		double dens = 0.0;
 		gx = gy = gz = lap = 0.0;
@@ -65,6 +66,7 @@ namespace aux_density
 			if (r2 < NUCLEUS_R2) dx = NUCLEUS_R, r2 = NUCLEUS_R2;
 			const double r = sqrt(r2), ux = dx / r, uy = dy / r, uz = dz / r;
 			for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+				if (sh_r2 && r2 > sh_r2[s]) continue;
 				const int l = sh_l[s];
 				double radial = 0.0, dradial = 0.0, ddradial = 0.0, rl = 1.0;
 				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
@@ -89,17 +91,17 @@ namespace aux_density
 	AUX_HD inline double at_grad(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, const double* sh_r2 = nullptr)
 	{
 		double lap;
-		return at_deriv<false>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap);
+		return at_deriv<false>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap, sh_r2);
 	}
 	AUX_HD inline double at_lap(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap, const double* sh_r2 = nullptr)
 	{
-		return at_deriv<true>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap);
+		return at_deriv<true>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap, sh_r2);
 	}
 	//Value, gradient and the six upper-triangle second derivatives (xx xy xz yy yz zz), so the harmonic differentiates
 	//itself twice through u(d) = d / r
@@ -137,7 +139,7 @@ namespace aux_density
 	AUX_HD inline double at_hess(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double* H)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double* H, const double* sh_r2 = nullptr)
 	{
 		double dens = 0.0, grad[3] = { 0.0, 0.0, 0.0 };
 		for (int i = 0; i < 9; i++) H[i] = 0.0;
@@ -155,6 +157,7 @@ namespace aux_density
 						hu[i].h[n] = (3 * u[i] * u[j] * u[k] - (i == j ? u[k] : 0.0) - (i == k ? u[j] : 0.0) - (j == k ? u[i] : 0.0)) / r2;
 			}
 			for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+				if (sh_r2 && r2 > sh_r2[s]) continue;
 				const int l = sh_l[s];
 				double R = 0.0, Ra = 0.0, Raa = 0.0, rl = 1.0;
 				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
@@ -207,20 +210,21 @@ namespace aux_density
 		return 0.5 * rho * pow(24.0 / (rho * alpha * 0.3 * kf2 * rho), 0.375);
 	}
 	//gamma(l+3/2, x) / x^(l+3/2), the lower incomplete gamma without its leading power so the
-	//potential below has no r^-(l+1) to cancel: the series below a+1, the erf recurrence above
-	AUX_HD inline double lower_gamma_scaled(const int l, const double x)
+	//potential below has no r^-(l+1) to cancel: the series below a+1, the erf recurrence above.
+	//ex = exp(-x), passed in by a caller that needs it too; where it is 0 (x > 745) erf(sqrt(x)) is exactly 1
+	AUX_HD inline double lower_gamma_scaled(const int l, const double x, const double ex)
 	{
 		const double a = l + 1.5;
 		if (x < a + 1.0) {
 			double term = 1.0 / a, sum = term;
 			for (int k = 1; k < 500 && term > sum * 1E-17; k++) term *= x / (a + k), sum += term;
-			return exp(-x) * sum;
+			return ex * sum;
 		}
-		const double ex = exp(-x);
-		double g = 1.7724538509055160273 * erf(sqrt(x)), xa = sqrt(x), aa = 0.5;
+		double g = 1.7724538509055160273 * (ex == 0.0 ? 1.0 : erf(sqrt(x))), xa = sqrt(x), aa = 0.5;
 		for (int i = 0; i <= l; i++) g = aa * g - xa * ex, xa *= x, aa += 1.0;
 		return g / xa;
 	}
+	AUX_HD inline double lower_gamma_scaled(const int l, const double x) { return lower_gamma_scaled(l, x, exp(-x)); }
 	//Electrostatic potential of the fitted density plus the nuclei at (x, y, z), in Hartree/e like
 	//WFN::computeESP. Each shell n exp(-a r^2) r^l Y(u) has the closed-form potential
 	//4 pi / (2l+1) Y(u) sum_p n_p [ r^(l+2) G(l+3/2, a_p r^2) / 2 + r^l exp(-a_p r^2) / (2 a_p) ]
@@ -240,8 +244,11 @@ namespace aux_density
 				double rl = 1.0;
 				for (int i = 0; i < l; i++) rl *= r;
 				double radial = 0.0;
-				for (int p = pr_start[s]; p < pr_start[s + 1]; p++)
-					radial += pr_norm[p] * (0.5 * rl * r2 * lower_gamma_scaled(l, pr_exp[p] * r2) + 0.5 * rl * exp(-pr_exp[p] * r2) / pr_exp[p]);
+				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
+					//one exp for both terms; beyond x = 746 it underflows to 0 in any libm, so it is not called there
+					const double xp = pr_exp[p] * r2, ex = xp > 746.0 ? 0.0 : exp(-xp);
+					radial += pr_norm[p] * (0.5 * rl * r2 * lower_gamma_scaled(l, xp, ex) + 0.5 * rl * ex / pr_exp[p]);
+				}
 				esp -= 4.0 * constants::PI / (2 * l + 1) * radial * constants::spherical_harmonic(l, ux, uy, uz, coefs + coef_off[s]);
 			}
 		}

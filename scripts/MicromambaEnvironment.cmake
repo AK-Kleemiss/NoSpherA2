@@ -163,6 +163,11 @@ function(setup_micromamba_environment)
         "${CMAKE_HOST_SYSTEM_PROCESSOR}"
         host_processor
     )
+    # Unset in script mode (cmake -P), which made a Windows ARM64 host fetch win-64 packages
+    if(host_processor STREQUAL "")
+        cmake_host_system_information(RESULT host_processor QUERY OS_PLATFORM)
+        string(TOLOWER "${host_processor}" host_processor)
+    endif()
 
     if(WIN32)
         if(host_processor MATCHES "^(arm64|aarch64)$")
@@ -416,10 +421,25 @@ function(setup_micromamba_environment)
             )
         else()
             set(micromamba_operation "create")
+            # A failed create leaves only .mambarc behind, and every later create then refuses
+            # with "Non-conda folder exists at prefix"; clear exactly that leftover, nothing else
+            file(GLOB _prefix_left LIST_DIRECTORIES true "${environment_prefix}/*")
+            list(REMOVE_ITEM _prefix_left "${environment_prefix}/.mambarc")
+            if(EXISTS "${environment_prefix}/.mambarc" AND NOT _prefix_left)
+                file(REMOVE_RECURSE "${environment_prefix}")
+            endif()
             message(STATUS
                 "Creating micromamba environment: "
                 "${environment_prefix}"
             )
+        endif()
+
+        # A win-arm64 env made on an x64 host holds an ARM64 python.exe that cannot run here, and
+        # the .pyc compile step waits on it forever
+        set(_micromamba_extra_args)
+        if(micromamba_environment_platform STREQUAL "win-arm64"
+           AND micromamba_executable_platform STREQUAL "win-64")
+            set(_micromamba_extra_args --no-pyc)
         endif()
 
         execute_process(
@@ -432,6 +452,7 @@ function(setup_micromamba_environment)
                 --platform "${micromamba_environment_platform}"
                 --prefix "${environment_prefix}"
                 --file "${environment_file}"
+                ${_micromamba_extra_args}
             RESULT_VARIABLE environment_result
             OUTPUT_VARIABLE environment_output
             ERROR_VARIABLE environment_error

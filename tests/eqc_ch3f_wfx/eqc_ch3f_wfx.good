@@ -1,0 +1,47 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+
+================================================================================
+  EQC energy decomposition analysis
+================================================================================
+  Wavefunction : parent.wfx
+  Full run log : NoSpherA2.log (this file repeats the result sections of it)
+
+  References for this analysis:
+    [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282, DOI 10.1021/jacs.5b05600
+    [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731, DOI 10.1021/jacs.5b12434
+    [EQC] Rahm, Zeng & Hoffmann, J. Am. Chem. Soc. 141 (2019) 342, DOI 10.1021/jacs.8b10246
+EQC analysis, Mode 2: parent and fragments read from files
+
+Mode 2 (external wavefunctions): every term read from its file, no SCF run
+
+Terms per wavefunction (eV; Eee = Vnn - (E - nX))
+                n                 E                nX               Vnn               Eee   iter   cold  source
+parent         18      -3795.519079      -2128.813069       1016.761674       2683.467684      -      -  parent.wfx
+fragment 1      8      -1070.643189       -725.817275        261.977828        606.803742      -      -  ch3p.wfx
+fragment 2     10      -2710.119451      -1323.482732          0.000000       1386.636719      -      -  fm.wfx
+
+Fragments -> parent, products minus reactants (eV), as X-analysis -m 2 prints it
+  Delta E              -14.756440
+  Delta(nX-bar)        -79.513063
+  Delta(Vnn-Eee)        64.756623
+  Delta(E/n)            -0.819802
+  Delta(X-bar)          -4.417392
+  Delta(Vnn/n)          41.932436
+  Delta(Eee/n)          38.334846
+  Delta(Vnn-Eee)/n       3.597590
+  Q                      9.776727
+  Delta|Eee/E| (%)      17.975058
+  Covalency (%)         55.114186
+  Ionicity (%)          44.885814
+
+================================================================================
+  End of eqc results
+================================================================================

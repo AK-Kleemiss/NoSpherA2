@@ -7,141 +7,104 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Calculating for 118400 Gridpoints.
-Calcualting spherical Rho... ...done!
-Calculating for 118400 Gridpoints.
-Calcualting Rho... ...done!
-Calcualting spherical Rho... ...done!
-Calcualting Hirshfeld density for atom: 0
-..done!
-Calcualting Hirshfeld density for atom: 1
-..done!
-Calcualting Hirshfeld density for atom: 2
-..done!
-Calcualting Hirshfeld density for atom: 3
-..done!
-...done!
- atom   |    charge    | dipole moment x,        y,         z
-===================================================
-  0 (C) | 4.275101e-01 |  -5.551115e-16,   1.676987e-15,  -2.706434e-01
-  1 (C) | 4.275101e-01 |  -4.884981e-15,   1.569034e-16,   2.706433e-01
-  2 (H) |-1.164363e-01 |   9.992007e-16,   3.403371e-16,   1.411023e-01
-  3 (H) |-1.164364e-01 |  -1.235123e-15,  -4.710975e-17,  -1.411026e-01
-Calculating for 118400 Gridpoints.
-Calcualting Rho... ...done!
-Calcualting spherical Rho... ...done!
-Calcualting Hirshfeld density for atom: 0
-..done!
-Calcualting Hirshfeld density for atom: 1
-..done!
-Calcualting Hirshfeld density for atom: 2
-..done!
-Calcualting Hirshfeld density for atom: 3
-..done!
-...done!
- atom   |    charge    | dipole moment x,        y,         z
-===================================================
-  0 (C) | 4.274010e-01 |   2.647845e-02,   7.153100e-16,  -2.706087e-01
-  1 (C) | 4.274010e-01 |   2.647845e-02,  -2.351181e-16,   2.706086e-01
-  2 (H) |-1.164690e-01 |   4.530154e-03,   1.635093e-16,   1.411109e-01
-  3 (H) |-1.164690e-01 |   4.530154e-03,  -3.027842e-16,  -1.411113e-01
-Calculating for 118400 Gridpoints.
-Calcualting Rho... ...done!
-Calcualting spherical Rho... ...done!
-Calcualting Hirshfeld density for atom: 0
-..done!
-Calcualting Hirshfeld density for atom: 1
-..done!
-Calcualting Hirshfeld density for atom: 2
-..done!
-Calcualting Hirshfeld density for atom: 3
-..done!
-...done!
- atom   |    charge    | dipole moment x,        y,         z
-===================================================
-  0 (C) | 4.274010e-01 |  -2.647845e-02,   2.438328e-16,  -2.706087e-01
-  1 (C) | 4.274010e-01 |  -2.647845e-02,  -5.829422e-16,   2.706086e-01
-  2 (H) |-1.164690e-01 |  -4.530154e-03,   9.565026e-17,   1.411109e-01
-  3 (H) |-1.164690e-01 |  -4.530154e-03,  -2.275680e-16,  -1.411113e-01
-Calculating for 118400 Gridpoints.
-Calcualting Rho... ...done!
-Calcualting spherical Rho... ...done!
-Calcualting Hirshfeld density for atom: 0
-..done!
-Calcualting Hirshfeld density for atom: 1
-..done!
-Calcualting Hirshfeld density for atom: 2
-..done!
-Calcualting Hirshfeld density for atom: 3
-..done!
-...done!
- atom   |    charge    | dipole moment x,        y,         z
-===================================================
-  0 (C) | 4.274010e-01 |   8.104628e-15,   2.647845e-02,  -2.706087e-01
-  1 (C) | 4.274010e-01 |   8.548717e-15,   2.647845e-02,   2.706086e-01
-  2 (H) |-1.164690e-01 |   1.387779e-16,   4.530154e-03,   1.411109e-01
-  3 (H) |-1.164690e-01 |  -1.264613e-15,   4.530154e-03,  -1.411113e-01
-Calculating for 118400 Gridpoints.
-Calcualting Rho... ...done!
-Calcualting spherical Rho... ...done!
-Calcualting Hirshfeld density for atom: 0
-..done!
-Calcualting Hirshfeld density for atom: 1
-..done!
-Calcualting Hirshfeld density for atom: 2
-..done!
-Calcualting Hirshfeld density for atom: 3
-..done!
-...done!
- atom   |    charge    | dipole moment x,        y,         z
-===================================================
-  0 (C) | 4.274010e-01 |  -1.443290e-15,  -2.647845e-02,  -2.706087e-01
-  1 (C) | 4.274010e-01 |  -1.154632e-14,  -2.647845e-02,   2.706086e-01
-  2 (H) |-1.164690e-01 |   4.163336e-16,  -4.530154e-03,   1.411109e-01
-  3 (H) |-1.164690e-01 |  -2.192690e-15,  -4.530154e-03,  -1.411113e-01
-Calculating for 118400 Gridpoints.
-Calcualting Rho... ...done!
-Calcualting spherical Rho... ...done!
-Calcualting Hirshfeld density for atom: 0
-..done!
-Calcualting Hirshfeld density for atom: 1
-..done!
-Calcualting Hirshfeld density for atom: 2
-..done!
-Calcualting Hirshfeld density for atom: 3
-..done!
-...done!
- atom   |    charge    | dipole moment x,        y,         z
-===================================================
-  0 (C) | 4.437192e-01 |   1.110223e-16,   1.594925e-15,  -2.550825e-01
-  1 (C) | 4.109574e-01 |  -2.775558e-15,  -2.957137e-16,   2.857259e-01
-  2 (H) |-1.265501e-01 |   6.800116e-16,   4.019482e-16,   1.464672e-01
-  3 (H) |-1.062175e-01 |  -1.956768e-15,  -9.281745e-17,  -1.354445e-01
-Calculating for 118400 Gridpoints.
-Calcualting Rho... ...done!
-Calcualting spherical Rho... ...done!
-Calcualting Hirshfeld density for atom: 0
-..done!
-Calcualting Hirshfeld density for atom: 1
-..done!
-Calcualting Hirshfeld density for atom: 2
-..done!
-Calcualting Hirshfeld density for atom: 3
-..done!
-...done!
- atom   |    charge    | dipole moment x,        y,         z
-===================================================
-  0 (C) | 4.109574e-01 |   4.447831e-15,   1.486712e-15,  -2.857261e-01
-  1 (C) | 4.437193e-01 |  -8.548717e-15,  -8.054549e-16,   2.550824e-01
-  2 (H) |-1.062174e-01 |   3.275158e-15,   5.958011e-16,   1.354441e-01
-  3 (H) |-1.265502e-01 |  -1.554312e-15,  -9.788779e-17,  -1.464675e-01
-Polarizabilities:
- atom   |    charge    |       xx,            xy,            xz,            yx,            yy,            yz,            zx,            zy,            zz
-========|==============|=======================================================================================================================================
-  0 (C) | 4.275101e-01 |  5.295691e+00,  9.547918e-13, -4.336809e-13,  4.714772e-14,  5.295691e+00,  1.082129e-14, -1.094736e-08, -4.547857e-09,  3.064353e+00
-  1 (C) | 4.275101e-01 |  5.295691e+00,  2.009504e-12,  5.773160e-13,  3.478242e-14,  5.295691e+00,  5.097412e-14,  1.157757e-09,  2.255390e-09,  3.064353e+00
-  2 (H) |-1.164363e-01 |  9.060308e-01, -2.775558e-14, -2.595146e-13,  6.785901e-15,  9.060308e-01, -1.938530e-14,  1.445910e-09,  1.630224e-10,  1.102310e+00
-  3 (H) |-1.164364e-01 |  9.060308e-01,  9.280771e-14, -4.024558e-14, -7.521621e-15,  9.060308e-01,  5.070339e-16, -4.270376e-09, -3.546219e-10,  1.102303e+00
+Partitioning field 1 of 6...
+Partitioning field 2 of 6...
+Partitioning field 3 of 6...
+Partitioning field 4 of 6...
+Partitioning field 5 of 6...
+Partitioning field 6 of 6...
+
+Atomic polarizabilities in a.u. (bohr^3) from fields of 0.005 a.u. (field sign of the input reversed)
+alpha = alpha_p + alpha_c: alpha_p from the atom's own dipole, alpha_c from Keith's charge translation through the
+bonds (bond charges weighted 1/rho at the bond point, as in PolaBer); tensors symmetrized.
+frozen: partition weights and bond points of the zero-field density; moving: rebuilt for every field.
+
+Bond graph (zero field): atoms, distance of the bond point from the first atom (bohr), rho there (a.u.)
+    C1    C2    1.1303    0.4242
+    C1    H4    1.3058    0.2963
+    C2    H3    1.3058    0.2963
+
+Becke, frozen boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.1229   6.8633   6.8633  12.1190  -0.0000  -0.0000  -0.0000   8.6152   5.1680   3.4472
+    C2  -0.1229   6.8634   6.8634  12.1191  -0.0000   0.0000  -0.0000   8.6153   5.1681   3.4472
+    H3   0.1227   1.0265   1.0265   3.4692  -0.0000   0.0000  -0.0000   1.8407   1.2617   0.5790
+    H4   0.1227   1.0265   1.0265   3.4692  -0.0000  -0.0000   0.0000   1.8408   1.2617   0.5790
+   sum   0.0000  15.7796  15.7796  31.1765  -0.0000  -0.0000  -0.0000  20.9119  12.8596   8.0524
+
+TFVC, frozen boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.0726   6.7369   6.7369  12.0049  -0.0000  -0.0000  -0.0000   8.4929   4.8984   3.5945
+    C2  -0.0726   6.7369   6.7369  12.0049  -0.0000   0.0000  -0.0000   8.4929   4.8984   3.5945
+    H3   0.0724   1.1532   1.1532   3.5843  -0.0000   0.0000  -0.0000   1.9635   1.3524   0.6112
+    H4   0.0724   1.1532   1.1532   3.5843  -0.0000  -0.0000   0.0000   1.9635   1.3524   0.6112
+   sum   0.0000  15.7801  15.7801  31.1784  -0.0000  -0.0000  -0.0000  20.9128  12.5016   8.4112
+
+Hirshfeld, frozen boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.1117   6.8583   6.8583  12.8814  -0.0000  -0.0000  -0.0000   8.8660   5.8078   3.0582
+    C2  -0.1117   6.8583   6.8583  12.8814  -0.0000  -0.0000  -0.0000   8.8660   5.8078   3.0582
+    H3   0.1119   1.0258   1.0258   2.6992  -0.0000   0.0000  -0.0000   1.5836   1.0902   0.4934
+    H4   0.1119   1.0258   1.0258   2.6992  -0.0000  -0.0000   0.0000   1.5836   1.0902   0.4934
+   sum   0.0000  15.7682  15.7682  31.1612  -0.0000  -0.0000  -0.0000  20.8992  13.7959   7.1033
+
+MBIS, frozen boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.2476   7.3132   7.3132  13.4616  -0.0000  -0.0000  -0.0000   9.3626   6.5543   2.8083
+    C2  -0.2476   7.3132   7.3132  13.4616  -0.0000   0.0000  -0.0000   9.3626   6.5543   2.8083
+    H3   0.2467   0.5709   0.5709   2.1212  -0.0000   0.0000  -0.0000   1.0877   0.7107   0.3770
+    H4   0.2467   0.5709   0.5709   2.1212  -0.0000  -0.0000   0.0000   1.0877   0.7107   0.3770
+   sum   0.0000  15.7682  15.7682  31.1656  -0.0000  -0.0000  -0.0000  20.9006  14.5300   6.3706
+
+EMBIS, frozen boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.4686   7.5827   7.5827  14.3734  -0.0000  -0.0000  -0.0000   9.8462   7.5129   2.3334
+    C2  -0.4686   7.5827   7.5827  14.3733  -0.0000  -0.0000  -0.0000   9.8462   7.5129   2.3334
+    H3   0.4672   0.3013   0.3013   1.2072  -0.0000   0.0000  -0.0000   0.6033   0.3665   0.2368
+    H4   0.4672   0.3013   0.3013   1.2072  -0.0000  -0.0000   0.0000   0.6033   0.3665   0.2368
+   sum   0.0000  15.7680  15.7680  31.1611  -0.0000  -0.0000  -0.0000  20.8990  15.7587   5.1403
+
+Becke, moving boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.1229   6.8633   6.8633  12.3168  -0.0000  -0.0000  -0.0000   8.6811   5.1680   3.5131
+    C2  -0.1229   6.8634   6.8634  12.3169  -0.0000   0.0000  -0.0000   8.6812   5.1681   3.5131
+    H3   0.1227   1.0265   1.0265   3.2714  -0.0000   0.0000  -0.0000   1.7748   1.2617   0.5131
+    H4   0.1227   1.0265   1.0265   3.2714  -0.0000  -0.0000   0.0000   1.7748   1.2617   0.5131
+   sum   0.0000  15.7796  15.7796  31.1765  -0.0000  -0.0000  -0.0000  20.9119  12.8596   8.0524
+
+TFVC, moving boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.0726   6.7370   6.7370  11.7033  -0.0000  -0.0000  -0.0000   8.3924   5.7516   2.6408
+    C2  -0.0726   6.7370   6.7370  11.7033  -0.0000   0.0000  -0.0000   8.3925   5.7516   2.6408
+    H3   0.0724   1.1530   1.1530   3.8628  -0.0000   0.0000  -0.0000   2.0563   0.9191   1.1371
+    H4   0.0724   1.1530   1.1530   3.8628  -0.0000  -0.0000   0.0000   2.0563   0.9192   1.1371
+   sum   0.0000  15.7801  15.7801  31.1322  -0.0000  -0.0000  -0.0000  20.8974  13.3416   7.5559
+
+Hirshfeld, moving boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.1117   6.8583   6.8583  13.0616  -0.0000  -0.0000  -0.0000   8.9261   5.8078   3.1183
+    C2  -0.1117   6.8583   6.8583  13.0616  -0.0000  -0.0000  -0.0000   8.9261   5.8078   3.1183
+    H3   0.1119   1.0258   1.0258   2.5191  -0.0000   0.0000  -0.0000   1.5235   1.0902   0.4334
+    H4   0.1119   1.0258   1.0258   2.5191  -0.0000  -0.0000   0.0000   1.5235   1.0902   0.4334
+   sum   0.0000  15.7682  15.7682  31.1612  -0.0000  -0.0000  -0.0000  20.8992  13.7959   7.1033
+
+MBIS, moving boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.2476   7.3134   7.3134  14.1305  -0.0000  -0.0000  -0.0000   9.5858   4.6241   4.9617
+    C2  -0.2476   7.3134   7.3134  14.1305  -0.0000  -0.0000  -0.0000   9.5858   4.6241   4.9617
+    H3   0.2467   0.5706   0.5706   1.4462  -0.0000   0.0000  -0.0000   0.8625   0.5286   0.3339
+    H4   0.2467   0.5706   0.5706   1.4462  -0.0000  -0.0000   0.0000   0.8625   0.5286   0.3339
+   sum   0.0000  15.7682  15.7682  31.1534  -0.0000  -0.0000  -0.0000  20.8966  10.3054  10.5912
+
+EMBIS, moving boundary
+  atom       Q        xx       yy       zz       xy       xz       yz      iso    iso_p    iso_c
+    C1  -0.4686   7.6123   7.6123  14.8268  -0.0000  -0.0000  -0.0000  10.0171   4.8307   5.1865
+    C2  -0.4686   7.6123   7.6123  14.8267  -0.0000  -0.0000  -0.0000  10.0171   4.8307   5.1865
+    H3   0.4672   0.2716   0.2716   0.7462  -0.0000   0.0000  -0.0000   0.4298   0.2172   0.2126
+    H4   0.4672   0.2716   0.2716   0.7462  -0.0000  -0.0000   0.0000   0.4298   0.2172   0.2126
+   sum   0.0000  15.7679  15.7679  31.1459  -0.0000  -0.0000  -0.0000  20.8939  10.0958  10.7981
+
+Table for plotting: polarizabilities.dat
 
 
 Properties calculation done!

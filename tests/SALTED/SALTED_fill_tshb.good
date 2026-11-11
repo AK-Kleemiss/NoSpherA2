@@ -1,0 +1,95 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                  "Co110.xyz" done!
+Number of atoms in Wavefunction file: 49 Number of MOs: 0
+WARNING: Not all species in the structure are known to the model. The following species are not known: Co F F F F F F 
+I will fill out these atoms using spherical Thakkar densities!
+Using "model.salted" for the prediction
+Reading:                                  "Co110.cif" done!
+Generating hkl indices up to d=:              0.80... done!
+Nr of reflections generated:                  4407
+Number of symmetry operations:                   1
+Nr of reflections to be used:                 4407
+
+Generating densities... 
+[SALTED] Grisafi, Lewis, Rossi & Ceriotti, J. Chem. Theory Comput. 19 (2023) 4451, DOI 10.1021/acs.jctc.2c00850
+Descriptor sets identical: sharing one copy
+[              Calculating descriptors for l = 0              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 1              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 2              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 3              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 4              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 5              ]
+[#############################################################] 100% 
+                                           ... done!
+Table of Charges in electrons
+       Atom      ML
+       S21    -0.553
+       O21    -0.673
+       O22    -0.651
+       N21    -0.989
+       N22    -0.737
+       C21     0.258
+       C22     0.225
+      H22A     0.070
+      H22B     0.066
+       C23     0.229
+       C24     0.310
+       H24     0.002
+       C25     0.298
+       H25     0.000
+       C26     0.302
+       H26     0.007
+       C27     0.248
+       C28     0.224
+      H28A     0.106
+      H28B     0.086
+      H28C     0.086
+       S11    -0.553
+       O11    -0.676
+       O12    -0.651
+       N11    -0.982
+       N12    -0.745
+       C11     0.261
+       C12     0.214
+      H12A     0.060
+      H12B     0.089
+       C13     0.226
+       C14     0.309
+       H14     0.003
+       C15     0.299
+       H15     0.000
+       C16     0.302
+       H16     0.007
+       C17     0.245
+       C18     0.228
+      H18A     0.087
+      H18C     0.087
+      H18B     0.082
+Total number of analytical Electrons: 206.1937
+42 atom(s) go into the .tshb, no table
+                                          ... done!
+Performing the remaining calculation of spherical atoms...
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[IAM] Kleemiss, Peyerimhoff & Bodensteiner, J. Appl. Cryst. 57 (2024) 161, DOI 10.1107/S1600576723010981
+[IAM] Koga, Tatewaki & Thakkar, Phys. Rev. A 47 (1993) 4510, DOI 10.1103/PhysRevA.47.4510
+Number of protons: 285
+Number of electrons: 0.0000
+Reading:                                  "Co110.cif" done!
+Spherical fill: 7 of 7 atom(s) given a fractional charge (-0.2056 to 0.6344).
+Spherical fill: 7 atom(s) go into the .tshb as Slater records
+Wrote experimental.tshb: 49 atom(s), 7 of them spherical
+Writing tsc file...  ... done!
+  (no table: experimental.tshb holds the fitted densities)

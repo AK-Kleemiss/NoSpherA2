@@ -1,26 +1,24 @@
-//XCW SCF driver and I tensor storage: run_XCW_fitting on the P1 fixture through the
-//settings file, observed through XCW.log, stdout and the files a run leaves behind, plus
-//the i_tensor_file container on its own.
+//XCW SCF driver: XCW_wrapper::run on the P1 fixture through the settings file, observed through
+//SCF.log, stdout and the files a run leaves behind.
 //
-//Every run uses the sto-3g basis of tests/P1_test at a single lambda on every 8th
-//reflection of P1_test.hkl (402 of 3215). The I tensor costs reflections x grid points and
-//was 10 of the 11 s of a full-hkl run; an SCF iteration is 9 ms. The GooF values of the
-//subset are nobody's golden, so the runs check determinism (two runs, one answer), physical
-//sanity (finite, bounded, descending) and the one number the subset cannot move: at lambda
-//= 0 the perturbation is zero and the converged energy is the Hartree-Fock energy of
-//P1_test_XCW.good, -1961.923538820 Eh. The last test builds the tensor for H2 in a cubic
-//cell and compares every element with the analytic Fourier transform of the Gaussians.
+//Every run uses the sto-3g basis of tests/P1_test at a single lambda on every 8th reflection of
+//P1_test.hkl (402 of 3215). The GooF values of the subset are nobody's golden, so the runs check
+//determinism (two runs, one answer), physical sanity (finite, bounded, descending) and the one
+//number the subset cannot move: at lambda = 0 the perturbation is zero and the converged energy is
+//the Hartree-Fock energy of P1_test_XCW.good, -1961.925585145 Eh. One test sets up the grid for H2
+//in a cubic cell and compares its structure factors with the analytic Fourier transform of the
+//Gaussians.
 #include "pch.h"
 #include <gtest/gtest.h>
 
 #include "core/convenience.h"
-#include "core/XCW.h"
-#include "core/i_tensor_stream.h"
+#include "core/XCW_wrapper.h"
+#include "core/basis_set.h"
 #include "core/tsc_block.h"
+#include "core/tuning.h"
 
 #include <cmath>
 #include <complex>
-#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -42,7 +40,7 @@ namespace {
 	std::filesystem::path p1_fixture()
 	{
 		const auto fixture = nos_test_repo_root() / "tests" / "P1_test";
-		if (!std::filesystem::exists(fixture / "P1_test_NA2.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
+		if (!std::filesystem::exists(fixture / "P1_test.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
 			return {};
 		}
 		return fixture;
@@ -101,8 +99,8 @@ namespace {
 	}
 
 	struct p1_run {
-		std::string out;    //what run_XCW_fitting and the constructor printed
-		std::string log;    //XCW.log
+		std::string out;    //what the constructors and XCW_wrapper::run printed
+		std::string log;    //SCF.log
 		int nr = 0;         //reflections in the hkl file the run was given
 	};
 
@@ -126,10 +124,10 @@ namespace {
 		return n;
 	}
 
-	//One XCW run in dir on cif and hkl with the given settings file, no GPU and no timing
-	//lines; the anomalous dispersion file is passed when it is given
-	p1_run run_xcw(const std::filesystem::path& dir, const std::filesystem::path& cif, const std::filesystem::path& hkl,
-		const std::filesystem::path& anom, const std::string& settings_text, const bool double_tensor = false, const int accuracy = 2)
+	//The options of an XCW run in dir on cif and hkl with the given settings file, no GPU and no timing
+	//lines; the anomalous dispersion comes from the CIF
+	options xcw_options(const std::filesystem::path& dir, const std::filesystem::path& cif, const std::filesystem::path& hkl,
+		const std::string& settings_text, const bool double_grid = false, const int accuracy = 2)
 	{
 		const auto settings = dir / "settings.txt";
 		std::ofstream(settings) << settings_text;
@@ -137,46 +135,72 @@ namespace {
 		opt.xcw_settings_path = settings;
 		opt.cif = std::filesystem::absolute(cif);
 		opt.hkl = std::filesystem::absolute(hkl);
-		if (!anom.empty()) {
-			opt.anom_disp_path = std::filesystem::absolute(anom);
-		}
 		opt.do_XCW = true;
 		opt.use_gpu = false;
-		opt.cpu_itensor_fp32 = !double_tensor;
+		opt.cpu_itensor_fp32 = !double_grid;
 		opt.accuracy = accuracy;
 		opt.no_date = true;
-		//As the driver does before constructing XCW: the tscb of a converged step is built
+		//As the driver does before constructing the solver: the tscb of a converged step is built
 		//from CIF disorder group 0 (NoSpherA2.cpp, do_XCW branch)
 		opt.groups[0].push_back(0);
+		return opt;
+	}
+
+	//One XCW run with xcw_options; print_F writes the F_calc table of each converged step
+	p1_run run_xcw(const std::filesystem::path& dir, const std::filesystem::path& cif, const std::filesystem::path& hkl,
+		const std::string& settings_text, const bool print_F = false)
+	{
+		options opt = xcw_options(dir, cif, hkl, settings_text);
+		opt.print_F = print_F;
 		p1_run r;
 		{
 			cwd_guard cwd(dir);
 			cout_capture capture;
+			opt.loadXCWsettings();
 			{
-				XCW x(opt);
-				x.run_XCW_fitting();
+				XCW_wrapper x(opt);
+				x.run();
 			}
 			r.out = capture.buf.str();
 		}
-		r.log = read_text(dir / "XCW.log");
+		r.log = read_text(dir / "SCF.log");
 		return r;
 	}
 
 	//The P1 fixture on the reflection subset, written into dir on the first call
-	p1_run run_on_p1(const std::filesystem::path& dir, const std::string& settings_text, const bool with_anom)
+	p1_run run_on_p1(const std::filesystem::path& dir, const std::string& settings_text, const bool print_F = false)
 	{
 		const auto fixture = p1_fixture();
 		const auto hkl = dir / "subset.hkl";
 		const int nr = write_subset_hkl(hkl);
-		p1_run r = run_xcw(dir, fixture / "P1_test_NA2.cif", hkl, with_anom ? fixture / "anom_disp.txt" : std::filesystem::path{}, settings_text);
+		p1_run r = run_xcw(dir, fixture / "P1_test.cif", hkl, settings_text, print_F);
 		r.nr = nr;
 		return r;
 	}
 
-	//One line of the lambda table run_XCW_fitting prints per converged step:
+	//The stored two-electron integrals depend on geometry and basis only. Under ctest, SharedEriBuild writes the P1
+	//molecule's into NOS_TEST_SHARED_DIR once and the runs that test the SCF rather than these read them; without that
+	//directory or file every run builds its own, with the same numbers.
+	std::filesystem::path shared_eri()
+	{
+		const char* d = std::getenv("NOS_TEST_SHARED_DIR");
+		if (d == nullptr || *d == '\0') return {};
+		return std::filesystem::path(d) / "xcw_p1_subset_eri.bin";
+	}
+
+	//A read path is one settings token, so the file is copied into dir rather than named where it lies
+	std::string read_shared_eri(const std::filesystem::path& dir)
+	{
+		const auto p = shared_eri();
+		if (p.empty() || !std::filesystem::exists(p)) return "";
+		std::filesystem::copy_file(p, dir / "shared_eri.bin", std::filesystem::copy_options::overwrite_existing);
+		return " read_eri shared_eri.bin";
+	}
+
+	//One line of the lambda table XCW_wrapper::run prints per converged step:
 	//lambda(5) criterion(4) GooF2(4) R1(5) energy(9) lambda*criterion(3) quant(9), tab separated.
-	//An XCW.log iteration row has the same seven columns behind a leading tab, with the
-	//iteration count in the first.
+	//An SCF.log iteration row has the same seven columns behind a leading tab, with the
+	//iteration count in the first and wR2 after R1.
 	struct lambda_row {
 		std::string lambda, criterion, goof2, r1, energy, penalty, quant;
 		double d(const std::string& s) const { return std::stod(s); }
@@ -188,21 +212,18 @@ namespace {
 		std::istringstream in(text);
 		std::string line;
 		while (std::getline(in, line)) {
-			if (line.empty() || (line[0] == '\t') != iterations) continue;
-			const size_t first = iterations ? 1 : 0;
-			if (line.size() <= first || !std::isdigit(static_cast<unsigned char>(line[first])) || line.find('\t', first) == std::string::npos) {
-				continue;
-			}
+			//both start with a space or a tab; a lambda carries a decimal point, an iteration count not
+			if (line.empty() || (line[0] != ' ' && line[0] != '\t') || line.find('\t') == std::string::npos) continue;
 			std::vector<std::string> fields;
 			std::istringstream cols(line);
 			std::string f;
-			while (std::getline(cols, f, '\t')) {
-				if (!f.empty()) fields.push_back(f);
-			}
-			if (fields.size() < 7) {
+			while (cols >> f) fields.push_back(f);
+			if (fields.size() < 7 || !std::isdigit(static_cast<unsigned char>(fields[0][0])) || (fields[0].find('.') == std::string::npos) == !iterations) {
 				continue;
 			}
-			rows.push_back({ fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6] });
+			//an iteration row carries wR2 between R1 and the energy
+			const size_t e = iterations && fields.size() >= 8 ? 5 : 4;
+			rows.push_back({ fields[0], fields[1], fields[2], fields[3], fields[e], fields[e + 1], fields[e + 2] });
 		}
 		return rows;
 	}
@@ -217,343 +238,47 @@ namespace {
 		return std::isfinite(v) && v > 0.0 && v < 1e3;
 	}
 
-	//P1_test_XCW.good, lambda = 0: the Hartree-Fock energy, which no reflection subset moves
-	constexpr double golden_energy = -1961.923538820;
+	//P1_test_XCW.good, lambda = 0: the Hartree-Fock energy of P1_test.cif, which no reflection subset moves
+	constexpr double golden_energy = -1961.925585145;
 	constexpr int p1_nmo = 103;
 	constexpr int p1_pairs = p1_nmo * (p1_nmo + 1) / 2;
 	constexpr int p1_atoms = 23;
 	const std::string common = "normal normal_conv params 177 basis_set sto-3g max_iter 100 charge 0 mult 1 ";
 
-	//------------------------------------------------------------------
-	//A tiny tensor for the container tests: 3 reflections, 4 of the 10 pairs of a 4-function
-	//basis, values that single precision holds exactly
-
-	constexpr int tiny_nr = 3;
-	constexpr int tiny_nmo = 4;
-	const ivec tiny_mu = { 0, 0, 1, 3 };
-	const ivec tiny_nu = { 0, 2, 3, 3 };
-	constexpr int64_t magic_compact = 0x4E4132495F544E32LL;
-	constexpr int64_t magic_full = 0x4E4132495F54454ELL;
-
-	cdouble tiny_value(const int r, const size_t i)
-	{
-		return cdouble(10.0 * r + static_cast<double>(i), -(r + 0.5 * static_cast<double>(i)));
-	}
-
-	//Written from double blocks into a file of either element type
-	void write_tiny(const std::filesystem::path& p, const bool single)
-	{
-		i_tensor_file f;
-		f.create(p, tiny_nr, tiny_nmo, tiny_mu, tiny_nu, single);
-		cvec block(tiny_mu.size());
-		//Out of order on purpose: the writer seeks by index
-		for (const int r : { 2, 0, 1 }) {
-			for (size_t i = 0; i < block.size(); i++) block[i] = tiny_value(r, i);
-			f.write_block(r, block.data());
-		}
-		f.finish_write();
-		f.close();
-	}
-
-	//A file from raw parts: header, pair lists, then payload bytes
-	void write_raw(const std::filesystem::path& p, const int64_t h[5], const ivec& mu, const ivec& nu, const size_t payload_bytes)
-	{
-		std::ofstream out(p, std::ios::binary);
-		out.write(reinterpret_cast<const char*>(h), 5 * sizeof(int64_t));
-		out.write(reinterpret_cast<const char*>(mu.data()), static_cast<std::streamsize>(mu.size() * sizeof(int)));
-		out.write(reinterpret_cast<const char*>(nu.data()), static_cast<std::streamsize>(nu.size() * sizeof(int)));
-		const std::vector<char> zeros(payload_bytes, 0);
-		out.write(zeros.data(), static_cast<std::streamsize>(zeros.size()));
-	}
-
-	std::string open_error(const std::filesystem::path& p)
-	{
-		i_tensor_file f;
-		try {
-			f.open(p, 1);
-		}
-		catch (const std::runtime_error& e) {
-			return e.what();
-		}
-		return "";
-	}
-
 } //namespace
-
-//------------------------------------------------------------------
-//i_tensor_file
-
-TEST(XcwScfTensorFileTests, SizesFollowElementType)
-{
-	EXPECT_EQ(i_tensor_file::block_bytes(4, true), 32u);
-	EXPECT_EQ(i_tensor_file::block_bytes(4, false), 64u);
-	EXPECT_EQ(i_tensor_file::total_bytes(3, 4, true), 96u);
-	EXPECT_EQ(i_tensor_file::total_bytes(3, 4, false), 192u);
-	//size_t arithmetic: 20000 reflections of 200000 pairs pass 2^31 elements
-	EXPECT_EQ(i_tensor_file::total_bytes(20000, 200000, false), 20000ull * 200000ull * 16ull);
-}
-
-TEST(XcwScfTensorFileTests, DoubleRoundTripThroughWindow)
-{
-	const auto dir = scratch_dir();
-	const auto p = dir / "tiny.bin";
-	write_tiny(p, false);
-	//header 40 B + 2*4 ints 32 B + 3 blocks of 4 cdouble 192 B
-	EXPECT_EQ(std::filesystem::file_size(p), 40u + 32u + 192u);
-
-	size_t kept = 0;
-	bool single = true;
-	EXPECT_TRUE(i_tensor_file::matches(p, tiny_nr, tiny_nmo, kept, single));
-	EXPECT_EQ(kept, 4u);
-	EXPECT_FALSE(single);
-
-	i_tensor_file f;
-	f.open(p, 2);
-	EXPECT_EQ(f.nr(), tiny_nr);
-	EXPECT_EQ(f.nmo(), tiny_nmo);
-	EXPECT_EQ(f.kept(), 4u);
-	EXPECT_FALSE(f.single());
-	EXPECT_EQ(f.window_blocks(), 2u);
-	EXPECT_EQ(f.pair_mu(), tiny_mu);
-	EXPECT_EQ(f.pair_nu(), tiny_nu);
-	EXPECT_EQ(f.path(), p);
-
-	f.load(0, 2);
-	for (int r = 0; r < 2; r++) {
-		for (size_t i = 0; i < 4; i++) {
-			EXPECT_EQ(f.block(r)[i], tiny_value(r, i)) << "r " << r << " i " << i;
-		}
-	}
-	f.load(2, 3);
-	for (size_t i = 0; i < 4; i++) {
-		EXPECT_EQ(f.block(2)[i], tiny_value(2, i)) << "i " << i;
-	}
-	//An empty range is allowed, a range past the window or the file is not
-	EXPECT_NO_THROW(f.load(1, 1));
-	EXPECT_THROW(f.load(0, 3), std::runtime_error);
-	EXPECT_THROW(f.load(-1, 0), std::runtime_error);
-	EXPECT_THROW(f.load(2, 4), std::runtime_error);
-	EXPECT_THROW(f.load(2, 1), std::runtime_error);
-	f.close();
-	std::filesystem::remove_all(dir);
-}
-
-TEST(XcwScfTensorFileTests, SingleFileNarrowsDoubleBlocks)
-{
-	const auto dir = scratch_dir();
-	const auto p = dir / "tiny32.bin";
-	write_tiny(p, true);
-	EXPECT_EQ(std::filesystem::file_size(p), 40u + 32u + 96u);
-
-	size_t kept = 0;
-	bool single = false;
-	EXPECT_TRUE(i_tensor_file::matches(p, tiny_nr, tiny_nmo, kept, single));
-	EXPECT_EQ(kept, 4u);
-	EXPECT_TRUE(single);
-
-	i_tensor_file f;
-	f.open(p, 3);
-	EXPECT_TRUE(f.single());
-	f.load(0, 3);
-	for (int r = 0; r < 3; r++) {
-		for (size_t i = 0; i < 4; i++) {
-			const cdouble v = tiny_value(r, i);
-			EXPECT_EQ(f.block32(r)[i], std::complex<float>(static_cast<float>(v.real()), static_cast<float>(v.imag()))) << "r " << r << " i " << i;
-		}
-	}
-	f.close();
-	std::filesystem::remove_all(dir);
-}
-
-TEST(XcwScfTensorFileTests, DoubleFileWidensSingleBlocks)
-{
-	const auto dir = scratch_dir();
-	const auto p = dir / "widen.bin";
-	{
-		i_tensor_file f;
-		f.create(p, tiny_nr, tiny_nmo, tiny_mu, tiny_nu, false);
-		std::vector<std::complex<float>> block(4);
-		for (int r = 0; r < tiny_nr; r++) {
-			for (size_t i = 0; i < 4; i++) {
-				const cdouble v = tiny_value(r, i);
-				block[i] = std::complex<float>(static_cast<float>(v.real()), static_cast<float>(v.imag()));
-			}
-			f.write_block(r, block.data());
-		}
-		f.finish_write();
-	}
-	i_tensor_file f;
-	f.open(p, 1);
-	EXPECT_FALSE(f.single());
-	for (int r = 0; r < tiny_nr; r++) {
-		f.load(r, r + 1);
-		for (size_t i = 0; i < 4; i++) {
-			EXPECT_EQ(f.block(r)[i], tiny_value(r, i)) << "r " << r << " i " << i;
-		}
-	}
-	f.close();
-	std::filesystem::remove_all(dir);
-}
-
-TEST(XcwScfTensorFileTests, WindowClampsToOneAndToNr)
-{
-	const auto dir = scratch_dir();
-	const auto p = dir / "window.bin";
-	write_tiny(p, false);
-	i_tensor_file f;
-	f.open(p, 0);
-	EXPECT_EQ(f.window_blocks(), 1u);
-	f.set_window(100);
-	EXPECT_EQ(f.window_blocks(), 3u);
-	EXPECT_NO_THROW(f.load(0, 3));
-	f.set_window(1);
-	EXPECT_EQ(f.window_blocks(), 1u);
-	EXPECT_THROW(f.load(0, 2), std::runtime_error);
-	f.close();
-	//close() twice and a fresh object are both fine
-	f.close();
-	std::filesystem::remove_all(dir);
-}
-
-TEST(XcwScfTensorFileTests, MatchesRefusesOtherShapesAndLayouts)
-{
-	const auto dir = scratch_dir();
-	const auto good = dir / "good.bin";
-	write_tiny(good, false);
-	size_t kept = 99;
-	bool single = true;
-	EXPECT_FALSE(i_tensor_file::matches(good, tiny_nr + 1, tiny_nmo, kept, single));
-	EXPECT_EQ(kept, 0u);
-	EXPECT_FALSE(single);
-	EXPECT_FALSE(i_tensor_file::matches(good, tiny_nr, tiny_nmo + 1, kept, single));
-	EXPECT_FALSE(i_tensor_file::matches(dir / "absent.bin", tiny_nr, tiny_nmo, kept, single));
-
-	//The previous layout, every pair in double: refused with a note on stdout
-	{
-		const int64_t h[5] = { magic_full, tiny_nr, tiny_nmo, 10, 16 };
-		write_raw(dir / "full.bin", h, ivec(10, 0), ivec(10, 0), 3 * 10 * 16);
-		cout_capture capture;
-		EXPECT_FALSE(i_tensor_file::matches(dir / "full.bin", tiny_nr, tiny_nmo, kept, single));
-		EXPECT_NE(capture.buf.str().find("stores every pair, the previous layout; it is rebuilt"), std::string::npos) << capture.buf.str();
-	}
-	//No pairs kept
-	{
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 0, 16 };
-		write_raw(dir / "empty.bin", h, {}, {}, 0);
-		EXPECT_FALSE(i_tensor_file::matches(dir / "empty.bin", tiny_nr, tiny_nmo, kept, single));
-	}
-	//An element size that is neither complex<float> nor complex<double>
-	{
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 12 };
-		write_raw(dir / "elem.bin", h, tiny_mu, tiny_nu, 3 * 4 * 12);
-		EXPECT_FALSE(i_tensor_file::matches(dir / "elem.bin", tiny_nr, tiny_nmo, kept, single));
-	}
-	//Header and pairs but one block short
-	{
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 8 };
-		write_raw(dir / "short.bin", h, tiny_mu, tiny_nu, 2 * 4 * 8);
-		EXPECT_FALSE(i_tensor_file::matches(dir / "short.bin", tiny_nr, tiny_nmo, kept, single));
-	}
-	//Shorter than the header itself
-	{
-		std::ofstream(dir / "stub.bin", std::ios::binary) << "NA2I";
-		EXPECT_FALSE(i_tensor_file::matches(dir / "stub.bin", tiny_nr, tiny_nmo, kept, single));
-	}
-	//The good file still matches after all that, and reports its shape
-	EXPECT_TRUE(i_tensor_file::matches(good, tiny_nr, tiny_nmo, kept, single));
-	EXPECT_EQ(kept, 4u);
-	EXPECT_FALSE(single);
-	std::filesystem::remove_all(dir);
-}
-
-TEST(XcwScfTensorFileTests, OpenRejectsDamagedHeaders)
-{
-	const auto dir = scratch_dir();
-
-	EXPECT_NE(open_error(dir / "absent.bin").find("cannot open"), std::string::npos);
-	{
-		const int64_t h[5] = { magic_full, tiny_nr, tiny_nmo, 4, 16 };
-		write_raw(dir / "magic.bin", h, tiny_mu, tiny_nu, 3 * 4 * 16);
-		EXPECT_NE(open_error(dir / "magic.bin").find("is not an I tensor in the compact layout"), std::string::npos);
-	}
-	{
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 12 };
-		write_raw(dir / "elem.bin", h, tiny_mu, tiny_nu, 3 * 4 * 12);
-		EXPECT_NE(open_error(dir / "elem.bin").find("has an unknown element size"), std::string::npos);
-	}
-	{
-		const int64_t h[5] = { magic_compact, 0, tiny_nmo, 4, 16 };
-		write_raw(dir / "nr0.bin", h, tiny_mu, tiny_nu, 0);
-		EXPECT_NE(open_error(dir / "nr0.bin").find("has a non-positive dimension"), std::string::npos);
-	}
-	{
-		//11 pairs of a 4-function basis: more than the 10 that exist
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 11, 16 };
-		write_raw(dir / "pairs.bin", h, ivec(11, 0), ivec(11, 0), 3 * 11 * 16);
-		const std::string msg = open_error(dir / "pairs.bin");
-		EXPECT_NE(msg.find("claims implausible dimensions"), std::string::npos) << msg;
-		EXPECT_NE(msg.find("pairs 11"), std::string::npos) << msg;
-	}
-	{
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 16 };
-		write_raw(dir / "trunc.bin", h, { 0, 0 }, {}, 0);
-		EXPECT_NE(open_error(dir / "trunc.bin").find("truncated pair list"), std::string::npos);
-	}
-	{
-		//mu > nu at entry 1
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 16 };
-		write_raw(dir / "swap.bin", h, { 0, 2, 1, 3 }, { 0, 1, 3, 3 }, 3 * 4 * 16);
-		EXPECT_NE(open_error(dir / "swap.bin").find("has a corrupt pair list at entry 1"), std::string::npos);
-	}
-	{
-		//nu past the basis at entry 2
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 16 };
-		write_raw(dir / "range.bin", h, { 0, 0, 1, 3 }, { 0, 2, 4, 3 }, 3 * 4 * 16);
-		EXPECT_NE(open_error(dir / "range.bin").find("has a corrupt pair list at entry 2"), std::string::npos);
-	}
-	{
-		//Pairs out of order at entry 3
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 16 };
-		write_raw(dir / "order.bin", h, { 0, 0, 3, 1 }, { 0, 2, 3, 3 }, 3 * 4 * 16);
-		EXPECT_NE(open_error(dir / "order.bin").find("has a corrupt pair list at entry 3"), std::string::npos);
-	}
-	{
-		//Right header, one byte too many
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 16 };
-		write_raw(dir / "long.bin", h, tiny_mu, tiny_nu, 3 * 4 * 16 + 1);
-		const std::string msg = open_error(dir / "long.bin");
-		EXPECT_NE(msg.find("is 265 bytes, but its header implies 264"), std::string::npos) << msg;
-	}
-	//A sound one opens after all the rejections and the rejected handles are closed
-	{
-		const int64_t h[5] = { magic_compact, tiny_nr, tiny_nmo, 4, 16 };
-		write_raw(dir / "sound.bin", h, tiny_mu, tiny_nu, 3 * 4 * 16);
-		EXPECT_EQ(open_error(dir / "sound.bin"), "");
-	}
-	std::filesystem::remove_all(dir);
-}
 
 //------------------------------------------------------------------
 //XCW runs on P1
 
+//The FIXTURES_SETUP of xcw_p1_eri (SetIntegrationTestLocks.cmake): one SCF iteration is enough to have the
+//stored two-electron integrals written
+TEST(XcwScfTests, SharedEriBuild)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	if (shared_eri().empty()) GTEST_SKIP() << "NOS_TEST_SHARED_DIR is not set, so every run builds its own integrals";
+	const auto dir = scratch_dir();
+	std::filesystem::create_directories(shared_eri().parent_path());
+	std::filesystem::remove(shared_eri());
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 save_eri eri.bin");
+	ASSERT_TRUE(std::filesystem::exists(dir / "eri.bin")) << run.log;
+	std::filesystem::copy_file(dir / "eri.bin", shared_eri());
+	std::filesystem::remove_all(dir);
+}
+
 //lambda = 0 is a plain Hartree-Fock: the energy of P1_test_XCW.good, the .tscb/.wfn/.fchk
-//of that step, damping and level shift switched off along the way. `save` writes the
-//tensor on a thread; a second run `read`s it instead of building and lands on the same
-//numbers.
-TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
+//of that step, damping and level shift switched off along the way; a second run lands on the
+//same numbers
+TEST(XcwScfTests, LambdaZeroIsTheHartreeFockEnergy)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin save tensor.bin";
+	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0";
 
-	const p1_run first = run_on_p1(dir, settings, true);
+	const p1_run first = run_on_p1(dir, settings + read_shared_eri(dir));
 	EXPECT_EQ(first.nr, 402);
-	EXPECT_NE(first.out.find("XCW orbital basis set: sto-3g-basis"), std::string::npos);
-	EXPECT_EQ(first.out.find("Could not open anomalous dispersion file"), std::string::npos);
-	EXPECT_EQ(first.out.find("I tensor read from"), std::string::npos);
-	EXPECT_NE(first.out.find("Writing the I tensor to tensor.bin in the background"), std::string::npos) << first.out;
-	EXPECT_NE(first.out.find("I tensor written to tensor.bin"), std::string::npos) << first.out;
-	EXPECT_NE(first.out.find("More detailed output in XCW.log file..."), std::string::npos);
+	EXPECT_NE(first.out.find("XCW orbital basis set: sto-3g"), std::string::npos);
+	EXPECT_EQ(first.out.find("I tensor"), std::string::npos) << first.out;
+	EXPECT_NE(first.out.find("More detailed output in SCF.log file..."), std::string::npos);
 	EXPECT_NE(first.out.find("Finished XCW fitting procedure."), std::string::npos);
 	//Distance screening is a property of the structure and the basis, not of the hkl
 	const int screened = static_cast<int>(number_after(first.out, "Screened out "));
@@ -581,6 +306,8 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	//The converged step's files: to_string(0.0) minus its dot, padded to seven digits
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.wfn"));
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.fchk"));
+	//the F_calc table only with -print_F
+	EXPECT_FALSE(std::filesystem::exists(dir / "NA2_0000000_Fcalc.txt"));
 	ASSERT_TRUE(std::filesystem::exists(dir / "NA2_0000000.tscb"));
 	{
 		tsc_block<int, cdouble> tscb(dir / "NA2_0000000.tscb");
@@ -594,20 +321,8 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 		}
 	}
 
-	//The saved tensor has this problem's shape and the single precision it was built in
-	size_t kept = 0;
-	bool single = false;
-	ASSERT_TRUE(i_tensor_file::matches(dir / "tensor.bin", first.nr, p1_nmo, kept, single));
-	EXPECT_EQ(kept, static_cast<size_t>(p1_pairs - screened));
-	EXPECT_TRUE(single);
-	EXPECT_EQ(std::filesystem::file_size(dir / "tensor.bin"), 40u + 2u * kept * sizeof(int) + i_tensor_file::total_bytes(first.nr, kept, true));
-
-	const p1_run second = run_on_p1(dir, settings, true);
-	EXPECT_NE(second.out.find("I tensor read from tensor.bin"), std::string::npos) << second.out;
-	EXPECT_NE(second.out.find(", single precision), not recomputed, held in memory"), std::string::npos) << second.out;
-	EXPECT_EQ(second.out.find("Screened out"), std::string::npos);
-	EXPECT_EQ(second.out.find("Writing the I tensor"), std::string::npos);
-	EXPECT_EQ(second.out.find("NOTE:"), std::string::npos);
+	const p1_run second = run_on_p1(dir, settings + read_shared_eri(dir));
+	EXPECT_EQ(static_cast<int>(number_after(second.out, "Screened out ")), screened);
 	const auto rows2 = lambda_rows(second.out);
 	ASSERT_EQ(rows2.size(), 1u) << second.out;
 	EXPECT_EQ(rows2[0].criterion, rows[0].criterion);
@@ -618,75 +333,58 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	std::filesystem::remove_all(dir);
 }
 
-//A one MB budget cannot hold the 11 MB tensor: it goes to I_tensor_stream.bin and the SCF
-//walks it a window at a time. The perturbation at lambda = 0.01 then comes from the file,
-//and the result is the in-memory one.
-TEST(XcwScfTests, StreamedTensorMatchesInMemory)
+//At lambda = 0.01 the perturbation raises the energy a little above the Hartree-Fock minimum, and the
+//target quantity is the energy plus lambda times the criterion
+TEST(XcwScfTests, LambdaPointZeroOneRaisesTheEnergy)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const std::string settings = common + "f rhf start 0.01 step_size 0.01 end 0.01";
-
-	const p1_run held = run_on_p1(dir, settings, true);
-	EXPECT_EQ(held.out.find("I tensor streamed to disk"), std::string::npos);
-	EXPECT_FALSE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
-	const auto rows = lambda_rows(held.out);
-	ASSERT_EQ(rows.size(), 1u) << held.out;
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0.01 step_size 0.01 end 0.01" + read_shared_eri(dir));
+	const auto rows = lambda_rows(run.out);
+	ASSERT_EQ(rows.size(), 1u) << run.out;
 	EXPECT_EQ(rows[0].lambda, "0.01000");
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0010000.tscb"));
 	//quant = energy + lambda * criterion; the printed penalty is that product to 3 decimals
 	EXPECT_NEAR(rows[0].d(rows[0].quant), rows[0].d(rows[0].energy) + 0.01 * rows[0].d(rows[0].criterion), 1e-3);
 	EXPECT_NEAR(rows[0].d(rows[0].penalty), 0.01 * rows[0].d(rows[0].criterion), 1e-3);
-	//The perturbation raises the energy above the Hartree-Fock minimum, by little at 0.01
 	EXPECT_GT(rows[0].d(rows[0].energy), golden_energy);
 	EXPECT_LT(rows[0].d(rows[0].energy), golden_energy + 0.5);
 	EXPECT_TRUE(physical_criterion(rows[0].criterion)) << rows[0].criterion;
 	EXPECT_TRUE(physical_criterion(rows[0].goof2)) << rows[0].goof2;
-	EXPECT_NE(held.log.find("Starting XCW SCF solver with lambda = 0.01000"), std::string::npos);
-	EXPECT_NE(held.log.find("***SCF converged in "), std::string::npos);
-	const int screened = static_cast<int>(number_after(held.out, "Screened out "));
-	EXPECT_GT(screened, 0);
-	const size_t kept = static_cast<size_t>(p1_pairs - screened);
-
-	std::filesystem::remove(dir / "NA2_0010000.tscb");
-	const p1_run streamed = run_on_p1(dir, settings + " i_tensor_mb 1", true);
-	const std::string line_key = "I tensor streamed to disk: ";
-	ASSERT_NE(streamed.out.find(line_key), std::string::npos) << streamed.out;
-	EXPECT_NE(streamed.out.find("(single precision) total, "), std::string::npos) << streamed.out;
-	EXPECT_NE(streamed.out.find("to fit i_tensor_mb (1.00 MB)"), std::string::npos) << streamed.out;
-	//The window is what one MiB holds of kept complex<float> blocks
-	const size_t window = static_cast<size_t>(number_after(streamed.out, "(single precision) total, "));
-	EXPECT_EQ(window, (1024u * 1024u) / i_tensor_file::block_bytes(kept, true));
-	EXPECT_NE(streamed.out.find(std::to_string(window) + " of " + std::to_string(held.nr) + " reflections resident"), std::string::npos) << streamed.out;
-	EXPECT_NEAR(number_after(streamed.out, line_key), i_tensor_file::total_bytes(held.nr, kept, true) / 1048576.0, 0.01);
-
-	ASSERT_TRUE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
-	size_t kept_on_disk = 0;
-	bool single = false;
-	EXPECT_TRUE(i_tensor_file::matches(dir / "I_tensor_stream.bin", held.nr, p1_nmo, kept_on_disk, single));
-	EXPECT_EQ(kept_on_disk, kept);
-	EXPECT_TRUE(single);
-
-	const auto rows2 = lambda_rows(streamed.out);
-	ASSERT_EQ(rows2.size(), 1u) << streamed.out;
-	EXPECT_EQ(rows2[0].criterion, rows[0].criterion);
-	EXPECT_EQ(rows2[0].goof2, rows[0].goof2);
-	EXPECT_NEAR(rows2[0].d(rows2[0].energy), rows[0].d(rows[0].energy), 1e-8);
-	EXPECT_NEAR(rows2[0].d(rows2[0].quant), rows[0].d(rows[0].quant), 1e-8);
-	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0010000.tscb"));
-	EXPECT_NE(streamed.log.find("***SCF converged in "), std::string::npos);
-
+	EXPECT_NE(run.log.find("Starting XCW SCF solver with lambda = 0.01000"), std::string::npos);
+	EXPECT_NE(run.log.find("***SCF converged in "), std::string::npos);
 	std::filesystem::remove_all(dir);
 }
 
 //`guess_basis`: the first lambda starts from OCC's own Hartree-Fock in that basis. With the
 //orbital basis itself as the guess basis the small SCF is the whole answer, so the log line
 //carries the golden energy and the XCW loop has nothing left to do beyond recognising it.
+TEST(XcwScfTests, OrbitalJsonOverridesMatchTheLibraryBasis)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "P1 fixture not found";
+	const auto dir = scratch_dir();
+	const auto basis = BasisSetLibrary::get_basis_set("sto-3g");
+	basis->write_occ_json(dir / "override basis.json", { 1, 6, 7, 8, 16, 17 });
+	const auto baseline = run_on_p1(dir, common + "start 0 end 0" + read_shared_eri(dir));
+	const std::string eri = read_shared_eri(dir);
+	const auto overridden = run_on_p1(dir, common + "basis_overrides \"" + (dir / "override basis.json").string() + "\" start 0 end 0" + eri);
+	const auto a = lambda_rows(baseline.out), b = lambda_rows(overridden.out);
+	ASSERT_EQ(a.size(), 1u);
+	ASSERT_EQ(b.size(), 1u);
+	EXPECT_NEAR(a[0].d(a[0].energy), b[0].d(b[0].energy), 1e-8);
+	EXPECT_NEAR(a[0].d(a[0].criterion), b[0].d(b[0].criterion), 1e-6);
+	EXPECT_NE(overridden.log.find("_overrides_override basis.json"), std::string::npos);
+	//The library basis's stored integrals are keyed on every exponent, coefficient and centre: read back, the
+	//override is that basis to the last bit
+	if (!eri.empty()) EXPECT_NE(overridden.log.find("read from shared_eri.bin"), std::string::npos) << overridden.log;
+	std::filesystem::remove_all(dir);
+}
+
 TEST(XcwScfTests, SmallBasisGuessStartsFromConvergedDensity)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 guess_basis sto-3g", true);
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 guess_basis sto-3g" + read_shared_eri(dir));
 
 	const std::string key = "XCW: initial guess from a sto-3g Hartree-Fock (";
 	ASSERT_NE(run.log.find(key), std::string::npos) << run.log;
@@ -710,25 +408,25 @@ TEST(XcwScfTests, SmallBasisGuessStartsFromConvergedDensity)
 }
 
 //A closed shell in UHF is the RHF answer; the criterion column under `f2` is GooF(F2)
-//itself. The unrestricted branches of the effective density, the level shift and the
+//squared. The unrestricted branches of the effective density, the level shift and the
 //orbital gradient all run here, and the RHF run on the same subset is the reference.
 TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f2 uhf start 0 step_size 0.01 end 0", true);
+	const p1_run run = run_on_p1(dir, common + "f2 uhf start 0 step_size 0.01 end 0" + read_shared_eri(dir));
 
 	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
 	EXPECT_EQ(occurrences(run.log, "***Turned off level shift***"), 1u);
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 1u) << run.out;
-	EXPECT_EQ(rows[0].criterion, rows[0].goof2);
+	EXPECT_NEAR(rows[0].d(rows[0].criterion), rows[0].d(rows[0].goof2) * rows[0].d(rows[0].goof2), 1e-4 * rows[0].d(rows[0].goof2) + 1e-4);
 	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
 	EXPECT_EQ(rows[0].quant, rows[0].energy);
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.tscb"));
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.fchk"));
 
-	const p1_run rhf = run_on_p1(dir, common + "f2 rhf start 0 step_size 0.01 end 0", true);
+	const p1_run rhf = run_on_p1(dir, common + "f2 rhf start 0 step_size 0.01 end 0" + read_shared_eri(dir));
 	const auto rows_rhf = lambda_rows(rhf.out);
 	ASSERT_EQ(rows_rhf.size(), 1u) << rhf.out;
 	EXPECT_EQ(rows_rhf[0].goof2, rows[0].goof2);
@@ -743,7 +441,7 @@ TEST(XcwScfTests, FastConvWeightedRunsWithoutDampingOrShift)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, "normal fast_conv params 177 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 weighted", true);
+	const p1_run run = run_on_p1(dir, "normal fast_conv params 177 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 weighted" + read_shared_eri(dir));
 
 	EXPECT_NE(run.out.find("XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion"), std::string::npos) << run.out;
 	EXPECT_NE(run.log.find("XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion"), std::string::npos);
@@ -760,17 +458,17 @@ TEST(XcwScfTests, FastConvWeightedRunsWithoutDampingOrShift)
 	std::filesystem::remove_all(dir);
 }
 
-//Five iterations at lambda = 0.01 from the core guess, twice: the same five XCW.log rows to
-//the last printed digit (the I tensor contraction, the Fock build and DIIS are all in
+//Five iterations at lambda = 0.01 from the core guess, twice: the same five SCF.log rows to
+//the last printed digit (the grid contraction, the Fock build and DIIS are all in
 //them), energies within a few Hartree of the Hartree-Fock minimum and lower at the end
 //than at the start, criteria positive. No converged result is asked for.
 TEST(XcwScfTests, FiveIterationsAreDeterministicAndPhysical)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const std::string settings = "normal normal_conv params 177 basis_set sto-3g max_iter 5 charge 0 mult 1 f rhf start 0.01 step_size 0.01 end 0.01";
+	const std::string settings = "normal normal_conv params 177 basis_set sto-3g max_iter 5 charge 0 mult 1 f rhf start 0.01 step_size 0.01 end 0.01" + read_shared_eri(dir);
 
-	const p1_run first = run_on_p1(dir, settings, true);
+	const p1_run first = run_on_p1(dir, settings);
 	const auto rows = iteration_rows(first.log);
 	ASSERT_EQ(rows.size(), 5u) << first.log;
 	EXPECT_NE(first.log.find("***SCF did not converge***"), std::string::npos);
@@ -789,7 +487,7 @@ TEST(XcwScfTests, FiveIterationsAreDeterministicAndPhysical)
 	}
 	EXPECT_LT(rows[4].d(rows[4].energy), rows[0].d(rows[0].energy));
 
-	const p1_run second = run_on_p1(dir, settings, true);
+	const p1_run second = run_on_p1(dir, settings);
 	const auto rows2 = iteration_rows(second.log);
 	ASSERT_EQ(rows2.size(), 5u) << second.log;
 	for (size_t i = 0; i < rows.size(); i++) {
@@ -808,10 +506,8 @@ TEST(XcwScfTests, MaxIterOneStopsScanWithoutTscb)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0.01", false);
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0.01" + read_shared_eri(dir));
 
-	//No anomalous dispersion file this time: said once, then carried on
-	EXPECT_EQ(occurrences(run.out, "Could not open anomalous dispersion file. Continuing without anomalous dispersions."), 1u) << run.out;
 	EXPECT_NE(run.log.find("***SCF did not converge***"), std::string::npos) << run.log;
 	EXPECT_EQ(run.log.find("***SCF converged in "), std::string::npos);
 	EXPECT_NE(run.log.find("NOT CONVERGED for perturbed energy: "), std::string::npos);
@@ -822,8 +518,8 @@ TEST(XcwScfTests, MaxIterOneStopsScanWithoutTscb)
 	EXPECT_EQ(occurrences(run.log, "CONVERGED"), 5u);
 	EXPECT_EQ(occurrences(run.log, "Starting XCW SCF solver with lambda = "), 1u);
 	EXPECT_EQ(run.log.find("Creating .tscb file"), std::string::npos);
-	EXPECT_NE(run.log.find("\t1\t\t"), std::string::npos);
-	EXPECT_EQ(run.log.find("\t2\t\t"), std::string::npos);
+	EXPECT_NE(run.log.find("\n 1\t"), std::string::npos);
+	EXPECT_EQ(run.log.find("\n 2\t"), std::string::npos);
 
 	//step 0 has no converged neighbour to halve the step towards, so the message names the
 	//iteration cap instead of a continuation step
@@ -839,15 +535,15 @@ TEST(XcwScfTests, MaxIterOneStopsScanWithoutTscb)
 }
 
 //------------------------------------------------------------------
-//The I tensor against closed-form numbers: H2 in a cubic P1 cell, STO-3G, U = 0, so
-//I_mn(h) = integral phi_m phi_n exp(i q.r) d3r with q = 2 pi/a (h k l) is a sum over the
+//The grid against closed-form numbers: H2 in a cubic P1 cell, STO-3G, U = 0, so the structure factor of
+//a density matrix with one element set is that element times
+//I_mn(h) = integral phi_m phi_n exp(i q.r) d3r with q = 2 pi/a (h k l), a sum over the
 //nine primitive pairs of the Gaussian product theorem, (pi/p)^(3/2) exp(-ab/p |A-B|^2)
 //exp(-|q|^2/(4p)) exp(i q.P), p = a + b, P = (aA + bB)/p, with the contraction normalised
-//as the basis loader does. What the grid quadrature, the Hirshfeld partition, the
-//phase and DW factors and the pair packing produce has to agree with that to the grid's
-//accuracy (5.6e-6 at accuracy 3 on FLOWOFFICE, 3.3e-4 at the default 2, both largest at
-//0 0 4), I(-h) has to be the conjugate of I(h) and no diagonal element can exceed the
-//overlap of a normalised function with itself.
+//as the basis loader does. What the grid quadrature, the Hirshfeld partition and the phase
+//and DW factors produce with the direct-sum transform has to agree with that to the grid's
+//accuracy (largest at 0 0 4), F(-h) has to be the conjugate of F(h) and no diagonal element
+//can exceed the overlap of a normalised function with itself.
 namespace {
 
 	struct h2_analytic {
@@ -884,7 +580,7 @@ namespace {
 
 } //namespace
 
-TEST(XcwScfTests, ITensorOfH2MatchesAnalyticGaussianTransform)
+TEST(XcwScfTests, GridOfH2MatchesAnalyticGaussianTransform)
 {
 	const auto dir = scratch_dir();
 	constexpr double a_ang = 6.0;
@@ -912,58 +608,67 @@ TEST(XcwScfTests, ITensorOfH2MatchesAnalyticGaussianTransform)
 		std::ofstream o(hkl_path);
 		for (const i3& r : hkl) o << std::setw(4) << r[0] << std::setw(4) << r[1] << std::setw(4) << r[2] << "  100.00    1.00\n";
 	}
-	const int nr = static_cast<int>(hkl.size());
-
-	const p1_run run = run_xcw(dir, cif, hkl_path, {}, "normal normal_conv params 1 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 save tensor.bin", true, 3);
-	EXPECT_NE(run.out.find("I tensor written to tensor.bin"), std::string::npos) << run.out;
-	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
-
-	i_tensor_file f;
-	f.open(dir / "tensor.bin", nr);
-	EXPECT_EQ(f.nr(), nr);
-	EXPECT_EQ(f.nmo(), 2);
-	ASSERT_EQ(f.kept(), 3u);
-	EXPECT_FALSE(f.single());
-	EXPECT_EQ(f.pair_mu(), (ivec{ 0, 0, 1 }));
-	EXPECT_EQ(f.pair_nu(), (ivec{ 0, 1, 1 }));
-	f.load(0, nr);
-
+	struct direct_transform {
+		std::string old; bool had = false;
+		direct_transform() { if (const char* e = tuning("NOSPHERA2_XCW_GRID_DIRECT")) { old = e; had = true; } set_tuning("NOSPHERA2_XCW_GRID_DIRECT", "1"); }
+		~direct_transform() { set_tuning("NOSPHERA2_XCW_GRID_DIRECT", had ? old.c_str() : nullptr); }
+	} pin;
+	options opt = xcw_options(dir, cif, hkl_path, "normal normal_conv params 1 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0", true, 3);
+	std::vector<cvec> got;
+	std::vector<i3> rows;
+	{
+		cwd_guard cwd(dir);
+		cout_capture capture;
+		opt.loadXCWsettings();
+		structure_factors sf(opt);
+		const occ::core::Molecule mol = SCF_solver::setup_SCF_mol(sf.asym_atoms, 0, 1);
+		sf.set_DW();
+		sf.set_phases();
+		sf.set_anom();
+		sf.setup_grid(sf.orbital_basis->to_AOBasis(mol.atoms()));
+		ASSERT_EQ(sf.model_data.nmo, 2);
+		rows.assign(sf.scatter_data.hkl.begin(), sf.scatter_data.hkl.end());
+		got.assign(rows.size(), cvec(3));
+		//F = anomalous + Sum_{mu<=nu} (2|4) D I: D(0,0) = 1/2 gives I_00, D(0,1) = D(1,0) = 1/4 I_01, D(1,1) = 1/2 I_11
+		const double D_entries[3][3] = { { 0.5, 0, 0 }, { 0, 0.25, 0 }, { 0, 0, 0.5 } };
+		for (int t = 0; t < 3; t++) {
+			dMatrix2 D(2, 2);
+			D(0, 0) = D_entries[t][0];
+			D(0, 1) = D(1, 0) = D_entries[t][1];
+			D(1, 1) = D_entries[t][2];
+			sf.calc_F_calc(D);
+			for (size_t r = 0; r < rows.size(); r++) got[r][t] = sf.scatter_data.F_calc[r] - sf.scatter_data.anom_correction[r];
+		}
+	}
 	const h2_analytic ref;
 	const double a_bohr = constants::ang2bohr(a_ang);
 	const vec A = { 0.5 * a_bohr, 0.5 * a_bohr, (0.5 - dz) * a_bohr };
 	const vec B = { 0.5 * a_bohr, 0.5 * a_bohr, (0.5 + dz) * a_bohr };
 	const vec centres[2] = { A, B };
+	const int pair_mu[3] = { 0, 0, 1 }, pair_nu[3] = { 0, 1, 1 };
 	double max_dev = 0.0;
-	int r = 0;
-	std::vector<cvec> got(nr);
-	for (const i3& h : hkl) {
+	for (size_t r = 0; r < rows.size(); r++) {
+		const i3& h = rows[r];
 		const vec q = { constants::TWO_PI / a_bohr * h[0], constants::TWO_PI / a_bohr * h[1], constants::TWO_PI / a_bohr * h[2] };
-		const cdouble* block = f.block(r);
-		got[r].assign(block, block + 3);
-		for (size_t t = 0; t < 3; t++) {
-			const cdouble expected = ref.I(centres[f.pair_mu()[t]], centres[f.pair_nu()[t]], q);
-			const double dev = std::abs(block[t] - expected);
+		for (int t = 0; t < 3; t++) {
+			const cdouble expected = ref.I(centres[pair_mu[t]], centres[pair_nu[t]], q);
+			const double dev = std::abs(got[r][t] - expected);
 			max_dev = std::max(max_dev, dev);
-			EXPECT_LT(dev, 5e-5) << "hkl " << h[0] << " " << h[1] << " " << h[2] << " pair " << t << ": got " << block[t] << " expected " << expected;
+			EXPECT_LT(dev, 5e-5) << "hkl " << h[0] << " " << h[1] << " " << h[2] << " pair " << t << ": got " << got[r][t] << " expected " << expected;
 		}
-		EXPECT_LE(std::abs(block[0]), 1.0 + 1e-6);
-		EXPECT_LE(std::abs(block[2]), 1.0 + 1e-6);
-		r++;
+		EXPECT_LE(std::abs(got[r][0]), 1.0 + 1e-6);
+		EXPECT_LE(std::abs(got[r][2]), 1.0 + 1e-6);
 	}
-	std::cerr << "H2 I tensor: max |grid - analytic| = " << max_dev << " over " << nr << " reflections" << std::endl;
-
-	//Friedel mates are complex conjugates: the same grid points and weights enter, only
-	//the phase flips, so this holds to rounding
-	r = 0;
-	for (const i3& h : hkl) {
-		const auto mate = std::distance(hkl.begin(), hkl.find({ -h[0], -h[1], -h[2] }));
-		for (size_t t = 0; t < 3; t++) {
+	std::cerr << "H2 grid: max |grid - analytic| = " << max_dev << " over " << rows.size() << " reflections" << std::endl;
+	//Friedel mates are complex conjugates: the same grid points and weights enter, only the phase flips
+	for (size_t r = 0; r < rows.size(); r++) {
+		const size_t mate = std::find(rows.begin(), rows.end(), i3{ -rows[r][0], -rows[r][1], -rows[r][2] }) - rows.begin();
+		ASSERT_LT(mate, rows.size());
+		for (int t = 0; t < 3; t++) {
 			EXPECT_NEAR(got[r][t].real(), got[mate][t].real(), 1e-10);
 			EXPECT_NEAR(got[r][t].imag(), -got[mate][t].imag(), 1e-10);
 		}
-		r++;
 	}
-	f.close();
 	std::filesystem::remove_all(dir);
 }
 
@@ -974,7 +679,7 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 i_sigma 20", true);
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 i_sigma 20" + read_shared_eri(dir));
 
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 1u) << run.out;
@@ -988,26 +693,26 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 	EXPECT_GT(n_fit, 0);
 	EXPECT_LT(n_fit, nr) << run.out;
 
-	//the nine columns of the converged row: fit-set criterion and R1(gt) differ from Crit(all) and R1(all)
-	const size_t row = run.out.find("\n0.00000\t");
+	//the eleven columns of the converged row: fit-set criterion, R1(gt) and wR2 differ from Crit(all), R1(all) and wR2(all)
+	const size_t row = run.out.find("\n 0.00000\t");
 	ASSERT_NE(row, std::string::npos) << run.out;
 	std::vector<std::string> fields;
 	std::istringstream cols(run.out.substr(row + 1, run.out.find('\n', row + 1) - row - 1));
-	for (std::string f; std::getline(cols, f, '\t');) if (!f.empty()) fields.push_back(f);
-	ASSERT_EQ(fields.size(), 9u) << run.out;
+	for (std::string f; cols >> f;) fields.push_back(f);
+	ASSERT_EQ(fields.size(), 11u) << run.out;
 	EXPECT_NE(fields[7], fields[1]);
 	EXPECT_NE(fields[8], fields[3]);
+	EXPECT_NE(fields[10], fields[9]);
 	std::filesystem::remove_all(dir);
 }
 
-//`slow_conv` keeps its damping for the perturbed steps; the unperturbed first step runs the
-//normal schedule, which reaches the golden lambda = 0 energy where slow damping stalls
-TEST(XcwScfTests, SlowConvStartsFromTheNormalSchedule)
+//`slow_conv` damps every step, the unperturbed first one included, and still reaches the golden lambda = 0 energy
+TEST(XcwScfTests, SlowConvDampsFromTheFirstStep)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0.01 slow_conv", true);
-	EXPECT_NE(run.out.find("XCW: slow_conv - the unperturbed first step runs the normal schedule"), std::string::npos) << run.out;
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0.01 slow_conv" + read_shared_eri(dir));
+	EXPECT_EQ(run.out.find("normal schedule"), std::string::npos) << run.out;
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 2u) << run.out;
 	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
@@ -1023,7 +728,7 @@ TEST(XcwScfTests, ScaleIsStationaryForTheCriterion)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0", true);
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0" + read_shared_eri(dir), true);
 	std::istringstream dump(read_text(dir / "NA2_0000000_Fcalc.txt"));
 	std::string line;
 	double numerator = 0.0, denominator = 0.0;
@@ -1044,14 +749,14 @@ TEST(XcwScfTests, ScaleIsStationaryForTheCriterion)
 	std::filesystem::remove_all(dir);
 }
 
-//`soscf` hands the step to the second-order solver once the DIIS error is below 1e-2; from
+//`check_hessian` hands the step to the second-order solver once the DIIS error is below 1e-2; from
 //there the trust-region augmented-Hessian steps on the orbital rotations have to reach the
 //same lambda = 0 minimum as the Roothaan/DIIS iterations, with micro-iterations reported
 TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 soscf", true);
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 check_hessian" + read_shared_eri(dir));
 	EXPECT_NE(run.log.find("second-order steps on the orbital rotations from here"), std::string::npos) << run.log;
 	EXPECT_NE(run.log.find("TRAH: "), std::string::npos) << run.log;
 	EXPECT_NE(run.log.find("***SCF converged in"), std::string::npos) << run.log;
@@ -1064,13 +769,13 @@ TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
 //The exact Hessian-vector product behind the second-order steps (Fock response plus the
 //response of the perturbation with the scale moving) against a central finite difference of
 //the gradient, at a lambda where the perturbation is on, for both spin treatments; the
-//tensor in double so the difference quotient is not limited by fp32 noise in the gradient
+//grid in double so the difference quotient is not limited by fp32 noise in the gradient
 TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	for (const std::string kind : { "f rhf", "f2 uhf" }) {
 		const auto dir = scratch_dir();
-		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double soscf check_hessian", true);
+		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double check_hessian" + read_shared_eri(dir));
 		const size_t at = run.log.find("Hessian check: |Hv - FD| / |FD| = ");
 		ASSERT_NE(at, std::string::npos) << run.log;
 		const double rel = std::stod(run.log.substr(at + std::string("Hessian check: |Hv - FD| / |FD| = ").size()));

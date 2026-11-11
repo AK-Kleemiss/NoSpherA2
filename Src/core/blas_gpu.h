@@ -2,28 +2,19 @@
 
 #include "gpu_api.h"
 
-//A device GEMM behind the same row-major interface cblas_dgemm presents, so nos_math's
-//dot_BLAS can hand off without the callers knowing. Works against cuBLAS or hipBLAS.
-//
-//It is size-gated, and that gate is the whole point. With the operands living on the host
-//every call pays to ship them, and a small GEMM loses: the SALTED regression GEMM is
-//barely faster on the device than on the host and not worth a code path. Only shapes
-//well past that are offered to the device, and the threshold below was calibrated by
-//measurement, not chosen.
-//
-//Returns false whenever the caller should just call BLAS, which includes every case where
-//no device is present.
+//Device GEMM behind cblas_dgemm's row-major interface, so nos_math's dot_BLAS hands off unseen.
+//Size-gated: the operands live on the host, and a small GEMM loses to shipping them.
+//False means call BLAS, including whenever there is no device.
 
 NOSPHERA2_GPU_API_BEGIN
 
 bool blas_gpu_available();
 
-//-gpu_blas turns the offload on; off unless asked, like the other GPU paths
+//Off unless -gpu_blas
 void blas_gpu_set_enabled(bool on);
 bool blas_gpu_enabled();
 
-//Row-major C(m x n) = alpha * op(A) * op(B) + beta * C, matching cblas_dgemm's arguments.
-//lda/ldb/ldc are the row-major leading dimensions cblas would take.
+//Row-major C(m x n) = alpha * op(A) * op(B) + beta * C, arguments and leading dimensions as cblas_dgemm.
 bool blas_gpu_dgemm(bool transA, bool transB, int m, int n, int k,
 	double alpha, const double* A, int lda, const double* B, int ldb,
 	double beta, double* C, int ldc);

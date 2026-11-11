@@ -123,35 +123,22 @@ def build_argv(exe: str, args_table: dict) -> list[str]:
 
 
 def default_executable_candidates(root: Path, build_kind: str = "auto") -> list[Path]:
-    """Known build output locations, most-preferred first: the legacy Visual
-    Studio solution build (Windows only) ahead of the CMake preset build
-    trees (see CMakePresets.json), release presets ahead of debug ones.
-
-    The VS `NoSpherA2`/`NoSpherA2_LIB` projects share an OutDir
-    (Windows/Windows_utils/NoSpherA2_universal.props) pointing at
-    build/<Configuration>_<Platform>/ (e.g. build/Release_x64/NoSpherA2.exe) --
-    a sibling of, but distinct from, the CMake preset tree
-    build/release-windows/bin/NoSpherA2.exe.
-
-    build_kind restricts the search: "vs" for the VS build only, "cmake" for
-    the CMake preset trees only, "auto" (default) for VS-then-CMake."""
+    """Known build output locations, most-preferred first: the CMake preset
+    build trees (see CMakePresets.json), release presets ahead of debug ones.
+    build_kind is kept for compatibility; every kind searches the same trees
+    since the Visual Studio solution was removed."""
     exe_name = "NoSpherA2.exe" if os.name == "nt" else "NoSpherA2"
     candidates: list[Path] = []
-    if build_kind in ("auto", "vs") and os.name == "nt":
-        candidates.append(root / "build" / "Release_x64" / exe_name)
-        candidates.append(root / "build" / "Debug_x64" / exe_name)
-    if build_kind in ("auto", "cmake"):
-        for preset in (
-            "release-windows", "release-linux", "release-macos-arm64", "release-macos-x86_64",
-            "debug-windows", "debug-linux", "debug-macos-arm64", "debug-macos-x86_64",
-        ):
-            candidates.append(root / "build" / preset / "bin" / exe_name)
+    for preset in (
+        "release-windows", "release-linux", "release-macos-arm64", "release-macos-x86_64",
+        "debug-windows", "debug-linux", "debug-macos-arm64", "debug-macos-x86_64",
+    ):
+        candidates.append(root / "build" / preset / "bin" / exe_name)
     return candidates
 
 
 def resolve_executable(root: Path, explicit: str | None, build_kind: str = "auto") -> str:
-    """Priority: --exe > $NOS_EXE > first existing known build output for
-    build_kind (VS preferred over CMake when build_kind is "auto", see
+    """Priority: --exe > $NOS_EXE > first existing known build output (see
     default_executable_candidates) > bare 'NoSpherA2' resolved via PATH."""
     if explicit:
         return explicit
@@ -350,11 +337,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--build",
-        choices=("auto", "vs", "cmake"),
+        choices=("auto", "cmake"),
         default="auto",
-        help="Which known build output to auto-discover for --run when --exe/$NOS_EXE aren't set: "
-        "'auto' (default) tries the VS Release build first then CMake preset builds, 'vs' or "
-        "'cmake' restricts the search to just that one",
+        help="Kept for compatibility; both values search the CMake preset build trees "
+        "for --run when --exe/$NOS_EXE aren't set",
     )
     parser.add_argument(
         "--occ-data-path",

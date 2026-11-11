@@ -318,6 +318,24 @@ namespace
 		}
 	}
 
+	//The ESP pair table's (l,r,s) tables stop at g x g (Afac_pre [9][5][9], pcp [3][9], Fn [25]) while the
+	//OCC WFN constructor accepts l up to 10, so an h primitive must be refused, not indexed past all three
+	TEST(WfnOpsTests, EspRefusesPrimitivesBeyondG)
+	{
+		int l[3];
+		constants::type2vector(36, l);
+		ASSERT_EQ(l[0] + l[1] + l[2], 5) << "type 36 is meant to be the first h cartesian";
+		WFN w(e_origin::NOT_YET_DEFINED);
+		w.push_back_atom("He", 0.0, 0.0, 0.0, 2);
+		w.push_back_MO(1, 1.0, -0.9);
+		double c = 1.0;
+		w.add_primitive(1, 36, 1.0, &c);
+		w.set_exp_cutoff();
+		//not_implemented restores std::cout's buffer before printing, so the message escapes the death test's
+		//capture and only the exit code is asserted; the tests/CuF2_i_func run checks the message
+		EXPECT_EXIT(w.build_ESP_pairs(), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	}
+
 	//MO::hdr writes the fixed-width wfn MO line: occupation branches for 2, 0 and fractional, energy padding per decade
 	TEST(WfnOpsMoTests, HeaderFormatsOccupationAndEnergy)
 	{
@@ -540,6 +558,30 @@ namespace
 		EXPECT_EQ(w.get_atom_ECP_electrons(0), 28);
 		w.set_has_ECPs(false, false);
 		EXPECT_FALSE(w.get_has_ECPs());
+	}
+
+	//the tables stop at Rn: an actinide must not index past their end
+	TEST(WfnOpsAtomTests, EcpTablesEndAtRadonAndAnActinideGetsNoCore)
+	{
+		EXPECT_EQ(constants::heaviest_ECP_element, 86);
+		EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons, 86), 60);
+		for (const int Z : { 87, 90, 92, 103, 118, 1000, -1 })
+		{
+			EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons, Z), 0) << "Z = " << Z;
+			EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons_xTB, Z), 0) << "Z = " << Z;
+			EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons_pTB, Z), 0) << "Z = " << Z;
+		}
+		WFN w(e_origin::NOT_YET_DEFINED);
+		w.push_back_atom("U", 0.0, 0.0, 0.0, 92);
+		w.push_back_atom("H", 1.0, 0.0, 0.0, 1);
+		std::ostringstream captured;
+		std::streambuf *const previous = std::cout.rdbuf(captured.rdbuf());
+		w.set_has_ECPs(true, true, 1);
+		std::cout.rdbuf(previous);
+		EXPECT_EQ(w.get_atom_ECP_electrons(0), 0);
+		EXPECT_EQ(w.get_atom_ECP_electrons(1), 0);
+		//and it says so, rather than quietly counting 92 nuclear charges against a valence basis
+		EXPECT_NE(captured.str().find("Z = 92"), std::string::npos) << captured.str();
 	}
 
 	//charge = sum Z - sum occ, -1000 for an untyped atom; the multiplicity guess is 1 for even and 2 for odd electron counts

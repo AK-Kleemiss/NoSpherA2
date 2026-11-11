@@ -5,6 +5,7 @@
 #include "SALTED_predictor.h"
 #include "basis_set.h"
 #include "npy.h"
+#include "spherical_density.h"
 #include <random>
 
 Multipoles Gaussian_Atom::electrical_moments(const int lmax) const
@@ -52,8 +53,6 @@ namespace {
 			if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
 			coef = SP.gen_SALTED_densities();
 			err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
-			if (!opt.salted_charge_constraint)
-				std::cout << "Hint: -salted_charge_constraint pins the electron count of the prediction; a missing fraction of an electron shifts the whole ESP by q/r" << std::endl;
 			aux = SP.wavy;
 			aux.set_origin(e_origin::NOT_YET_DEFINED);
 		}
@@ -91,7 +90,9 @@ Gaussian_Molecule::Gaussian_Molecule(WFN aux_basis, vec coefficients)
 //One Gaussian_Atom per atom with its contiguous run of the coefficients
 void Gaussian_Molecule::slice()
 {
-	err_checkf(static_cast<int>(coefs.size()) == tab.n_coef, "Coefficient count does not match the auxiliary basis", std::cout);
+	err_checkf(static_cast<int>(coefs.size()) == tab.n_coef,
+		"Coefficient count does not match the auxiliary basis: " + std::to_string(coefs.size())
+		+ " coefficients for a basis of " + std::to_string(tab.n_coef), std::cout);
 	const std::vector<::atom>& atoms = *aux.get_atoms_ptr();
 	ats.reserve(tab.n_at);
 	for (int a = 0; a < tab.n_at; a++) {
@@ -152,6 +153,49 @@ const Interaction_Energy& Gaussian_Molecule::interaction(const Gaussian_Molecule
 	if (it == energies.end())
 		it = energies.emplace(B.id, DensityFitting::interaction_energy(coefs, aux, B.coefs, B.aux, repulsion_K, x_fun)).first;
 	return it->second;
+}
+
+std::array<double, 3> tshb_slater(const std::array<double, 3>& t)
+{
+	const double b = constants::bohr2ang(1.0);
+	return { t[0] / (constants::FOUR_PI * std::pow(b, t[1] + 2)), t[1] - 1, t[2] / b };
+}
+
+tshb_block Gaussian_Molecule::tshb(const svec& labels, const ScattererLabels& keys, const ivec& atoms, const WFN& wave, const int ECP_mode, const bool ED) const
+{
+	err_checkf(labels.size() == atoms.size() && keys.size() == atoms.size(), "Labels, keys and atoms do not match for the .tshb", std::cout);
+	const double b = constants::bohr2ang(1.0);
+	std::vector<tshb_record> records(atoms.size());
+	for (int i = 0; i < atoms.size(); i++) {
+		const int a = atoms[i];
+		tshb_record& r = records[i];
+		r.label = labels[i];
+		r.part = wave.get_atom_group_nr(a);
+		r.Z = wave.get_atom_charge(a);
+		for (int s = tab.sh_start[a]; s < tab.sh_start[a + 1]; s++) {
+			const int32_t l = tab.sh_l[s];
+			//n exp(-a r^2) r^l in bohr is n b^-(l+3) exp(-(a/b^2) R^2) R^l in angstrom and e/A^3
+			const double scale = std::pow(b, -(l + 3));
+			for (int p = tab.pr_start[s]; p < tab.pr_start[s + 1]; p++) {
+				tshb_record::shell sh{ l, tab.pr_exp[p] / (b * b), vec(2 * l + 1) };
+				for (int m = 0; m < 2 * l + 1; m++)
+					sh.c[m] = coefs[tab.coef_off[s] + m] * tab.pr_norm[p] * scale;
+				r.shells.push_back(std::move(sh));
+			}
+		}
+		const int n_ecp = wave.get_atom_ECP_electrons(a);
+		if (n_ecp != 0 && ECP_mode == 0)
+			//mode 0 adds n e^(-k/16pi) with k = 4pi stl = 2pi s
+			r.f_terms.push_back({ double(n_ecp), 1.0 / 8.0 });
+		else if (n_ecp != 0) {
+			for (const std::array<double, 3>& t : Thakkar(r.Z, ECP_mode).core_slater_terms(n_ecp))
+				r.slaters.push_back(tshb_slater(t));
+			const Spherical_Gaussian_Density g(r.Z, ECP_mode);
+			for (int k = 0; k < g.size(); k++)
+				r.gaussians.push_back({ g.coefficient(k) / (b * b * b), g.exponent(k) / (b * b) });
+		}
+	}
+	return tshb_block(std::move(records), keys, ED);
 }
 
 Gaussian_Molecule Gaussian_Molecule::transformed(const vec2& R, const vec& t) const

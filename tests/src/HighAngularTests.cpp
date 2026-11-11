@@ -24,7 +24,6 @@
 #include "core/npy.h"
 #include "core/libCintMain.h"
 #include "core/throughput.h"
-#include "core/i_tensor_stream.h"
 #include "core/tsc_label_converter.h"
 #include "core/sphere_lebedev_rule.h"
 #include <occ/qm/hf.h>
@@ -355,37 +354,35 @@ namespace NoSpherA2UnitTests
 		expect_same_density(a, b, 1e-6, "CuF2 i-function gbw vs its molden");
 	}
 	//OCC writes fchk in the Gaussian convention, so the reader's pure conventions are checked against the bridge for every l
-	//up to h; from l = 6 libcint's Rys roots fail (nroots 12) inside occ's own HF
+	//up to h, all in one basis that holds s to h on both atoms; from l = 6 libcint's Rys roots fail (nroots 12) inside occ's own HF
 	TEST(FormatConsistencyTests, OccFchkMatchesBridge)
 	{
 		spdlog::set_level(spdlog::level::err);
-		for (const int lmax : { 1, 2, 3, 4, 5 })
-		{
-			const std::vector<occ::core::Atom> atoms{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.3, 0.7 } };
-			std::vector<occ::gto::Shell> shells;
-			for (const auto& at : atoms)
-				for (int l = 0; l <= lmax; l++)
-				{
-					shells.emplace_back(l, vec{ 1.2, 0.5 + 0.1 * l }, vec2{ { 0.4, 0.7 } }, std::array<double, 3>{ at.x, at.y, at.z });
-					shells.back().kind = occ::gto::Shell::Kind::Spherical;
-					shells.back().incorporate_shell_norm();
-				}
-			occ::gto::AOBasis basis(atoms, shells, "test");
-			basis.set_pure(true);
-			occ::qm::HartreeFock hf(basis);
-			occ::qm::SCF<occ::qm::HartreeFock> scf(hf, occ::qm::SpinorbitalKind::Restricted);
-			scf.set_charge_multiplicity(0, 1);
-			scf.compute_initial_guess();
-			scf.compute_scf_energy();
-			occ::qm::Wavefunction wf = scf.wavefunction();
-			const auto tmp = std::filesystem::temp_directory_path() / ("nosphera2_occ_roundtrip_l" + std::to_string(lmax) + ".fchk");
+		const int lmax = 5;
+		const std::vector<occ::core::Atom> atoms{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.3, 0.7 } };
+		std::vector<occ::gto::Shell> shells;
+		for (const auto& at : atoms)
+			for (int l = 0; l <= lmax; l++)
 			{
-				occ::io::FchkWriter writer(tmp.string());
-				wf.save(writer);
-				writer.write();
+				shells.emplace_back(l, vec{ 1.2, 0.5 + 0.1 * l }, vec2{ { 0.4, 0.7 } }, std::array<double, 3>{ at.x, at.y, at.z });
+				shells.back().kind = occ::gto::Shell::Kind::Spherical;
+				shells.back().incorporate_shell_norm();
 			}
-			expect_same_density(WFN(wf, false), WFN(tmp, false), 1e-6, "occ pure fchk lmax " + std::to_string(lmax));
+		occ::gto::AOBasis basis(atoms, shells, "test");
+		basis.set_pure(true);
+		occ::qm::HartreeFock hf(basis);
+		occ::qm::SCF<occ::qm::HartreeFock> scf(hf, occ::qm::SpinorbitalKind::Restricted);
+		scf.set_charge_multiplicity(0, 1);
+		scf.compute_initial_guess();
+		scf.compute_scf_energy();
+		occ::qm::Wavefunction wf = scf.wavefunction();
+		const auto tmp = std::filesystem::temp_directory_path() / ("nosphera2_occ_roundtrip_l" + std::to_string(lmax) + ".fchk");
+		{
+			occ::io::FchkWriter writer(tmp.string());
+			wf.save(writer);
+			writer.write();
 		}
+		expect_same_density(WFN(wf, false), WFN(tmp, false), 1e-6, "occ pure fchk lmax " + std::to_string(lmax));
 	}
 	TEST(OccHighAngularTests, IntegratesElectronCountToL10)
 	{

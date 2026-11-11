@@ -1,0 +1,79 @@
+name: GPU (Aspire)
+# Fat CUDA build + ctest on real NVIDIA hardware: the self-hosted laptop Aspire (GTX 1060, sm_61, 8 threads, 32 GB),
+# Windows runner as a service, Linux runner in WSL2 Ubuntu 24.04. Internet only through FLOWOFFICE's proxy.
+# No pull_request trigger on purpose: in a public repository a fork PR could otherwise run its own code on Aspire.
+# schedule and workflow_dispatch only act once this file is on the default branch (master).
+on:
+  push:
+    branches: [density_source]
+  schedule:
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: gpu-aspire
+  cancel-in-progress: false
+
+env:
+  # The release list (CMakeLists.txt, CUDA 12.8+) plus 61: without it the binary has no code for the GTX 1060
+  # and every GPU path declines, which looks exactly like having no GPU. 120-virtual is appended by CMakeLists.
+  CUDA_ARCHS: 61;70;75;80;86;89;90;100;120
+
+jobs:
+  windows:
+    runs-on: [self-hosted, Windows, aspire, gpu]
+    timeout-minutes: 600
+    defaults:
+      run:
+        # Windows PowerShell 5.1, not pwsh: pwsh 7 is only a zip install on Aspire, outside the machine Path,
+        # and after msvc-dev-cmd rewrites Path the runner reported "pwsh: command not found"
+        shell: powershell
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 6
+    steps:
+      # clean: false keeps build/ and .mambaenv/ between runs, so a run only rebuilds what changed
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          submodules: recursive
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
+        with:
+          arch: x64
+      - run: nvidia-smi
+      - name: bootstrap
+        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9 -P scripts/BootstrapMicromamba.cmake
+      - name: configure
+        run: >-
+          cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
+          -DNOSPHERA2_GPU_AUTO=OFF -DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_CUDA_PORTABLE=ON
+          "-DCMAKE_CUDA_ARCHITECTURES=$env:CUDA_ARCHS"
+      - name: build
+        run: cmake --build --preset release-windows
+      - name: test
+        run: ctest --preset release-windows --output-on-failure
+
+  # After the Windows job, not beside it: both share the same 8 threads and 32 GB
+  linux:
+    needs: windows
+    if: ${{ !cancelled() }}
+    runs-on: [self-hosted, Linux, aspire, gpu]
+    timeout-minutes: 600
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: 4  # WSL gets 20 GB; nvcc on nine architectures is memory-hungry
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          submodules: recursive
+      - run: nvidia-smi
+      - name: bootstrap
+        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9 -P scripts/BootstrapMicromamba.cmake
+      - name: configure
+        run: >-
+          cmake --preset release-linux -DNOSPHERA2_BUILD_TESTS=ON
+          -DNOSPHERA2_GPU_AUTO=OFF -DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_CUDA_PORTABLE=ON
+          "-DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCHS"
+      - name: build
+        run: cmake --build --preset release-linux
+      - name: test
+        run: ctest --preset release-linux --output-on-failure
