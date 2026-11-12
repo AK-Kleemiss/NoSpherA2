@@ -39,6 +39,23 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
           arch: x64
+      # 11 Nov 2026: Windows Update ran the VS update as SYSTEM (no proxy), removed SDK 26100 and cancelled.
+      # vswhere -latest skips the incomplete instance, msvc-dev-cmd silently fell back to SDK 19041, and the PCH
+      # kept from the 26100 build (clean: false) broke every TU with corecrt.h redefinitions.
+      - name: toolchain guard
+        run: |
+          if (-not (& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath)) {
+            throw 'vswhere finds no complete Visual Studio instance - an interrupted VS update? Repair VS on Aspire.'
+          }
+          $b = 'build/release-windows'
+          $stamp = "$b/toolchain.stamp"
+          $now = "$env:WindowsSDKVersion|$env:VCToolsVersion"
+          Write-Host "toolchain: $now"
+          if ((Test-Path $b) -and (-not (Test-Path $stamp) -or (Get-Content $stamp -Raw).Trim() -ne $now)) {
+            Write-Host 'toolchain changed: dropping the precompiled headers'
+            Get-ChildItem $b -Recurse -Include 'cmake_pch*.pch', 'cmake_pch*.obj' | Remove-Item -Force
+          }
+          if (Test-Path $b) { Set-Content $stamp $now -NoNewline }
       - run: nvidia-smi
       - name: bootstrap
         run: cmake -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9 -P scripts/BootstrapMicromamba.cmake
