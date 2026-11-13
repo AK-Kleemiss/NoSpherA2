@@ -1140,7 +1140,10 @@ TEST(SaltedFchkEquicombTests, EmptyEnvironmentGivesZeros)
 	EXPECT_NEAR(sparse[0], 0.0, 1e-300);
 	EXPECT_NEAR(dense[0], 0.0, 1e-300);
 	EXPECT_FALSE(std::isnan(sparse[0]));
+	++constants::run_id;
+	testing::internal::CaptureStdout();
 	const vec2 norms = equicomb_norms(1, 1, 1, v, v, { &w3j }, { llvec }, { c2r }, true);
+	EXPECT_NE(testing::internal::GetCapturedStdout().find("1 atom(s) have no neighbour"), std::string::npos);
 	EXPECT_EQ(norms[0][0], 0.0);
 	EXPECT_TRUE(equicomb_norms(0, 1, 1, v, v, { &w3j }, { llvec }, { c2r }, true)[0].empty());
 }
@@ -1390,7 +1393,10 @@ TEST(SaltedFchkEquicombTests, ExactSymmetryZeroesTheVanishingFeatures)
 					w3j_ptr[lam] = &w3j[lam];
 				}
 				const double noise = 100.0 * std::numeric_limits<double>::epsilon() * L;
+				++constants::run_id;
+				testing::internal::CaptureStdout();
 				const vec2 norms = equicomb_norms(n, nchan, nchan, v, v, w3j_ptr, llvec, c2r, true, noise * noise);
+				EXPECT_EQ(testing::internal::GetCapturedStdout().find("no neighbour"), std::string::npos) << m.el[0] << " shift " << shift << " d " << d;
 				for (int lam = 0; lam <= lam_max; lam++)
 					for (int i = 0; i < n; i++)
 					{

@@ -233,6 +233,23 @@ static double atom_norm2(const lambda_plan &q, const double *m1, const size_t ds
 	return inner;
 }
 
+// Said once per run. An atom with no neighbours still has an l = 0 descriptor, its own density
+// being spherically symmetric; only the equivariant lam >= 1 parts vanish, so zeroing them
+// leaves the atom spherical, which is the right answer for it.
+static void warn_empty(const int empty_environments)
+{
+	static std::atomic<unsigned> warned_empty_environment{0};
+	if (empty_environments > 0 && constants::first_this_run(warned_empty_environment))
+	{
+		std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
+				  << " inside the descriptor cutoff.\n"
+				  << "         Their environment singles out no direction, so their"
+				  << " predicted density stays spherical.\n"
+				  << "         Isolated solvent is the usual cause."
+				  << std::endl;
+	}
+}
+
 // normfact[k][atom] for every plan. The density matrices do not depend on lambda, so each
 // atom's are built once into a per-thread buffer and contracted for all plans, instead of
 // being stored for all atoms (natoms * 2 * sum (2l+1)^2 doubles): no faster, but that memory
@@ -256,6 +273,7 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 	const size_t dsz1 = dm_offset(lmax1 + 1), dsz2 = dm_offset(lmax2 + 1);
 	vec2 normfact(nplans, vec(natoms, 0.0));
 	ivec direct(nplans, 0), zeroed(nplans, 0);
+	int empty = 0;
 #pragma omp parallel
 	{
 		vec m1(2 * dsz1), m2(share ? 0 : 2 * dsz2);
@@ -311,6 +329,12 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 				else if (inner > 0.0) [[likely]]
 					normfact[k][iat] = 1.0 / sqrt(inner);
 			}
+			// no neighbour: only the atom's own spherical density, every l >= 1 trace exactly zero
+			if (tot1 == tr1[0] && tot2 == tr2[0])
+			{
+#pragma omp atomic
+				++empty;
+			}
 		}
 	}
 	if (ProgressBar::report_counts)
@@ -323,6 +347,7 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 			std::cout << " " << plans[k]->lam << ":" << zeroed[k];
 		std::cout << std::endl;
 	}
+	warn_empty(empty);
 	return normfact;
 }
 
@@ -405,23 +430,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	//features actually built
 	const _time_point eq_t0 = get_time();
 	vec normfact(natoms, 0.0);
-	// Said once per run, on the first lambda that sees it - NOT gated on lam == 0.
-	// An atom with no neighbours still has an l = 0 descriptor, its own density being
-	// spherically symmetric; only the equivariant lam >= 1 parts vanish, so zeroing
-	// them leaves the atom spherical, which is the right answer for it.
-	auto warn_empty = [](const int empty_environments)
-	{
-		static std::atomic<unsigned> warned_empty_environment{0};
-		if (empty_environments > 0 && constants::first_this_run(warned_empty_environment))
-		{
-			std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
-					  << " inside the descriptor cutoff.\n"
-					  << "         Their environment singles out no direction, so their"
-					  << " predicted density stays spherical.\n"
-					  << "         Isolated solvent is the usual cause."
-					  << std::endl;
-		}
-	};
 	// Features past nrad1*nrad2*llmax stay zero, as they were when ptemp was built in full
 	const int shells_i = static_cast<int>(shells);
 
@@ -434,7 +442,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		const lambda_plan *one = &plan;
 		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1, 0.0)[0];
 	}
-	warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
 	if (ProgressBar::report_counts)
 		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
