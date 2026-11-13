@@ -66,6 +66,7 @@ struct lambda_plan
 	vec K_re, K_im, G_re, G_im;
 	std::vector<c2r_entry> c2r_nz;
 	ivec c2r_cnt;
+	vec cpm_re, cpm_im;
 };
 
 static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, const cvec2 &c2r)
@@ -125,7 +126,7 @@ static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, 
 	// middle row holds one). Dropping the exact zeros leaves a finite sum bit for
 	// bit the same as long as the survivors stay in ascending column order, which
 	// is the order the dense loop added them in. The structure is read off c2r
-	// rather than assumed; anything not two-per-row is an error.
+	// rather than assumed; anything else is an error.
 	q.c2r_nz.assign(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
 	q.c2r_cnt.assign(l21, 0);
 	for (int i2 = 0; i2 < l21; ++i2)
@@ -135,29 +136,53 @@ static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, 
 		{
 			const cdouble &e = c2r[i2][j2];
 			if (e.real() == 0.0 && e.imag() == 0.0) continue;
-			err_checkf(cnt < 2, "equicomb: complex-to-real row " + std::to_string(i2) + " has more than two non-zeros", std::cout);
+			err_checkf(cnt < 2 && (j2 == i2 || j2 == l21 - 1 - i2), "equicomb: complex-to-real row " + std::to_string(i2) + " is not a mirror pair", std::cout);
 			q.c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
 			++cnt;
 		}
 		q.c2r_cnt[i2] = cnt;
 	}
+	// pc[-mu] = (-1)^mu conj(pc[mu]), so row imu of c2r gives Re(cpm[imu] pc[|mu|]) with
+	// cpm = c2r[imu][lam + mu] + (-1)^mu conj(c2r[imu][lam - mu])
+	q.cpm_re.assign(l21, 0.0);
+	q.cpm_im.assign(l21, 0.0);
+	q.cpm_re[lam] = c2r[lam][lam].real();
+	for (int mu = 1; mu <= lam; ++mu)
+		for (const int imu : { lam - mu, lam + mu })
+		{
+			const cdouble c = c2r[imu][lam + mu] + (mu % 2 ? -1.0 : 1.0) * std::conj(c2r[imu][lam - mu]);
+			q.cpm_re[imu] = c.real();
+			q.cpm_im[imu] = c.imag();
+		}
 	return q;
 }
 
 // The l21 real features of channels (n1, n2) and (l1, l2) = llvec[.][il] of one atom into
 // out[imu * stride]: Re(c2r pc), pc[mu] = sum_m1 w v1[n1,l1,m1] u[n2,l2,m1-mu] with u = conj(v1)
-// or v2 as stored. w * v1 is rounded to a double first, then the run sum, then c2r, as in
-// the dense walk, so the features are bit-identical to it.
+// or v2 as stored. For real densities and l1 + l2 + lam even pc[-mu] = (-1)^mu conj(pc[mu]),
+// so only mu >= 0 is summed; in pc[0] the terms of m1 and -m1 are complex conjugates.
 static inline void shell_features(const lambda_plan &q, const SALTEDDescriptors &v1, const SALTEDDescriptors &u, const bool conj,
-	const int iat, const int n1, const int n2, const int il, double *pre, double *pim, double *out, const size_t stride)
+	const int iat, const int n1, const int n2, const int il, double *out, const size_t stride)
 {
-	const int l21 = q.l21;
+	const int lam = q.lam, l21 = q.l21;
 	const cdouble *__restrict a = v1.block(iat, n1, (*q.llvec)[0][il]);
 	const cdouble *__restrict v2_ptr = u.block(iat, n2, (*q.llvec)[1][il]);
-	for (int imu = 0; imu < l21; ++imu)
+	{
+		const w3j_run &run = q.runs[static_cast<size_t>(il) * l21 + lam];
+		const double *__restrict w = q.w3j->data() + run.w_off;
+		const cdouble *__restrict av = a + run.im1_begin;
+		const cdouble *__restrict b = v2_ptr + run.im2_begin;
+		const int h = run.count / 2;
+		const double sg = conj ? 1.0 : -1.0;
+		double x = 0.0;
+		for (int k = 0; k < h; ++k)
+			x += w[k] * (av[k].real() * b[k].real() + sg * av[k].imag() * b[k].imag());
+		out[static_cast<size_t>(lam) * stride] = q.cpm_re[lam] * (2.0 * x + w[h] * av[h].real() * b[h].real());
+	}
+	for (int mu = 1; mu <= lam; ++mu)
 	{
 		double sr = 0.0, si = 0.0;
-		const w3j_run &run = q.runs[static_cast<size_t>(il) * l21 + imu];
+		const w3j_run &run = q.runs[static_cast<size_t>(il) * l21 + lam + mu];
 		const double *__restrict w = q.w3j->data() + run.w_off;
 		const cdouble *__restrict av = a + run.im1_begin;
 		const cdouble *__restrict b = v2_ptr + run.im2_begin;
@@ -179,16 +204,8 @@ static inline void shell_features(const lambda_plan &q, const SALTEDDescriptors 
 				si += ar * b[k].imag() + ai * b[k].real();
 			}
 		}
-		pre[imu] = sr;
-		pim[imu] = si;
-	}
-	for (int imu = 0; imu < l21; ++imu)
-	{
-		double preal = 0.0;
-		const c2r_entry *__restrict row = &q.c2r_nz[static_cast<size_t>(imu) * 2];
-		for (int k = 0; k < q.c2r_cnt[imu]; ++k)
-			preal += row[k].re * pre[row[k].j] - row[k].im * pim[row[k].j];
-		out[static_cast<size_t>(imu) * stride] = preal;
+		out[static_cast<size_t>(lam + mu) * stride] = q.cpm_re[lam + mu] * sr - q.cpm_im[lam + mu] * si;
+		out[static_cast<size_t>(lam - mu) * stride] = q.cpm_re[lam - mu] * sr - q.cpm_im[lam - mu] * si;
 	}
 }
 
@@ -196,14 +213,13 @@ static inline void shell_features(const lambda_plan &q, const SALTEDDescriptors 
 static double atom_norm2_direct(const lambda_plan &q, const SALTEDDescriptors &v1, const SALTEDDescriptors &u, const bool conj,
 	const int iat, const int nrad1, const int nrad2)
 {
-	vec buf(3 * static_cast<size_t>(q.l21));
-	double *pre = buf.data(), *pim = pre + q.l21, *f = pim + q.l21;
+	vec f(q.l21);
 	double inner = 0.0;
 	for (int n1 = 0; n1 < nrad1; ++n1)
 		for (int n2 = 0; n2 < nrad2; ++n2)
 			for (int il = 0; il < q.llmax; ++il)
 			{
-				shell_features(q, v1, u, conj, iat, n1, n2, il, pre, pim, f, 1);
+				shell_features(q, v1, u, conj, iat, n1, n2, il, f.data(), 1);
 				for (int i = 0; i < q.l21; ++i)
 					inner += f[i] * f[i];
 			}
@@ -212,8 +228,9 @@ static double atom_norm2_direct(const lambda_plan &q, const SALTEDDescriptors &v
 
 // sum of the squared features of one atom for one lambda, from its density matrices. For real
 // densities, v[n,l,-m] = (-1)^m conj(v[n,l,m]), and l1 + l2 + lam even every feature is real, so
-// with c2r unitary the sum is sum_mu |pc_mu|^2, and summed over n1 and n2 that is
-// sum_mu sum_m1,m1' w w' A1[m1,m1'] A2[m1-mu,m1'-mu], A2 of u = conj(v1) (s2 = -1) or of v2
+// with c2r unitary the sum is sum_mu |pc_mu|^2 = |pc_0|^2 + 2 sum_mu>0 |pc_mu|^2, and summed over
+// n1 and n2 that is sum_mu sum_m1,m1' w w' A1[m1,m1'] A2[m1-mu,m1'-mu], A2 of u = conj(v1)
+// (s2 = -1) or of v2
 static double atom_norm2(const lambda_plan &q, const double *m1, const size_t dsz1, const double *m2, const size_t dsz2, const double s2)
 {
 	const int l21 = q.l21;
@@ -227,7 +244,7 @@ static double atom_norm2(const lambda_plan &q, const double *m1, const size_t ds
 		const size_t o1 = dm_offset(l1), o2 = dm_offset(l2);
 		const double *a1r = m1 + o1, *a1i = m1 + dsz1 + o1;
 		const double *a2r = m2 + o2, *a2i = m2 + dsz2 + o2;
-		for (int mu = 0; mu < l21; ++mu)
+		for (int mu = q.lam; mu < l21; ++mu)
 		{
 			const w3j_run &r = q.runs[static_cast<size_t>(il) * l21 + mu];
 			double P = 0.0;
@@ -239,7 +256,7 @@ static double atom_norm2(const lambda_plan &q, const double *m1, const size_t ds
 				for (int y = 0; y < r.count; ++y)
 					P += w * w3j[static_cast<size_t>(r.w_off) + y] * (a1r[i1 + y] * a2r[i2 + y] - s2 * a1i[i1 + y] * a2i[i2 + y]);
 			}
-			inner += P;
+			inner += (mu == q.lam ? 1.0 : 2.0) * P;
 		}
 	}
 	return inner;
@@ -503,29 +520,24 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	if (ProgressBar::report_counts)
 		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
-	// Only the nfps selected features are built, bit-identical to the full walk; only
-	// normfact comes from the norm above.
+	// Only the nfps selected features are built; only normfact comes from the norm above.
 	// Scoped: the bar rewinds to its own line when it is destroyed, so anything
 	// printed after the loop but before that is silently overwritten.
 	{
 	ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
-#pragma omp parallel
+#pragma omp parallel for schedule(dynamic, 1)
+	for (int iat = 0; iat < natoms; ++iat)
 	{
-		vec pre(l21), pim(l21);
-#pragma omp for schedule(dynamic, 1)
-		for (int iat = 0; iat < natoms; ++iat)
+		const size_t offset = static_cast<size_t>(iat) * l21 * nfps;
+		for (int i = 0; i < nfps; ++i)
 		{
-			const size_t offset = static_cast<size_t>(iat) * l21 * nfps;
-			for (int i = 0; i < nfps; ++i)
-			{
-				const int f = static_cast<int>(vfps[i]);
-				if (f >= shells_i) continue;
-				const int il = f % llmax, n2 = (f / llmax) % nrad2, n1 = f / (llmax * nrad2);
-				double *out = p.data() + offset + i;
-				shell_features(plan, v1, v2_src, v2_is_conj_of_v1, iat, n1, n2, il, pre.data(), pim.data(), out, nfps);
-				for (int imu = 0; imu < l21; ++imu)
-					out[static_cast<size_t>(imu) * nfps] *= normfact[iat];
-			}
+			const int f = static_cast<int>(vfps[i]);
+			if (f >= shells_i) continue;
+			const int il = f % llmax, n2 = (f / llmax) % nrad2, n1 = f / (llmax * nrad2);
+			double *out = p.data() + offset + i;
+			shell_features(plan, v1, v2_src, v2_is_conj_of_v1, iat, n1, n2, il, out, nfps);
+			for (int imu = 0; imu < l21; ++imu)
+				out[static_cast<size_t>(imu) * nfps] *= normfact[iat];
 		}
 	}
 	}

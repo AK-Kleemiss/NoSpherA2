@@ -1222,8 +1222,9 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 
 // NaCl rocksalt atoms sit on cubic inversion centres, where the lam = 1, 2, 3 features vanish. Displaced by d their
 // squared norm is a small fraction of the bound sum_il tr A1[l1] tr A2[l2] / (2 lam + 1), while the density-matrix norm
-// is a sum of terms of the size of the bound, so it cancels. The sparse path, norm made inside or by equicomb_norms,
-// must stay on the dense path, which sums the squared features, to 1e-9 of the largest feature for d >= 1e-5 A
+// is a sum of terms of the size of the bound, so it cancels. For every d > 0 the norm from equicomb_norms must be the
+// sum of the squared features to 1e-12, and the sparse features, norm made inside or by equicomb_norms, must stay on the
+// dense path to the rounding of features that small
 TEST(SaltedFchkEquicombTests, NearSymmetricSitesKeepTheNorm)
 {
 	EXPECT_NEAR(wigner_3j(1, 1, 0, 0, 0, 0), -1.0 / std::sqrt(3.0), 1e-15);
@@ -1310,15 +1311,18 @@ TEST(SaltedFchkEquicombTests, NearSymmetricSitesKeepTheNorm)
 				dev_inside = std::max(dev_inside, di / top);
 				dev_given = std::max(dev_given, dg / top);
 				const double nf = norms[lam][i];
-				norm_err = std::max(norm_err, nf > 0.0 ? std::abs(1.0 / (nf * nf) - direct) / direct : 1.0);
+				const double err = nf > 0.0 ? std::abs(1.0 / (nf * nf) - direct) / direct : 1.0;
+				norm_err = std::max(norm_err, err);
 				ratio = std::min(ratio, direct / bound);
+				// features a fraction r of the size of their terms carry rounding of about 1e-16 / sqrt(r) in either path
+				if (d > 0.0)
+				{
+					EXPECT_LE(err, 1e-12) << "d " << d << " lam " << lam << " atom " << i;
+					EXPECT_LE(di / top, 1e-14 / std::sqrt(direct / bound)) << "d " << d << " lam " << lam << " atom " << i;
+					EXPECT_LE(dg / top, 1e-14 / std::sqrt(direct / bound)) << "d " << d << " lam " << lam << " atom " << i;
+				}
 			}
 			std::printf("%8.0e  %3d  %16.2e  %19.2e  %17.2e  %15.2e\n", d, lam, dev_inside, dev_given, norm_err, ratio);
-			if (d >= 1e-5)
-			{
-				EXPECT_LE(dev_inside, 1e-9) << "d " << d << " lam " << lam;
-				EXPECT_LE(dev_given, 1e-9) << "d " << d << " lam " << lam;
-			}
 		}
 	}
 	equicomb_set_gpu(gpu_before);
