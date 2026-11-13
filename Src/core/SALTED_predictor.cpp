@@ -1010,14 +1010,7 @@ vec SALTEDPredictor::predict()
 		std::vector<const vec *> w3j_all(lmax_max + 1);
 		for (int lam = 0; lam <= lmax_max; lam++)
 			w3j_all[lam] = &wigner3j[lam];
-		// Positions of size L (Angstrom) are rounded to about eps L, which breaks a site symmetry by that much;
-		// features that vanish by it then carry a squared norm of about (eps L)^2 of the atom's total power
-		double L = 1.0;
-		for (size_t i = 0; i < 3 * featomic_system.size(); i++)
-			L = std::max(L, std::abs(featomic_system.positions()[i]));
-		const double noise = 100.0 * std::numeric_limits<double>::epsilon() * L;
-		norms = equicomb_norms(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, w3j_all, llvec_all, c2r_all, v2_is_conj_of_v1,
-			noise * noise);
+		norms = equicomb_norms(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, w3j_all, llvec_all, c2r_all, v2_is_conj_of_v1);
 		const double norm_s = _elapsed(_t_norm);
 		_t_equicomb += norm_s;
 		throughput::record_time("SALTED equicomb", false, 1000.0 * norm_s);
