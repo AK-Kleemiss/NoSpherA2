@@ -21,19 +21,18 @@ bool equicomb_gpu_enabled() { return g_equicomb_use_gpu; }
 // Start of the l block in one atom's matrices: sum_{k<l} (2k+1)^2
 static size_t dm_offset(const int l) { return static_cast<size_t>(l * (2 * l - 1) * (2 * l + 1) / 3); }
 
-// One atom's A and B for l = 0..lmax into m ([are, aim, bre, bim][(2l+1)^2 blocks], dsz =
-// dm_offset(lmax + 1) apart), real and imaginary parts apart: plain double loops vectorise,
-// std::complex products without -ffast-math do not
+// One atom's A[m,m'] = sum_n x_m conj(x_m') for l = 0..lmax into m ([are, aim][(2l+1)^2 blocks],
+// dsz = dm_offset(lmax + 1) apart), real and imaginary parts apart: plain double loops
+// vectorise, std::complex products without -ffast-math do not
 static void atom_density(const SALTEDDescriptors &d, const int nch, const int lmax, const int iat, const size_t dsz, double *m)
 {
-	std::fill(m, m + 4 * dsz, 0.0);
+	std::fill(m, m + 2 * dsz, 0.0);
 	double xr[64], xi[64];
 	for (int l = 0; l <= lmax; ++l)
 	{
 		const int nm = 2 * l + 1;
 		const size_t o = dm_offset(l);
 		double *__restrict are = m + o, *__restrict aim = m + dsz + o;
-		double *__restrict bre = m + 2 * dsz + o, *__restrict bim = m + 3 * dsz + o;
 		for (int n = 0; n < nch; ++n)
 		{
 			const cdouble *x = d.block(iat, n, l);
@@ -43,8 +42,6 @@ static void atom_density(const SALTEDDescriptors &d, const int nch, const int lm
 				{
 					are[a * nm + b] += xr[a] * xr[b] + xi[a] * xi[b];
 					aim[a * nm + b] += xi[a] * xr[b] - xr[a] * xi[b];
-					bre[a * nm + b] += xr[a] * xr[b] - xi[a] * xi[b];
-					bim[a * nm + b] += xi[a] * xr[b] + xr[a] * xi[b];
 				}
 		}
 	}
@@ -83,6 +80,7 @@ static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, 
 	{
 		const int tl1 = llvec[0][til], tl2 = llvec[1][til];
 		err_checkf(tl1 >= 0 && tl2 >= 0, "equicomb: negative angular momentum in llvec", std::cout);
+		err_checkf((tl1 + tl2 + lam) % 2 == 0, "equicomb: l1 + l2 + lambda odd in llvec", std::cout);
 		for (int timu = 0; timu < l21; ++timu)
 		{
 			const int tmu = timu - lam + tl1;
@@ -100,17 +98,14 @@ static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, 
 	q.lmax1 = *std::max_element(llvec[0].begin(), llvec[0].end());
 	q.lmax2 = *std::max_element(llvec[1].begin(), llvec[1].end());
 
-	// Every atom is normalised over all featsize features, but only nfps of them are
-	// kept, and the norm needs none of the others. Feature (n1, n2, il) is Re(q) with
-	// q = c2r pc and pc[mu] = sum_m1 w v1[n1,l1,m1] u[n2,l2,m1-mu], where u is the factor
-	// the loop multiplies by (conj(v1), or v2 as stored). Then
+	// The device's norm: feature (n1, n2, il) is Re(q) with q = c2r pc and
+	// pc[mu] = sum_m1 w v1[n1,l1,m1] u[n2,l2,m1-mu], where u is the factor the loop
+	// multiplies by (conj(v1), or v2 as stored). Then
 	//   sum_i Re(q_i)^2 = (q^H q + Re q^T q) / 2
 	//                   = Re(sum K[mu,mu'] pc_mu conj(pc_mu') + sum G[mu,mu'] pc_mu pc_mu') / 2
 	// with K = sum_i c2r[i,mu] conj(c2r[i,mu']) and G = sum_i c2r[i,mu] c2r[i,mu'], and
 	// summed over n1 and n2 both products factor into per-atom, per-l density matrices
-	// A[m,m'] = sum_n x_m conj(x_m') and B[m,m'] = sum_n x_m x_m' of v1 and of u. That is
-	// one pass over m pairs per shell instead of nrad1*nrad2 feature evaluations; the
-	// value is the same up to rounding (SALTED's equicombsparse_numba, a7fbc3a).
+	// A[m,m'] = sum_n x_m conj(x_m') and B[m,m'] = sum_n x_m x_m' of v1 and of u.
 	q.K_re.assign(static_cast<size_t>(l21) * l21, 0.0);
 	q.K_im = q.K_re; q.G_re = q.K_re; q.G_im = q.K_re;
 	for (int a = 0; a < l21; ++a)
@@ -215,7 +210,10 @@ static double atom_norm2_direct(const lambda_plan &q, const SALTEDDescriptors &v
 	return inner;
 }
 
-// sum of the squared features of one atom for one lambda, from its density matrices
+// sum of the squared features of one atom for one lambda, from its density matrices. For real
+// densities, v[n,l,-m] = (-1)^m conj(v[n,l,m]), and l1 + l2 + lam even every feature is real, so
+// with c2r unitary the sum is sum_mu |pc_mu|^2, and summed over n1 and n2 that is
+// sum_mu sum_m1,m1' w w' A1[m1,m1'] A2[m1-mu,m1'-mu], A2 of u = conj(v1) (s2 = -1) or of v2
 static double atom_norm2(const lambda_plan &q, const double *m1, const size_t dsz1, const double *m2, const size_t dsz2, const double s2)
 {
 	const int l21 = q.l21;
@@ -227,53 +225,36 @@ static double atom_norm2(const lambda_plan &q, const double *m1, const size_t ds
 		const int l1 = llvec[0][il], l2 = llvec[1][il];
 		const int nm1 = 2 * l1 + 1, nm2 = 2 * l2 + 1;
 		const size_t o1 = dm_offset(l1), o2 = dm_offset(l2);
-		const double *a1r = m1 + o1, *a1i = m1 + dsz1 + o1, *b1r = m1 + 2 * dsz1 + o1, *b1i = m1 + 3 * dsz1 + o1;
-		const double *a2r = m2 + o2, *a2i = m2 + dsz2 + o2, *b2r = m2 + 2 * dsz2 + o2, *b2i = m2 + 3 * dsz2 + o2;
-		double t = 0.0;
+		const double *a1r = m1 + o1, *a1i = m1 + dsz1 + o1;
+		const double *a2r = m2 + o2, *a2i = m2 + dsz2 + o2;
 		for (int mu = 0; mu < l21; ++mu)
 		{
 			const w3j_run &r = q.runs[static_cast<size_t>(il) * l21 + mu];
-			if (r.count == 0) continue;
-			for (int mu2 = 0; mu2 < l21; ++mu2)
+			double P = 0.0;
+			for (int x = 0; x < r.count; ++x)
 			{
-				const size_t mm = static_cast<size_t>(mu) * l21 + mu2;
-				const w3j_run &r2 = q.runs[static_cast<size_t>(il) * l21 + mu2];
-				if ((q.K_re[mm] == 0.0 && q.K_im[mm] == 0.0 && q.G_re[mm] == 0.0 && q.G_im[mm] == 0.0) || r2.count == 0) continue;
-				double Pr = 0.0, Pi = 0.0, Qr = 0.0, Qi = 0.0;
-				for (int x = 0; x < r.count; ++x)
-				{
-					const double w = w3j[static_cast<size_t>(r.w_off) + x];
-					const int i1 = (r.im1_begin + x) * nm1 + r2.im1_begin;
-					const int i2 = (r.im2_begin + x) * nm2 + r2.im2_begin;
-					for (int y = 0; y < r2.count; ++y)
-					{
-						const double ww = w * w3j[static_cast<size_t>(r2.w_off) + y];
-						const double ar = a2r[i2 + y], ai = s2 * a2i[i2 + y];
-						const double br = b2r[i2 + y], bi = s2 * b2i[i2 + y];
-						Pr += ww * (a1r[i1 + y] * ar - a1i[i1 + y] * ai);
-						Pi += ww * (a1r[i1 + y] * ai + a1i[i1 + y] * ar);
-						Qr += ww * (b1r[i1 + y] * br - b1i[i1 + y] * bi);
-						Qi += ww * (b1r[i1 + y] * bi + b1i[i1 + y] * br);
-					}
-				}
-				t += q.K_re[mm] * Pr - q.K_im[mm] * Pi + q.G_re[mm] * Qr - q.G_im[mm] * Qi;
+				const double w = w3j[static_cast<size_t>(r.w_off) + x];
+				const int i1 = (r.im1_begin + x) * nm1 + r.im1_begin;
+				const int i2 = (r.im2_begin + x) * nm2 + r.im2_begin;
+				for (int y = 0; y < r.count; ++y)
+					P += w * w3j[static_cast<size_t>(r.w_off) + y] * (a1r[i1 + y] * a2r[i2 + y] - s2 * a1i[i1 + y] * a2i[i2 + y]);
 			}
+			inner += P;
 		}
-		inner += 0.5 * t;
 	}
 	return inner;
 }
 
 // normfact[k][atom] for every plan. The density matrices do not depend on lambda, so each
 // atom's are built once into a per-thread buffer and contracted for all plans, instead of
-// being stored for all atoms (natoms * 4 * sum (2l+1)^2 doubles): no faster, but that memory
+// being stored for all atoms (natoms * 2 * sum (2l+1)^2 doubles): no faster, but that memory
 // is never held. The work per atom is fixed, so the norm scales linearly with the atom count.
 // An empty environment keeps 0.
 static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
 	const bool v2_is_conj_of_v1, const lambda_plan *const *plans, const size_t nplans)
 {
-	// u = conj(v1) has conj(A1), conj(B1) as its matrices; with nrad2 == nrad1 they are v1's
-	// own (share) and the pair sum flips the sign of their imaginary parts
+	// u = conj(v1) has conj(A1) as its matrix; with nrad2 == nrad1 that is v1's
+	// own (share) and the pair sum flips the sign of its imaginary part
 	const SALTEDDescriptors &u = v2_is_conj_of_v1 ? v1 : v2;
 	const bool share = v2_is_conj_of_v1 && nrad2 == nrad1;
 	const double s2 = v2_is_conj_of_v1 ? -1.0 : 1.0;
@@ -288,7 +269,7 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 	ivec direct(nplans, 0);
 #pragma omp parallel
 	{
-		vec m1(4 * dsz1), m2(share ? 0 : 4 * dsz2);
+		vec m1(2 * dsz1), m2(share ? 0 : 2 * dsz2);
 #pragma omp for schedule(dynamic, 8)
 		for (int iat = 0; iat < natoms; ++iat)
 		{
