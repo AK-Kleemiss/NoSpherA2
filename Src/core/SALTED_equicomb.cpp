@@ -285,6 +285,7 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 		"equicomb: the shells need an l the descriptors do not hold", std::cout);
 	const size_t dsz1 = dm_offset(lmax1 + 1), dsz2 = dm_offset(lmax2 + 1);
 	vec2 normfact(nplans, vec(natoms, 0.0));
+	ivec direct(nplans, 0);
 #pragma omp parallel
 	{
 		vec m1(4 * dsz1), m2(share ? 0 : 4 * dsz2);
@@ -317,7 +318,11 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 				for (int il = 0; il < q.llmax; ++il)
 					bound += tr1[(*q.llvec)[0][il]] * tr2[(*q.llvec)[1][il]];
 				if (inner < 1e-5 * bound / q.l21)
+				{
 					inner = atom_norm2_direct(q, v1, u, v2_is_conj_of_v1, iat, nrad1, nrad2);
+#pragma omp atomic
+					++direct[k];
+				}
 				// An empty environment gives an all-zero descriptor, so inner is 0 and
 				// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
 				// answer: the kernel contributes nothing and the atom keeps the species
@@ -326,6 +331,13 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 					normfact[k][iat] = 1.0 / sqrt(inner);
 			}
 		}
+	}
+	if (ProgressBar::report_counts)
+	{
+		std::cout << "[equicomb] direct norms of " << natoms << " atoms, per lambda:";
+		for (size_t k = 0; k < nplans; ++k)
+			std::cout << " " << plans[k]->lam << ":" << direct[k];
+		std::cout << std::endl;
 	}
 	return normfact;
 }
