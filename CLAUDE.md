@@ -239,6 +239,16 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-13 (equicomb follow-ups), the predictor keeps one descriptor buffer for all lambdas and the CUDA feature
+kernel builds mu >= 0 only; the zeroing of features that vanish by site symmetry moved to its own branch with the
+normalisation fix. `ctest -R "SALTED|Salted|salted"` on a CUDA `release-windows-tests` build: **56 passed, 0 failed** of 56; the full suite
+was not rerun (last full run: 1402 passed of 1416, above). See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-13 (equicomb guard), the sparse SALTED equicomb sums an atom's features directly where its density-matrix norm
+cancels (atoms near symmetric sites), builds features for mu >= 0 only, and the GPU takes the host's norms;
+`SaltedFchkEquicombTests.NearSymmetricSitesKeepTheNorm` is new. `ctest` on a `release-windows-tests` build with CUDA (GPU present)
+reports **1402 passed, 0 failed, 12 skipped** (2 disabled) of 1416. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-28 (RI .tshb), XCW's RI `.tshb` is the RI partition's own fit and the first step matches the table's scatterers
 to atoms by id; `XcwPartitionTests.RiTshbIsTheRiTable` is new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM
 reports **1328 passed, 0 failed, 23 skipped** (2 disabled) of 1353. See `UNIT_TESTS_STATUS.md`.

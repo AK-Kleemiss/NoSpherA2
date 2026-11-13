@@ -1002,9 +1002,9 @@ vec SALTEDPredictor::predict()
 		c2r_all[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
 	}
 	// Every lambda's norm in one pass over the atoms, with no density matrices kept for all of
-	// them; the device computes its own
+	// them; the device takes them too
 	vec2 norms;
-	if (config.sparsify && !gpu_equicomb)
+	if (config.sparsify)
 	{
 		const auto _t_norm = std::chrono::steady_clock::now();
 		std::vector<const vec *> w3j_all(lmax_max + 1);
@@ -1025,9 +1025,18 @@ vec SALTEDPredictor::predict()
 	// The only quantity that crosses lambda: set at lam = 0, reused above it when zeta != 1
 	std::vector<dMatrix2> kernell0(config.species.size());
 	env_score.assign(wavy.get_ncen(), -1.0);
+	// One output buffer for every lambda, sized for the largest: a fresh one per lambda is a serial
+	// zero fill of all of it, and the sparse equicomb writes every element it returns
+	vec p;
+	if (config.sparsify)
+	{
+		size_t n = 0;
+		for (int lam = 0; lam <= lmax_max; lam++)
+			n = std::max(n, (size_t)natoms * ((size_t)2 * lam + 1) * vfps[lam].size());
+		p.resize(n);
+	}
 	for (int lam = 0; lam <= lmax_max; lam++)
 	{
-		vec p;
 		const auto _t_eq = std::chrono::steady_clock::now();
 		ivec2 &llvec_t = llvec_all[lam];
 		cvec2 &c2r = c2r_all[lam];
@@ -1036,7 +1045,6 @@ vec SALTEDPredictor::predict()
 		if (config.sparsify)
 		{
 			int nfps = static_cast<int>(vfps[lam].size());
-			p.assign((size_t)natoms * ((size_t)2 * lam + 1) * nfps, 0.0);
 			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p, v2_is_conj_of_v1,
 				norms.empty() ? nullptr : norms[lam].data());
 			featsize[lam] = nfps;
