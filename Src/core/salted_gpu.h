@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-//GPU SALTED equicomb, the CPU walk exactly: per atom and selected shell triple (n1, n2, il) the
+//GPU SALTED equicomb, the CPU walk: per atom and selected shell triple (n1, n2, il) the
 //Wigner-weighted v1 block is contracted with v2 over the surviving m pairs and made real. Only the
 //nfps sparsified features are built; the per-atom norm comes from the host (equicomb_norms).
 
@@ -37,11 +37,9 @@ struct salted_gpu_problem {
 	const int* llvec1 = nullptr;         //[llmax] l2 per shell
 	//runs[il * l21 + imu] = {im1_begin, im2_begin, count, w_off}, flattened as 4 ints
 	const int* runs = nullptr;
-	//complex-to-real rows, two nonzeros each: cols[2i], cols[2i+1] and re/im pairs
-	const int* c2r_cols = nullptr;
-	const double* c2r_re = nullptr;
-	const double* c2r_im = nullptr;
-	const int* c2r_cnt = nullptr;
+	//[l21] feature imu = Re(cpm[imu] pc[|imu - lam|]), as the host's lambda_plan
+	const double* cpm_re = nullptr;
+	const double* cpm_im = nullptr;
 	const int* vfps = nullptr;           //[nfps] shell triple (n1*nrad2+n2)*llmax+il per output slot
 	const double* normfact = nullptr;    //[natoms] 1/|feature vector| over all shells, 0 if empty
 

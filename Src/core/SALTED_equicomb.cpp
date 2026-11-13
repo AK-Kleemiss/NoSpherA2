@@ -65,7 +65,6 @@ static void atom_density(const SALTEDDescriptors &d, const int nch, const int lm
 // offset into w3j describe a group completely. w3j is consumed in exactly (il, imu, im1)
 // order, so a group's weights are a contiguous slice of it and need no copy.
 struct w3j_run { int im1_begin, im2_begin, count, w_off; };
-struct c2r_entry { int j; double re, im; };
 
 // Everything of one lambda the walk needs that does not depend on the atoms
 struct lambda_plan
@@ -75,8 +74,6 @@ struct lambda_plan
 	const ivec2 *llvec = nullptr;
 	std::vector<w3j_run> runs;
 	size_t total_terms = 0;
-	std::vector<c2r_entry> c2r_nz;
-	ivec c2r_cnt;
 	vec cpm_re, cpm_im;
 };
 
@@ -110,27 +107,12 @@ static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, 
 	q.lmax1 = *std::max_element(llvec[0].begin(), llvec[0].end());
 	q.lmax2 = *std::max_element(llvec[1].begin(), llvec[1].end());
 
-	// The complex-to-real matrix is a mirror-pair transform: row i couples only
-	// column i and column l21-1-i, so every row holds exactly two nonzeros (the
-	// middle row holds one). Dropping the exact zeros leaves a finite sum bit for
-	// bit the same as long as the survivors stay in ascending column order, which
-	// is the order the dense loop added them in. The structure is read off c2r
-	// rather than assumed; anything else is an error.
-	q.c2r_nz.assign(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
-	q.c2r_cnt.assign(l21, 0);
+	// The complex-to-real matrix is a mirror-pair transform: row i couples only column i and
+	// column l21-1-i. The structure is read off c2r rather than assumed; anything else is an error.
 	for (int i2 = 0; i2 < l21; ++i2)
-	{
-		int cnt = 0;
 		for (int j2 = 0; j2 < l21; ++j2)
-		{
-			const cdouble &e = c2r[i2][j2];
-			if (e.real() == 0.0 && e.imag() == 0.0) continue;
-			err_checkf(cnt < 2 && (j2 == i2 || j2 == l21 - 1 - i2), "equicomb: complex-to-real row " + std::to_string(i2) + " is not a mirror pair", std::cout);
-			q.c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
-			++cnt;
-		}
-		q.c2r_cnt[i2] = cnt;
-	}
+			err_checkf((c2r[i2][j2].real() == 0.0 && c2r[i2][j2].imag() == 0.0) || j2 == i2 || j2 == l21 - 1 - i2,
+				"equicomb: complex-to-real row " + std::to_string(i2) + " is not a mirror pair", std::cout);
 	// pc[-mu] = (-1)^mu conj(pc[mu]), so row imu of c2r gives Re(cpm[imu] pc[|mu|]) with
 	// cpm = c2r[imu][lam + mu] + (-1)^mu conj(c2r[imu][lam - mu])
 	q.cpm_re.assign(l21, 0.0);
@@ -468,14 +450,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			flat_runs[r * 4 + 2] = runs[r].count;
 			flat_runs[r * 4 + 3] = runs[r].w_off;
 		}
-		ivec cols(static_cast<size_t>(l21) * 2, 0);
-		vec cre(static_cast<size_t>(l21) * 2, 0.0), cim(static_cast<size_t>(l21) * 2, 0.0);
-		for (int i2 = 0; i2 < l21; ++i2)
-			for (int k2 = 0; k2 < 2; ++k2) {
-				cols[i2 * 2 + k2] = plan.c2r_nz[static_cast<size_t>(i2) * 2 + k2].j;
-				cre[i2 * 2 + k2] = plan.c2r_nz[static_cast<size_t>(i2) * 2 + k2].re;
-				cim[i2 * 2 + k2] = plan.c2r_nz[static_cast<size_t>(i2) * 2 + k2].im;
-			}
 		ivec fps(vfps.begin(), vfps.begin() + nfps);
 		const SALTEDDescriptors &v2_gpu = v2_is_conj_of_v1 ? v1 : v2;
 		salted_gpu_problem q;
@@ -494,8 +468,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		q.v2_len_doubles = static_cast<long long>(v2_gpu.values().size()) * 2;
 		q.w3j = w3j.data(); q.w3j_len = static_cast<long long>(w3j.size());
 		q.llvec0 = llvec[0].data(); q.llvec1 = llvec[1].data();
-		q.runs = flat_runs.data(); q.c2r_cols = cols.data();
-		q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = plan.c2r_cnt.data();
+		q.runs = flat_runs.data(); q.cpm_re = plan.cpm_re.data(); q.cpm_im = plan.cpm_im.data();
 		q.vfps = fps.data(); q.normfact = normfact.data(); q.p = p.data();
 		const bool gpu_ok = salted_gpu_equicomb(q);
 		if (gpu_ok)

@@ -11,10 +11,6 @@ NOSPHERA2_GPU_API_BEGIN
 	std::fprintf(stderr, "NoSpherA2 SALTED GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	return false; } } while (0)
 
-//Sizes the per-thread transform vectors; l21 = 2*lam+1 is 17 for the v7 model, the margin is for
-//larger models, and the entry point refuses more
-#define SALTED_MAX_L21 64
-
 namespace {
 
 struct descriptor_cache {
@@ -78,59 +74,52 @@ __device__ __forceinline__ const double* desc_block(const double* v, const size_
 
 //One thread per (atom, output slot): only the nfps selected features are built, the norm comes
 //from the host. Consecutive slots write consecutive p entries for every imu, so the stores coalesce.
+//For real densities pc[-mu] = (-1)^mu conj(pc[mu]), so only mu >= 0 is summed and imu = lam +- mu
+//is Re(cpm[imu] pc[mu]); in pc[0] the terms of m1 and -m1 are complex conjugates.
 __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llmax,
-	const int l21, const int shells, const int nfps, const bool conj,
+	const int lam, const int shells, const int nfps, const bool conj,
 	const double* __restrict__ v1, const size_t* __restrict__ v1_off, const int v1_nch,
 	const double* __restrict__ v2, const size_t* __restrict__ v2_off, const int v2_nch,
 	const double* __restrict__ w3j, const int* __restrict__ llvec0, const int* __restrict__ llvec1,
-	const int* __restrict__ runs, const int* __restrict__ c2r_cols,
-	const double* __restrict__ c2r_re, const double* __restrict__ c2r_im,
-	const int* __restrict__ c2r_cnt, const int* __restrict__ vfps,
-	const double* __restrict__ normfact, double* __restrict__ p)
+	const int* __restrict__ runs, const double* __restrict__ cpm_re, const double* __restrict__ cpm_im,
+	const int* __restrict__ vfps, const double* __restrict__ normfact, double* __restrict__ p)
 {
 	const int atom = blockIdx.y;
 	const int slot = blockIdx.x * blockDim.x + threadIdx.x;
 	if (atom >= natoms || slot >= nfps) return;
+	const int l21 = 2 * lam + 1;
 	double* out = p + (size_t)atom * l21 * nfps + slot;
 	const int f = vfps[slot];
-	//Features past nrad1*nrad2*llmax stay zero; the host zeroed p
+	//Features past nrad1*nrad2*llmax stay zero; the device buffer was zeroed
 	if (f >= shells) return;
 	const int il = f % llmax, n2 = (f / llmax) % nrad2, n1 = f / (llmax * nrad2);
 	const double* v1p = desc_block(v1, v1_off, v1_nch, atom, n1, llvec0[il]);
 	const double* v2p = desc_block(v2, v2_off, v2_nch, atom, n2, llvec1[il]);
-	double pc_re[SALTED_MAX_L21], pc_im[SALTED_MAX_L21];
-	for (int imu = 0; imu < l21; imu++) {
-		const int* run = runs + 4 * (il * l21 + imu);
-		const int im1_begin = run[0], im2_begin = run[1], count = run[2], w_off = run[3];
-		double acc_r = 0.0, acc_i = 0.0;
-		for (int k = 0; k < count; k++) {
-			const double wk = w3j[w_off + k];
-			const double ar = wk * v1p[2 * (im1_begin + k)];
-			const double ai = wk * v1p[2 * (im1_begin + k) + 1];
-			const double br = v2p[2 * (im2_begin + k)];
-			const double bi = v2p[2 * (im2_begin + k) + 1];
-			if (conj) {
-				acc_r += ar * br + ai * bi;
-				acc_i += ai * br - ar * bi;
-			}
-			else {
-				acc_r += ar * br - ai * bi;
-				acc_i += ar * bi + ai * br;
-			}
-		}
-		pc_re[imu] = acc_r;
-		pc_im[imu] = acc_i;
+	const double nf = normfact[atom], sg = conj ? 1.0 : -1.0;
+	{
+		const int* run = runs + 4 * (il * l21 + lam);
+		const double* a = v1p + 2 * run[0];
+		const double* b = v2p + 2 * run[1];
+		const double* w = w3j + run[3];
+		const int h = run[2] / 2;
+		double x = 0.0;
+		for (int k = 0; k < h; k++)
+			x += w[k] * (a[2 * k] * b[2 * k] + sg * a[2 * k + 1] * b[2 * k + 1]);
+		out[(size_t)lam * nfps] = cpm_re[lam] * nf * (2.0 * x + w[h] * a[2 * h] * b[2 * h]);
 	}
-	//Two nonzeros per transform row, ascending columns, so the sum matches the CPU
-	const double nf = normfact[atom];
-	for (int i = 0; i < l21; i++) {
-		double preal = 0.0;
-		const int nz = c2r_cnt[i];
-		for (int k = 0; k < nz; k++) {
-			const int j = c2r_cols[2 * i + k];
-			preal += c2r_re[2 * i + k] * pc_re[j] - c2r_im[2 * i + k] * pc_im[j];
+	for (int mu = 1; mu <= lam; mu++) {
+		const int* run = runs + 4 * (il * l21 + lam + mu);
+		const double* a = v1p + 2 * run[0];
+		const double* b = v2p + 2 * run[1];
+		const double* w = w3j + run[3];
+		double sr = 0.0, si = 0.0;
+		for (int k = 0; k < run[2]; k++) {
+			const double ar = w[k] * a[2 * k], ai = w[k] * a[2 * k + 1];
+			sr += ar * b[2 * k] + sg * ai * b[2 * k + 1];
+			si += ai * b[2 * k] - sg * ar * b[2 * k + 1];
 		}
-		out[(size_t)i * nfps] = preal * nf;
+		out[(size_t)(lam + mu) * nfps] = nf * (cpm_re[lam + mu] * sr - cpm_im[lam + mu] * si);
+		out[(size_t)(lam - mu) * nfps] = nf * (cpm_re[lam - mu] * sr - cpm_im[lam - mu] * si);
 	}
 }
 
@@ -154,7 +143,6 @@ void salted_gpu_clear_cache()
 bool salted_gpu_equicomb(const salted_gpu_problem& q)
 {
 	if (q.natoms <= 0 || q.shells <= 0 || q.nfps <= 0 || q.l21 <= 0) return false;
-	if (q.l21 > SALTED_MAX_L21) return false;
 	if (!salted_gpu_available()) return false;
 
 	const size_t p_bytes = sizeof(double) * (size_t)q.natoms * q.nfps * q.l21;
@@ -162,8 +150,8 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q)
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
 	if (p_bytes + (1u << 27) > freeb) return false;
 
-	double *d_w3j = nullptr, *d_c2r_re = nullptr, *d_c2r_im = nullptr, *d_nf = nullptr, *d_p = nullptr;
-	int *d_ll0 = nullptr, *d_ll1 = nullptr, *d_runs = nullptr, *d_cols = nullptr, *d_cnt = nullptr, *d_vfps = nullptr;
+	double *d_w3j = nullptr, *d_cpm = nullptr, *d_nf = nullptr, *d_p = nullptr;
+	int *d_ll0 = nullptr, *d_ll1 = nullptr, *d_runs = nullptr, *d_vfps = nullptr;
 
 	if (!g_descriptor_cache.upload(q)) return false;
 	GPU_TRY(gpuMalloc(&d_w3j, sizeof(double) * (size_t)q.w3j_len));
@@ -174,14 +162,9 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q)
 	GPU_TRY(gpuMemcpy(d_ll1, q.llvec1, sizeof(int) * q.llmax, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMalloc(&d_runs, sizeof(int) * 4 * (size_t)q.llmax * q.l21));
 	GPU_TRY(gpuMemcpy(d_runs, q.runs, sizeof(int) * 4 * (size_t)q.llmax * q.l21, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMalloc(&d_cols, sizeof(int) * 2 * (size_t)q.l21));
-	GPU_TRY(gpuMemcpy(d_cols, q.c2r_cols, sizeof(int) * 2 * (size_t)q.l21, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMalloc(&d_c2r_re, sizeof(double) * 2 * (size_t)q.l21));
-	GPU_TRY(gpuMemcpy(d_c2r_re, q.c2r_re, sizeof(double) * 2 * (size_t)q.l21, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMalloc(&d_c2r_im, sizeof(double) * 2 * (size_t)q.l21));
-	GPU_TRY(gpuMemcpy(d_c2r_im, q.c2r_im, sizeof(double) * 2 * (size_t)q.l21, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMalloc(&d_cnt, sizeof(int) * (size_t)q.l21));
-	GPU_TRY(gpuMemcpy(d_cnt, q.c2r_cnt, sizeof(int) * (size_t)q.l21, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMalloc(&d_cpm, sizeof(double) * 2 * (size_t)q.l21));
+	GPU_TRY(gpuMemcpy(d_cpm, q.cpm_re, sizeof(double) * (size_t)q.l21, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_cpm + q.l21, q.cpm_im, sizeof(double) * (size_t)q.l21, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMalloc(&d_vfps, sizeof(int) * (size_t)q.nfps));
 	GPU_TRY(gpuMemcpy(d_vfps, q.vfps, sizeof(int) * (size_t)q.nfps, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMalloc(&d_nf, sizeof(double) * (size_t)q.natoms));
@@ -191,11 +174,11 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q)
 	GPU_TRY(gpuMemcpy(d_nf, q.normfact, sizeof(double) * (size_t)q.natoms, gpuMemcpyHostToDevice));
 
 	const dim3 thr(128), grid((q.nfps + 127) / 128, q.natoms);
-	equicomb_kernel<<<grid, thr>>>(q.natoms, q.nrad2, q.llmax, q.l21,
+	equicomb_kernel<<<grid, thr>>>(q.natoms, q.nrad2, q.llmax, q.lam,
 		q.shells, q.nfps, q.v2_is_conj_of_v1,
 		g_descriptor_cache.d_v1, g_descriptor_cache.d_v1off, q.v1_nchannels,
 		g_descriptor_cache.d_v2, g_descriptor_cache.d_v2off, q.v2_nchannels,
-		d_w3j, d_ll0, d_ll1, d_runs, d_cols, d_c2r_re, d_c2r_im, d_cnt, d_vfps, d_nf, d_p);
+		d_w3j, d_ll0, d_ll1, d_runs, d_cpm, d_cpm + q.l21, d_vfps, d_nf, d_p);
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuDeviceSynchronize());
 
@@ -215,7 +198,7 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q)
 	GPU_TRY(copied);
 
 	gpuFree(d_w3j); gpuFree(d_ll0); gpuFree(d_ll1); gpuFree(d_runs);
-	gpuFree(d_cols); gpuFree(d_c2r_re); gpuFree(d_c2r_im); gpuFree(d_cnt);
+	gpuFree(d_cpm);
 	gpuFree(d_vfps); gpuFree(d_nf); gpuFree(d_p);
 	return true;
 }
