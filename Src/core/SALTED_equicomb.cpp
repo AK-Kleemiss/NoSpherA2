@@ -56,6 +56,7 @@ static void atom_density(const SALTEDDescriptors &d, const int nch, const int lm
 // offset into w3j describe a group completely. w3j is consumed in exactly (il, imu, im1)
 // order, so a group's weights are a contiguous slice of it and need no copy.
 struct w3j_run { int im1_begin, im2_begin, count, w_off; };
+struct c2r_entry { int j; double re, im; };
 
 // Everything of one lambda the walk needs that does not depend on the atoms
 struct lambda_plan
@@ -66,6 +67,8 @@ struct lambda_plan
 	std::vector<w3j_run> runs;
 	size_t total_terms = 0;
 	vec K_re, K_im, G_re, G_im;
+	std::vector<c2r_entry> c2r_nz;
+	ivec c2r_cnt;
 };
 
 static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, const cvec2 &c2r)
@@ -122,7 +125,94 @@ static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, 
 			const size_t ab = static_cast<size_t>(a) * l21 + b;
 			q.K_re[ab] = k.real(); q.K_im[ab] = k.imag(); q.G_re[ab] = g.real(); q.G_im[ab] = g.imag();
 		}
+	// The complex-to-real matrix is a mirror-pair transform: row i couples only
+	// column i and column l21-1-i, so every row holds exactly two nonzeros (the
+	// middle row holds one). Dropping the exact zeros leaves a finite sum bit for
+	// bit the same as long as the survivors stay in ascending column order, which
+	// is the order the dense loop added them in. The structure is read off c2r
+	// rather than assumed; anything not two-per-row is an error.
+	q.c2r_nz.assign(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
+	q.c2r_cnt.assign(l21, 0);
+	for (int i2 = 0; i2 < l21; ++i2)
+	{
+		int cnt = 0;
+		for (int j2 = 0; j2 < l21; ++j2)
+		{
+			const cdouble &e = c2r[i2][j2];
+			if (e.real() == 0.0 && e.imag() == 0.0) continue;
+			err_checkf(cnt < 2, "equicomb: complex-to-real row " + std::to_string(i2) + " has more than two non-zeros", std::cout);
+			q.c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
+			++cnt;
+		}
+		q.c2r_cnt[i2] = cnt;
+	}
 	return q;
+}
+
+// The l21 real features of channels (n1, n2) and (l1, l2) = llvec[.][il] of one atom into
+// out[imu * stride]: Re(c2r pc), pc[mu] = sum_m1 w v1[n1,l1,m1] u[n2,l2,m1-mu] with u = conj(v1)
+// or v2 as stored. w * v1 is rounded to a double first, then the run sum, then c2r, as in
+// the dense walk, so the features are bit-identical to it.
+static inline void shell_features(const lambda_plan &q, const SALTEDDescriptors &v1, const SALTEDDescriptors &u, const bool conj,
+	const int iat, const int n1, const int n2, const int il, double *pre, double *pim, double *out, const size_t stride)
+{
+	const int l21 = q.l21;
+	const cdouble *__restrict a = v1.block(iat, n1, (*q.llvec)[0][il]);
+	const cdouble *__restrict v2_ptr = u.block(iat, n2, (*q.llvec)[1][il]);
+	for (int imu = 0; imu < l21; ++imu)
+	{
+		double sr = 0.0, si = 0.0;
+		const w3j_run &run = q.runs[static_cast<size_t>(il) * l21 + imu];
+		const double *__restrict w = q.w3j->data() + run.w_off;
+		const cdouble *__restrict av = a + run.im1_begin;
+		const cdouble *__restrict b = v2_ptr + run.im2_begin;
+		if (conj) [[likely]]
+		{
+			for (int k = 0; k < run.count; ++k)
+			{
+				const double ar = w[k] * av[k].real(), ai = w[k] * av[k].imag();
+				sr += ar * b[k].real() + ai * b[k].imag();
+				si += ai * b[k].real() - ar * b[k].imag();
+			}
+		}
+		else
+		{
+			for (int k = 0; k < run.count; ++k)
+			{
+				const double ar = w[k] * av[k].real(), ai = w[k] * av[k].imag();
+				sr += ar * b[k].real() - ai * b[k].imag();
+				si += ar * b[k].imag() + ai * b[k].real();
+			}
+		}
+		pre[imu] = sr;
+		pim[imu] = si;
+	}
+	for (int imu = 0; imu < l21; ++imu)
+	{
+		double preal = 0.0;
+		const c2r_entry *__restrict row = &q.c2r_nz[static_cast<size_t>(imu) * 2];
+		for (int k = 0; k < q.c2r_cnt[imu]; ++k)
+			preal += row[k].re * pre[row[k].j] - row[k].im * pim[row[k].j];
+		out[static_cast<size_t>(imu) * stride] = preal;
+	}
+}
+
+// sum of the squared features of one atom for one lambda, feature by feature
+static double atom_norm2_direct(const lambda_plan &q, const SALTEDDescriptors &v1, const SALTEDDescriptors &u, const bool conj,
+	const int iat, const int nrad1, const int nrad2)
+{
+	vec buf(3 * static_cast<size_t>(q.l21));
+	double *pre = buf.data(), *pim = pre + q.l21, *f = pim + q.l21;
+	double inner = 0.0;
+	for (int n1 = 0; n1 < nrad1; ++n1)
+		for (int n2 = 0; n2 < nrad2; ++n2)
+			for (int il = 0; il < q.llmax; ++il)
+			{
+				shell_features(q, v1, u, conj, iat, n1, n2, il, pre, pim, f, 1);
+				for (int i = 0; i < q.l21; ++i)
+					inner += f[i] * f[i];
+			}
+	return inner;
 }
 
 // sum of the squared features of one atom for one lambda, from its density matrices
@@ -205,9 +295,29 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 			if (!share)
 				atom_density(u, nrad2, lmax2, iat, dsz2, m2.data());
 			const double *M2 = share ? m1.data() : m2.data();
+			double tr1[32], tr2[32];
+			for (int l = 0; l <= lmax1; ++l)
+			{
+				tr1[l] = 0.0;
+				for (int a = 0; a <= 2 * l; ++a) tr1[l] += m1[dm_offset(l) + a * (2 * l + 1) + a];
+			}
+			for (int l = 0; l <= lmax2; ++l)
+			{
+				tr2[l] = 0.0;
+				for (int a = 0; a <= 2 * l; ++a) tr2[l] += M2[dm_offset(l) + a * (2 * l + 1) + a];
+			}
 			for (size_t k = 0; k < nplans; ++k)
 			{
-				const double inner = atom_norm2(*plans[k], m1.data(), dsz1, M2, dsz2, s2);
+				const lambda_plan &q = *plans[k];
+				double inner = atom_norm2(q, m1.data(), dsz1, M2, dsz2, s2);
+				// sum_il tr(A1[l1]) tr(A2[l2]) / (2 lam + 1) bounds inner from above and is the size of
+				// the terms the density-matrix sum adds; where they cancel to a small fraction of it,
+				// as for features that nearly vanish by site symmetry, the features are summed directly
+				double bound = 0.0;
+				for (int il = 0; il < q.llmax; ++il)
+					bound += tr1[(*q.llvec)[0][il]] * tr2[(*q.llvec)[1][il]];
+				if (inner < 1e-5 * bound / q.l21)
+					inner = atom_norm2_direct(q, v1, u, v2_is_conj_of_v1, iat, nrad1, nrad2);
 				// An empty environment gives an all-zero descriptor, so inner is 0 and
 				// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
 				// answer: the kernel contributes nothing and the atom keeps the species
@@ -288,29 +398,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	const lambda_plan plan = make_plan(w3j, llvec, lam, c2r);
 	const std::vector<w3j_run> &runs = plan.runs;
 	const size_t total_terms = plan.total_terms;
-
-	// The complex-to-real matrix is a mirror-pair transform: row i couples only
-	// column i and column l21-1-i, so every row holds exactly two nonzeros (the
-	// middle row holds one). Dropping the exact zeros leaves a finite sum bit for
-	// bit the same as long as the survivors stay in ascending column order, which
-	// is the order the dense loop added them in. The structure is read off c2r
-	// rather than assumed; anything not two-per-row is an error.
-	struct c2r_entry { int j; double re, im; };
-	std::vector<c2r_entry> c2r_nz(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
-	ivec c2r_cnt(l21, 0);
-	for (int i2 = 0; i2 < l21; ++i2)
-	{
-		int cnt = 0;
-		for (int j2 = 0; j2 < l21; ++j2)
-		{
-			const cdouble &e = c2r[i2][j2];
-			if (e.real() == 0.0 && e.imag() == 0.0) continue;
-			err_checkf(cnt < 2, "equicomb: complex-to-real row " + std::to_string(i2) + " has more than two non-zeros", std::cout);
-			c2r_nz[static_cast<size_t>(i2) * 2 + cnt] = { j2, e.real(), e.imag() };
-			++cnt;
-		}
-		c2r_cnt[i2] = cnt;
-	}
+	const std::vector<c2r_entry> &c2r_nz = plan.c2r_nz;
+	const ivec &c2r_cnt = plan.c2r_cnt;
 	if (ProgressBar::report_counts)
 	{
 		std::cout << "[equicomb] lam " << lam
@@ -421,9 +510,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	if (ProgressBar::report_counts)
 		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
-	// Only the nfps selected features are built. Each is the same arithmetic the full
-	// walk did (w * v1 rounded to a double first, then the run sum, then c2r), so the
-	// features are bit-identical to it; only normfact comes from the norm above.
+	// Only the nfps selected features are built, bit-identical to the full walk; only
+	// normfact comes from the norm above.
 	// Scoped: the bar rewinds to its own line when it is destroyed, so anything
 	// printed after the loop but before that is silently overwritten.
 	{
@@ -440,46 +528,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
 				const int f = static_cast<int>(vfps[i]);
 				if (f >= shells_i) continue;
 				const int il = f % llmax, n2 = (f / llmax) % nrad2, n1 = f / (llmax * nrad2);
-				const cdouble *__restrict a = v1.block(iat, n1, llvec[0][il]);
-				// v2 is conj(v1) when the two descriptor sets are the same; the sign is
-				// applied by choosing between the two forms of the inner loop
-				const cdouble *__restrict v2_ptr = v2_src.block(iat, n2, llvec[1][il]);
+				double *out = p.data() + offset + i;
+				shell_features(plan, v1, v2_src, v2_is_conj_of_v1, iat, n1, n2, il, pre.data(), pim.data(), out, nfps);
 				for (int imu = 0; imu < l21; ++imu)
-				{
-					double sr = 0.0, si = 0.0;
-					const w3j_run &run = runs[static_cast<size_t>(il) * l21 + imu];
-					const double *__restrict w = w3j.data() + run.w_off;
-					const cdouble *__restrict av = a + run.im1_begin;
-					const cdouble *__restrict b = v2_ptr + run.im2_begin;
-					if (v2_is_conj_of_v1) [[likely]]
-					{
-						for (int k = 0; k < run.count; ++k)
-						{
-							const double ar = w[k] * av[k].real(), ai = w[k] * av[k].imag();
-							sr += ar * b[k].real() + ai * b[k].imag();
-							si += ai * b[k].real() - ar * b[k].imag();
-						}
-					}
-					else
-					{
-						for (int k = 0; k < run.count; ++k)
-						{
-							const double ar = w[k] * av[k].real(), ai = w[k] * av[k].imag();
-							sr += ar * b[k].real() - ai * b[k].imag();
-							si += ar * b[k].imag() + ai * b[k].real();
-						}
-					}
-					pre[imu] = sr;
-					pim[imu] = si;
-				}
-				for (int imu = 0; imu < l21; ++imu)
-				{
-					double preal = 0.0;
-					const c2r_entry *__restrict row = &c2r_nz[static_cast<size_t>(imu) * 2];
-					for (int k = 0; k < c2r_cnt[imu]; ++k)
-						preal += row[k].re * pre[row[k].j] - row[k].im * pim[row[k].j];
-					p[offset + i + static_cast<size_t>(imu) * nfps] = preal * normfact[iat];
-				}
+					out[static_cast<size_t>(imu) * nfps] *= normfact[iat];
 			}
 		}
 	}
