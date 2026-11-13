@@ -408,8 +408,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	const lambda_plan plan = make_plan(w3j, llvec, lam, c2r);
 	const std::vector<w3j_run> &runs = plan.runs;
 	const size_t total_terms = plan.total_terms;
-	const std::vector<c2r_entry> &c2r_nz = plan.c2r_nz;
-	const ivec &c2r_cnt = plan.c2r_cnt;
 	if (ProgressBar::report_counts)
 	{
 		std::cout << "[equicomb] lam " << lam
@@ -459,9 +457,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		vec cre(static_cast<size_t>(l21) * 2, 0.0), cim(static_cast<size_t>(l21) * 2, 0.0);
 		for (int i2 = 0; i2 < l21; ++i2)
 			for (int k2 = 0; k2 < 2; ++k2) {
-				cols[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].j;
-				cre[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].re;
-				cim[i2 * 2 + k2] = c2r_nz[static_cast<size_t>(i2) * 2 + k2].im;
+				cols[i2 * 2 + k2] = plan.c2r_nz[static_cast<size_t>(i2) * 2 + k2].j;
+				cre[i2 * 2 + k2] = plan.c2r_nz[static_cast<size_t>(i2) * 2 + k2].re;
+				cim[i2 * 2 + k2] = plan.c2r_nz[static_cast<size_t>(i2) * 2 + k2].im;
 			}
 		ivec fps(vfps.begin(), vfps.begin() + nfps);
 		const SALTEDDescriptors &v2_gpu = v2_is_conj_of_v1 ? v1 : v2;
@@ -482,7 +480,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		q.w3j = w3j.data(); q.w3j_len = static_cast<long long>(w3j.size());
 		q.llvec0 = llvec[0].data(); q.llvec1 = llvec[1].data();
 		q.runs = flat_runs.data(); q.c2r_cols = cols.data();
-		q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = c2r_cnt.data();
+		q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = plan.c2r_cnt.data();
 		q.vfps = fps.data(); q.normfact = normfact.data(); q.p = p.data();
 		q.K_re = plan.K_re.data(); q.K_im = plan.K_im.data(); q.G_re = plan.G_re.data(); q.G_im = plan.G_im.data();
 		const bool gpu_ok = salted_gpu_equicomb(q);
@@ -520,7 +518,23 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	if (ProgressBar::report_counts)
 		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
-	// Only the nfps selected features are built; only normfact comes from the norm above.
+	// Only the nfps selected features are built, as in shell_features; only normfact comes
+	// from the norm above. They are grouped by il so that each (il, mu) run is set up once
+	// for all of them: features start[il]..start[il + 1] have channels sn1, sn2 and go to
+	// column scol of p.
+	ivec start(llmax + 1, 0);
+	for (int i = 0; i < nfps; ++i)
+		if (vfps[i] < shells_i) ++start[vfps[i] % llmax + 1];
+	for (int il = 0; il < llmax; ++il) start[il + 1] += start[il];
+	ivec sn1(start[llmax]), sn2(start[llmax]), scol(start[llmax]), next(start.begin(), start.end() - 1);
+	for (int i = 0; i < nfps; ++i)
+	{
+		const int f = static_cast<int>(vfps[i]);
+		if (f >= shells_i) continue;
+		const int k = next[f % llmax]++;
+		sn1[k] = f / (llmax * nrad2); sn2[k] = (f / llmax) % nrad2; scol[k] = i;
+	}
+	const double sg = v2_is_conj_of_v1 ? 1.0 : -1.0;
 	// Scoped: the bar rewinds to its own line when it is destroyed, so anything
 	// printed after the loop but before that is silently overwritten.
 	{
@@ -528,16 +542,49 @@ void equicomb(int natoms, int nrad1, int nrad2,
 #pragma omp parallel for schedule(dynamic, 1)
 	for (int iat = 0; iat < natoms; ++iat)
 	{
-		const size_t offset = static_cast<size_t>(iat) * l21 * nfps;
-		for (int i = 0; i < nfps; ++i)
+		double *pa = p.data() + static_cast<size_t>(iat) * l21 * nfps;
+		const double nf = normfact[iat];
+		for (int il = 0; il < llmax; ++il)
 		{
-			const int f = static_cast<int>(vfps[i]);
-			if (f >= shells_i) continue;
-			const int il = f % llmax, n2 = (f / llmax) % nrad2, n1 = f / (llmax * nrad2);
-			double *out = p.data() + offset + i;
-			shell_features(plan, v1, v2_src, v2_is_conj_of_v1, iat, n1, n2, il, out, nfps);
-			for (int imu = 0; imu < l21; ++imu)
-				out[static_cast<size_t>(imu) * nfps] *= normfact[iat];
+			const int l1 = llvec[0][il], l2 = llvec[1][il];
+			{
+				const w3j_run &run = runs[static_cast<size_t>(il) * l21 + lam];
+				const double *__restrict w = w3j.data() + run.w_off;
+				const int h = run.count / 2;
+				const double c = plan.cpm_re[lam] * nf;
+				double *__restrict out = pa + static_cast<size_t>(lam) * nfps;
+				for (int k = start[il]; k < start[il + 1]; ++k)
+				{
+					const cdouble *__restrict av = v1.block(iat, sn1[k], l1) + run.im1_begin;
+					const cdouble *__restrict b = v2_src.block(iat, sn2[k], l2) + run.im2_begin;
+					double x = 0.0;
+					for (int t = 0; t < h; ++t)
+						x += w[t] * (av[t].real() * b[t].real() + sg * av[t].imag() * b[t].imag());
+					out[scol[k]] = c * (2.0 * x + w[h] * av[h].real() * b[h].real());
+				}
+			}
+			for (int mu = 1; mu <= lam; ++mu)
+			{
+				const w3j_run &run = runs[static_cast<size_t>(il) * l21 + lam + mu];
+				const double *__restrict w = w3j.data() + run.w_off;
+				const double cpr = plan.cpm_re[lam + mu] * nf, cpi = plan.cpm_im[lam + mu] * nf;
+				const double cmr = plan.cpm_re[lam - mu] * nf, cmi = plan.cpm_im[lam - mu] * nf;
+				double *__restrict op = pa + static_cast<size_t>(lam + mu) * nfps, *__restrict om = pa + static_cast<size_t>(lam - mu) * nfps;
+				for (int k = start[il]; k < start[il + 1]; ++k)
+				{
+					const cdouble *__restrict av = v1.block(iat, sn1[k], l1) + run.im1_begin;
+					const cdouble *__restrict b = v2_src.block(iat, sn2[k], l2) + run.im2_begin;
+					double sr = 0.0, si = 0.0;
+					for (int t = 0; t < run.count; ++t)
+					{
+						const double ar = w[t] * av[t].real(), ai = w[t] * av[t].imag();
+						sr += ar * b[t].real() + sg * ai * b[t].imag();
+						si += ai * b[t].real() - sg * ar * b[t].imag();
+					}
+					op[scol[k]] = cpr * sr - cpi * si;
+					om[scol[k]] = cmr * sr - cmi * si;
+				}
+			}
 		}
 	}
 	}
