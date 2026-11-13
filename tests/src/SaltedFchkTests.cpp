@@ -1295,15 +1295,21 @@ TEST(SaltedFchkEquicombTests, NearSymmetricSitesKeepTheNorm)
 			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, inside, true);
 			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, given, true, norms[lam].data());
 			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, raw, true, ones.data());
+			// the device when one is present, the CPU otherwise
+			vec device(size, 0.0);
+			equicomb_set_gpu(true);
+			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, device, true, norms[lam].data());
+			equicomb_set_gpu(false);
 			double dev_inside = 0.0, dev_given = 0.0, norm_err = 0.0, ratio = 1e300;
 			for (int i = 0; i < natoms; i++)
 			{
-				double top = 0.0, di = 0.0, dg = 0.0, direct = 0.0, bound = 0.0;
+				double top = 0.0, di = 0.0, dg = 0.0, dd = 0.0, direct = 0.0, bound = 0.0;
 				for (int f = i * block; f < (i + 1) * block; f++)
 				{
 					top = std::max(top, std::abs(dense[f]));
 					di = std::max(di, std::abs(inside[f] - dense[f]));
 					dg = std::max(dg, std::abs(given[f] - dense[f]));
+					dd = std::max(dd, std::abs(device[f] - dense[f]));
 					direct += raw[f] * raw[f];
 				}
 				for (int il = 0; il < llmax; il++)
@@ -1320,6 +1326,7 @@ TEST(SaltedFchkEquicombTests, NearSymmetricSitesKeepTheNorm)
 					EXPECT_LE(err, 1e-12) << "d " << d << " lam " << lam << " atom " << i;
 					EXPECT_LE(di / top, 1e-14 / std::sqrt(direct / bound)) << "d " << d << " lam " << lam << " atom " << i;
 					EXPECT_LE(dg / top, 1e-14 / std::sqrt(direct / bound)) << "d " << d << " lam " << lam << " atom " << i;
+					EXPECT_LE(dd / top, 1e-14 / std::sqrt(direct / bound)) << "device, d " << d << " lam " << lam << " atom " << i;
 				}
 			}
 			std::printf("%8.0e  %3d  %16.2e  %19.2e  %17.2e  %15.2e\n", d, lam, dev_inside, dev_given, norm_err, ratio);

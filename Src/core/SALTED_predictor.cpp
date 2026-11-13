@@ -1002,9 +1002,9 @@ vec SALTEDPredictor::predict()
 		c2r_all[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
 	}
 	// Every lambda's norm in one pass over the atoms, with no density matrices kept for all of
-	// them; the device computes its own
+	// them; the device takes them too
 	vec2 norms;
-	if (config.sparsify && !gpu_equicomb)
+	if (config.sparsify)
 	{
 		const auto _t_norm = std::chrono::steady_clock::now();
 		std::vector<const vec *> w3j_all(lmax_max + 1);

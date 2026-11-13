@@ -75,7 +75,6 @@ struct lambda_plan
 	const ivec2 *llvec = nullptr;
 	std::vector<w3j_run> runs;
 	size_t total_terms = 0;
-	vec K_re, K_im, G_re, G_im;
 	std::vector<c2r_entry> c2r_nz;
 	ivec c2r_cnt;
 	vec cpm_re, cpm_im;
@@ -111,28 +110,6 @@ static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, 
 	q.lmax1 = *std::max_element(llvec[0].begin(), llvec[0].end());
 	q.lmax2 = *std::max_element(llvec[1].begin(), llvec[1].end());
 
-	// The device's norm: feature (n1, n2, il) is Re(q) with q = c2r pc and
-	// pc[mu] = sum_m1 w v1[n1,l1,m1] u[n2,l2,m1-mu], where u is the factor the loop
-	// multiplies by (conj(v1), or v2 as stored). Then
-	//   sum_i Re(q_i)^2 = (q^H q + Re q^T q) / 2
-	//                   = Re(sum K[mu,mu'] pc_mu conj(pc_mu') + sum G[mu,mu'] pc_mu pc_mu') / 2
-	// with K = sum_i c2r[i,mu] conj(c2r[i,mu']) and G = sum_i c2r[i,mu] c2r[i,mu'], and
-	// summed over n1 and n2 both products factor into per-atom, per-l density matrices
-	// A[m,m'] = sum_n x_m conj(x_m') and B[m,m'] = sum_n x_m x_m' of v1 and of u.
-	q.K_re.assign(static_cast<size_t>(l21) * l21, 0.0);
-	q.K_im = q.K_re; q.G_re = q.K_re; q.G_im = q.K_re;
-	for (int a = 0; a < l21; ++a)
-		for (int b = 0; b < l21; ++b)
-		{
-			cdouble k = constants::cnull, g = constants::cnull;
-			for (int i2 = 0; i2 < l21; ++i2)
-			{
-				k += c2r[i2][a] * std::conj(c2r[i2][b]);
-				g += c2r[i2][a] * c2r[i2][b];
-			}
-			const size_t ab = static_cast<size_t>(a) * l21 + b;
-			q.K_re[ab] = k.real(); q.K_im[ab] = k.imag(); q.G_re[ab] = g.real(); q.G_im[ab] = g.imag();
-		}
 	// The complex-to-real matrix is a mirror-pair transform: row i couples only
 	// column i and column l21-1-i, so every row holds exactly two nonzeros (the
 	// middle row holds one). Dropping the exact zeros leaves a finite sum bit for
@@ -455,9 +432,22 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	// Features past nrad1*nrad2*llmax stay zero, as they were when ptemp was built in full
 	const int shells_i = static_cast<int>(shells);
 
+	// The predictor hands in all lambda's norms from one pass (equicomb_norms); a caller
+	// without them gets this lambda's alone
+	if (norms)
+		std::copy(norms, norms + natoms, normfact.begin());
+	else
+	{
+		const lambda_plan *one = &plan;
+		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1)[0];
+	}
+	warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
+	if (ProgressBar::report_counts)
+		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
+
 #ifdef NOSPHERA2_USE_GPU
-	//The device reproduces this walk exactly; it falls through to the CPU loop below if
-	//no device is present or it will not fit.
+	//The device builds the selected features with the norm above; it falls through to the
+	//CPU loop below if no device is present or it will not fit.
 	if (g_equicomb_use_gpu && salted_gpu_available())
 	{
 		ivec flat_runs(static_cast<size_t>(llmax) * l21 * 4);
@@ -496,10 +486,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		q.runs = flat_runs.data(); q.c2r_cols = cols.data();
 		q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = plan.c2r_cnt.data();
 		q.vfps = fps.data(); q.normfact = normfact.data(); q.p = p.data();
-		q.K_re = plan.K_re.data(); q.K_im = plan.K_im.data(); q.G_re = plan.G_re.data(); q.G_im = plan.G_im.data();
 		const bool gpu_ok = salted_gpu_equicomb(q);
-		if (gpu_ok)
-			warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
 		if (gpu_ok)
 			throughput::record("SALTED equicomb", true,
 				throughput::flops_equicomb(natoms, nfps, 1, 1, l21),
@@ -518,19 +505,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			return;
 	}
 #endif
-
-	// The predictor hands in all lambda's norms from one pass (equicomb_norms); a caller
-	// without them gets this lambda's alone
-	if (norms)
-		std::copy(norms, norms + natoms, normfact.begin());
-	else
-	{
-		const lambda_plan *one = &plan;
-		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1)[0];
-	}
-	warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
-	if (ProgressBar::report_counts)
-		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
 	// Only the nfps selected features are built, as in shell_features; only normfact comes
 	// from the norm above. They are grouped by il so that each (il, mu) run is set up once
