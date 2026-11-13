@@ -23,11 +23,12 @@ static size_t dm_offset(const int l) { return static_cast<size_t>(l * (2 * l - 1
 
 // One atom's A[m,m'] = sum_n x_m conj(x_m') for l = 0..lmax into m ([are, aim][(2l+1)^2 blocks],
 // dsz = dm_offset(lmax + 1) apart), real and imaginary parts apart: plain double loops
-// vectorise, std::complex products without -ffast-math do not
-static void atom_density(const SALTEDDescriptors &d, const int nch, const int lmax, const int iat, const size_t dsz, double *m)
+// vectorise, std::complex products without -ffast-math do not. The sums over n run over
+// xr/xi[m * nch + n] ((2 lmax + 1) * nch each); for a real density A[-m',-m] =
+// (-1)^(m+m') A[m,m'] and A is Hermitian, so only m' <= m, m + m' <= 0 are summed.
+static void atom_density(const SALTEDDescriptors &d, const int nch, const int lmax, const int iat, const size_t dsz, double *m,
+	double *__restrict xr, double *__restrict xi)
 {
-	std::fill(m, m + 2 * dsz, 0.0);
-	double xr[64], xi[64];
 	for (int l = 0; l <= lmax; ++l)
 	{
 		const int nm = 2 * l + 1;
@@ -36,14 +37,25 @@ static void atom_density(const SALTEDDescriptors &d, const int nch, const int lm
 		for (int n = 0; n < nch; ++n)
 		{
 			const cdouble *x = d.block(iat, n, l);
-			for (int a = 0; a < nm; ++a) { xr[a] = x[a].real(); xi[a] = x[a].imag(); }
-			for (int a = 0; a < nm; ++a)
-				for (int b = 0; b < nm; ++b)
-				{
-					are[a * nm + b] += xr[a] * xr[b] + xi[a] * xi[b];
-					aim[a * nm + b] += xi[a] * xr[b] - xr[a] * xi[b];
-				}
+			for (int a = 0; a < nm; ++a) { xr[a * nch + n] = x[a].real(); xi[a * nch + n] = x[a].imag(); }
 		}
+		for (int i = 0; i <= l; ++i)
+			for (int j = i; j < nm - i; ++j)
+			{
+				const double *rj = xr + j * nch, *ij = xi + j * nch, *ri = xr + i * nch, *ii = xi + i * nch;
+				double sr = 0.0, si = 0.0;
+				for (int n = 0; n < nch; ++n)
+				{
+					sr += rj[n] * ri[n] + ij[n] * ii[n];
+					si += ij[n] * ri[n] - rj[n] * ii[n];
+				}
+				const double s = (i + j) % 2 ? -1.0 : 1.0;
+				const int jm = nm - 1 - j, im = nm - 1 - i;
+				are[j * nm + i] = sr; aim[j * nm + i] = si;
+				are[i * nm + j] = sr; aim[i * nm + j] = -si;
+				are[im * nm + jm] = s * sr; aim[im * nm + jm] = s * si;
+				are[jm * nm + im] = s * sr; aim[jm * nm + im] = -s * si;
+			}
 	}
 }
 
@@ -287,12 +299,14 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 #pragma omp parallel
 	{
 		vec m1(2 * dsz1), m2(share ? 0 : 2 * dsz2);
+		vec x(2 * static_cast<size_t>(2 * std::max(lmax1, lmax2) + 1) * std::max(nrad1, nrad2));
+		double *xr = x.data(), *xi = xr + x.size() / 2;
 #pragma omp for schedule(dynamic, 8)
 		for (int iat = 0; iat < natoms; ++iat)
 		{
-			atom_density(v1, nrad1, lmax1, iat, dsz1, m1.data());
+			atom_density(v1, nrad1, lmax1, iat, dsz1, m1.data(), xr, xi);
 			if (!share)
-				atom_density(u, nrad2, lmax2, iat, dsz2, m2.data());
+				atom_density(u, nrad2, lmax2, iat, dsz2, m2.data(), xr, xi);
 			const double *M2 = share ? m1.data() : m2.data();
 			double tr1[32], tr2[32];
 			for (int l = 0; l <= lmax1; ++l)
