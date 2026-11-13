@@ -925,6 +925,48 @@ TEST(SaltedFchkUtilTests, CubeMLIntegratesToPopulation)
 
 // ------------------------------------------------------------- equicomb
 
+namespace
+{
+	// the expansion of a real density, as featomic's are: v[n,l,-m] = (-1)^m conj(v[n,l,m]), so v[n,l,0] is real
+	void make_real_density(SALTEDDescriptors& v, const int natoms)
+	{
+		for (int l = 0; l < static_cast<int>(v.offsets().size()); l++)
+			for (int a = 0; a < natoms; a++)
+				for (int n = 0; n < v.nchannels(); n++)
+				{
+					cdouble* x = v.block(a, n, l);
+					x[l] = x[l].real();
+					for (int m = 1; m <= l; m++)
+						x[l + m] = (m % 2 ? -1.0 : 1.0) * std::conj(x[l - m]);
+				}
+	}
+
+	// Racah's formula for (j1 j2 j3; m1 m2 m3) at integer arguments
+	double wigner_3j(const int j1, const int j2, const int j3, const int m1, const int m2, const int m3)
+	{
+		if (m1 + m2 + m3 != 0 || j3 < std::abs(j1 - j2) || j3 > j1 + j2 || std::abs(m1) > j1 || std::abs(m2) > j2 || std::abs(m3) > j3)
+			return 0.0;
+		auto f = [](const int n) { return std::tgamma(n + 1.0); };
+		double s = 0.0;
+		for (int k = std::max({ 0, j2 - j3 - m1, j1 - j3 + m2 }); k <= std::min({ j1 + j2 - j3, j1 - m1, j2 + m2 }); k++)
+			s += (k % 2 ? -1.0 : 1.0) / (f(k) * f(j3 - j2 + k + m1) * f(j3 - j1 + k - m2) * f(j1 + j2 - j3 - k) * f(j1 - k - m1) * f(j2 - k + m2));
+		return ((j1 - j2 - m3) % 2 ? -1.0 : 1.0) * s * std::sqrt(f(j1 + j2 - j3) * f(j1 - j2 + j3) * f(j2 + j3 - j1) / f(j1 + j2 + j3 + 1)
+			* f(j1 + m1) * f(j1 - m1) * f(j2 + m2) * f(j2 - m2) * f(j3 + m3) * f(j3 - m3));
+	}
+
+	// SALTED's coupling list: per (l1, l2), mu, m1 with m2 = m1 - mu, (lam l2 l1; mu m2 -m1) (-1)^m1
+	vec salted_w3j(const int lam, const ivec2& llvec)
+	{
+		vec w;
+		for (size_t il = 0; il < llvec[0].size(); il++)
+			for (int mu = -lam; mu <= lam; mu++)
+				for (int m1 = -llvec[0][il]; m1 <= llvec[0][il]; m1++)
+					if (std::abs(m1 - mu) <= llvec[1][il])
+						w.push_back(wigner_3j(lam, llvec[1][il], llvec[0][il], mu, m1 - mu, -m1) * (m1 % 2 ? -1.0 : 1.0));
+		return w;
+	}
+}
+
 // the gpu switch is a plain flag; the sparse path checks dimensions before touching any buffer
 TEST(SaltedFchkEquicombTests, GpuSwitchAndArgumentChecks)
 {
@@ -980,18 +1022,16 @@ TEST(SaltedFchkEquicombTests, Lam0AnalyticNormalisation)
 	equicomb(1, 2, 1, v1, v2, w3j, llvec, 0, c2r, 2, 2, std::vector<int64_t>{ 1, 0 }, sparse);
 	EXPECT_NEAR(sparse[0], 0.8, 1e-14);
 	EXPECT_NEAR(sparse[1], 0.6, 1e-14);
-	// complex a: with conjugation a conj(a) is real and b conj(a) imaginary, without it a a is real and negative
-	v1.block(0, 0, 0)[0] = cdouble(0.0, 3.0);
-	vec conj_p(2, 0.0), plain(2, 0.0);
+	vec conj_p(2, 0.0);
 	equicomb(1, 2, 1, v1, v1, w3j, llvec, 0, c2r, 2, 2, std::vector<int64_t>{ 0, 1 }, conj_p, true);
-	EXPECT_NEAR(conj_p[0], 1.0, 1e-14);
-	EXPECT_NEAR(conj_p[1], 0.0, 1e-14);
+	EXPECT_NEAR(conj_p[0], 0.6, 1e-14);
+	EXPECT_NEAR(conj_p[1], 0.8, 1e-14);
+	// complex a, which no real density has, in the dense path only: without conjugation a a is real and negative
+	v1.block(0, 0, 0)[0] = cdouble(0.0, 3.0);
+	vec plain(2, 0.0);
 	equicomb(1, 2, 1, v1, v1, w3j, 1, llvec, 0, c2r, 2, plain, false);
 	EXPECT_NEAR(plain[0], -1.0, 1e-14);
 	EXPECT_NEAR(plain[1], 0.0, 1e-14);
-	vec plain_sparse(2, 0.0);
-	equicomb(1, 2, 1, v1, v1, w3j, llvec, 0, c2r, 2, 2, std::vector<int64_t>{ 0, 1 }, plain_sparse, false);
-	EXPECT_NEAR(plain_sparse[0], -1.0, 1e-14);
 }
 
 // lam = 1 over (l1, l2) = (1, 0) and (0, 1) with complex descriptors: the run-based sparse loop must reproduce
@@ -1011,8 +1051,10 @@ TEST(SaltedFchkEquicombTests, SparseMatchesDenseLam1)
 		x = cdouble(next(), next());
 	for (auto& x : v2.values())
 		x = cdouble(next(), next());
-	vec w3j{ 0.3, -0.5, 0.7, 0.2, 0.9, -0.4 };
+	make_real_density(v1, natoms);
+	make_real_density(v2, natoms);
 	ivec2 llvec{ { 1, 0 }, { 0, 1 } };
+	vec w3j = salted_w3j(1, llvec);
 	cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ 3 })[0];
 	const int llmax = 2, featsize = nrad1 * nrad2 * llmax, l21 = 3;
 	vec dense(static_cast<size_t>(natoms) * l21 * featsize, 0.0);
@@ -1059,13 +1101,14 @@ TEST(SaltedFchkEquicombTests, Lam1HandDerived)
 {
 	equicomb_set_gpu(false);
 	SALTEDDescriptors v(1, 1, 1);
-	const cdouble a(0.3, -0.7), b(-0.4, 0.2), c(0.9, 0.5), d(0.6, -0.8);
+	// a real density: c = -conj(a), b and d real
+	const cdouble a(0.3, -0.7), b(-0.4, 0.0), c(-0.3, -0.7), d(0.6, 0.0);
 	v.block(0, 0, 1)[0] = a;
 	v.block(0, 0, 1)[1] = b;
 	v.block(0, 0, 1)[2] = c;
 	v.block(0, 0, 0)[0] = d;
-	vec w3j{ 0.5, -0.25, 0.75 };
 	ivec2 llvec{ { 1 }, { 0 } };
+	vec w3j = salted_w3j(1, llvec);
 	cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ 3 })[0];
 	const cdouble p0 = w3j[0] * a * std::conj(d), p1 = w3j[1] * b * std::conj(d), p2 = w3j[2] * c * std::conj(d);
 	const double r = 1.0 / std::sqrt(2.0);
@@ -1102,7 +1145,7 @@ TEST(SaltedFchkEquicombTests, EmptyEnvironmentGivesZeros)
 	EXPECT_TRUE(equicomb_norms(0, 1, 1, v, v, { &w3j }, { llvec }, { c2r }, true)[0].empty());
 }
 
-// lam = 2 over every (l1, l2) up to 3 that couples to it, unequal channel counts: the sparse path builds only the
+// lam = 2 over every (l1, l2) up to 3 that couples to it with l1 + l2 + lam even, real densities, unequal channel counts: the sparse path builds only the
 // selected features and takes the norm from per-l density matrices, so a subset in shuffled order, with slots past
 // nrad1*nrad2*llmax, must still equal the dense path that builds and normalises all of them. Both conj forms, and
 // the device when one is present (it falls back to the CPU otherwise)
@@ -1120,24 +1163,29 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 		x = cdouble(next(), next());
 	for (auto& x : v2.values())
 		x = cdouble(next(), next());
+	make_real_density(v1, natoms);
+	make_real_density(v2, natoms);
 	// every lambda up to lam, for equicomb_norms' one pass over all of them
 	std::vector<ivec2> llvec_all(lam + 1, ivec2(2));
+	std::vector<vec> w3j_k(lam + 1);
+	std::vector<const vec*> w3j_all(lam + 1);
 	for (int k = 0; k <= lam; k++)
+	{
 		for (int l1 = 0; l1 <= lmax; l1++)
 			for (int l2 = 0; l2 <= lmax; l2++)
-				if (std::abs(l1 - l2) <= k && k <= l1 + l2)
+				if (std::abs(l1 - l2) <= k && k <= l1 + l2 && (l1 + l2 + k) % 2 == 0)
 				{
 					llvec_all[k][0].push_back(l1);
 					llvec_all[k][1].push_back(l2);
 				}
+		w3j_k[k] = salted_w3j(k, llvec_all[k]);
+		w3j_all[k] = &w3j_k[k];
+	}
 	ivec2& llvec = llvec_all[lam];
 	const int llmax = static_cast<int>(llvec[0].size());
-	vec w3j(4000);
-	for (double& w : w3j)
-		w = next();
+	vec& w3j = w3j_k[lam];
 	const std::vector<cvec2> c2r_all = SALTED_Utils::complex_to_real_transformation({ 1, 3, l21 });
 	cvec2 c2r = c2r_all[lam];
-	const std::vector<const vec*> w3j_all(lam + 1, &w3j);
 	const bool gpu_before = equicomb_gpu_enabled();
 	for (const bool conj : { false, true })
 	{
@@ -1170,34 +1218,6 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 		}
 	}
 	equicomb_set_gpu(gpu_before);
-}
-
-namespace
-{
-	// Racah's formula for (j1 j2 j3; m1 m2 m3) at integer arguments
-	double wigner_3j(const int j1, const int j2, const int j3, const int m1, const int m2, const int m3)
-	{
-		if (m1 + m2 + m3 != 0 || j3 < std::abs(j1 - j2) || j3 > j1 + j2 || std::abs(m1) > j1 || std::abs(m2) > j2 || std::abs(m3) > j3)
-			return 0.0;
-		auto f = [](const int n) { return std::tgamma(n + 1.0); };
-		double s = 0.0;
-		for (int k = std::max({ 0, j2 - j3 - m1, j1 - j3 + m2 }); k <= std::min({ j1 + j2 - j3, j1 - m1, j2 + m2 }); k++)
-			s += (k % 2 ? -1.0 : 1.0) / (f(k) * f(j3 - j2 + k + m1) * f(j3 - j1 + k - m2) * f(j1 + j2 - j3 - k) * f(j1 - k - m1) * f(j2 - k + m2));
-		return ((j1 - j2 - m3) % 2 ? -1.0 : 1.0) * s * std::sqrt(f(j1 + j2 - j3) * f(j1 - j2 + j3) * f(j2 + j3 - j1) / f(j1 + j2 + j3 + 1)
-			* f(j1 + m1) * f(j1 - m1) * f(j2 + m2) * f(j2 - m2) * f(j3 + m3) * f(j3 - m3));
-	}
-
-	// SALTED's coupling list: per (l1, l2), mu, m1 with m2 = m1 - mu, (lam l2 l1; mu m2 -m1) (-1)^m1
-	vec salted_w3j(const int lam, const ivec2& llvec)
-	{
-		vec w;
-		for (size_t il = 0; il < llvec[0].size(); il++)
-			for (int mu = -lam; mu <= lam; mu++)
-				for (int m1 = -llvec[0][il]; m1 <= llvec[0][il]; m1++)
-					if (std::abs(m1 - mu) <= llvec[1][il])
-						w.push_back(wigner_3j(lam, llvec[1][il], llvec[0][il], mu, m1 - mu, -m1) * (m1 % 2 ? -1.0 : 1.0));
-		return w;
-	}
 }
 
 // NaCl rocksalt atoms sit on cubic inversion centres, where the lam = 1, 2, 3 features vanish. Displaced by d their
