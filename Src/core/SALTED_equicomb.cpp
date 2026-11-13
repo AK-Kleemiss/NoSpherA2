@@ -237,9 +237,10 @@ static double atom_norm2(const lambda_plan &q, const double *m1, const size_t ds
 // atom's are built once into a per-thread buffer and contracted for all plans, instead of
 // being stored for all atoms (natoms * 2 * sum (2l+1)^2 doubles): no faster, but that memory
 // is never held. The work per atom is fixed, so the norm scales linearly with the atom count.
-// An empty environment keeps 0.
+// An empty environment keeps 0, and so does an atom whose squared norm is below noise2 times
+// tr(A1) tr(A2) / (2 lam + 1) over all l.
 static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
-	const bool v2_is_conj_of_v1, const lambda_plan *const *plans, const size_t nplans)
+	const bool v2_is_conj_of_v1, const lambda_plan *const *plans, const size_t nplans, const double noise2)
 {
 	// u = conj(v1) has conj(A1) as its matrix; with nrad2 == nrad1 that is v1's
 	// own (share) and the pair sum flips the sign of its imaginary part
@@ -254,7 +255,7 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 		"equicomb: the shells need an l the descriptors do not hold", std::cout);
 	const size_t dsz1 = dm_offset(lmax1 + 1), dsz2 = dm_offset(lmax2 + 1);
 	vec2 normfact(nplans, vec(natoms, 0.0));
-	ivec direct(nplans, 0);
+	ivec direct(nplans, 0), zeroed(nplans, 0);
 #pragma omp parallel
 	{
 		vec m1(2 * dsz1), m2(share ? 0 : 2 * dsz2);
@@ -267,16 +268,18 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 			if (!share)
 				atom_density(u, nrad2, lmax2, iat, dsz2, m2.data(), xr, xi);
 			const double *M2 = share ? m1.data() : m2.data();
-			double tr1[32], tr2[32];
+			double tr1[32], tr2[32], tot1 = 0.0, tot2 = 0.0;
 			for (int l = 0; l <= lmax1; ++l)
 			{
 				tr1[l] = 0.0;
 				for (int a = 0; a <= 2 * l; ++a) tr1[l] += m1[dm_offset(l) + a * (2 * l + 1) + a];
+				tot1 += tr1[l];
 			}
 			for (int l = 0; l <= lmax2; ++l)
 			{
 				tr2[l] = 0.0;
 				for (int a = 0; a <= 2 * l; ++a) tr2[l] += M2[dm_offset(l) + a * (2 * l + 1) + a];
+				tot2 += tr2[l];
 			}
 			for (size_t k = 0; k < nplans; ++k)
 			{
@@ -294,11 +297,18 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 #pragma omp atomic
 					++direct[k];
 				}
+				// Features that vanish by site symmetry come out as rounding noise of the positions
+				// and the descriptors; normalised they would point anywhere, so they are zeroed.
 				// An empty environment gives an all-zero descriptor, so inner is 0 and
 				// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
 				// answer: the kernel contributes nothing and the atom keeps the species
 				// average the model adds separately.
-				if (inner > 0.0) [[likely]]
+				if (inner > 0.0 && inner <= noise2 * tot1 * tot2 / q.l21)
+				{
+#pragma omp atomic
+					++zeroed[k];
+				}
+				else if (inner > 0.0) [[likely]]
 					normfact[k][iat] = 1.0 / sqrt(inner);
 			}
 		}
@@ -308,6 +318,9 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 		std::cout << "[equicomb] direct norms of " << natoms << " atoms, per lambda:";
 		for (size_t k = 0; k < nplans; ++k)
 			std::cout << " " << plans[k]->lam << ":" << direct[k];
+		std::cout << "; zeroed as rounding noise:";
+		for (size_t k = 0; k < nplans; ++k)
+			std::cout << " " << plans[k]->lam << ":" << zeroed[k];
 		std::cout << std::endl;
 	}
 	return normfact;
@@ -316,7 +329,7 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 vec2 equicomb_norms(int natoms, int nrad1, int nrad2,
 	const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
 	const std::vector<const vec *> &w3j, const std::vector<ivec2> &llvec, const std::vector<cvec2> &c2r,
-	bool v2_is_conj_of_v1)
+	bool v2_is_conj_of_v1, double noise2)
 {
 	err_checkf(w3j.size() == llvec.size() && c2r.size() == llvec.size(), "equicomb_norms: one w3j, llvec and c2r per lambda", std::cout);
 	std::vector<lambda_plan> plans;
@@ -325,7 +338,7 @@ vec2 equicomb_norms(int natoms, int nrad1, int nrad2,
 		plans.push_back(make_plan(*w3j[lam], llvec[lam], static_cast<int>(lam), c2r[lam]));
 	std::vector<const lambda_plan *> ptr;
 	for (const lambda_plan &q : plans) ptr.push_back(&q);
-	return plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, ptr.data(), ptr.size());
+	return plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, ptr.data(), ptr.size(), noise2);
 }
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
@@ -419,7 +432,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	else
 	{
 		const lambda_plan *one = &plan;
-		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1)[0];
+		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1, 0.0)[0];
 	}
 	warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
 	if (ProgressBar::report_counts)
