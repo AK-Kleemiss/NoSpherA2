@@ -297,6 +297,12 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-13 (equicomb follow-ups), the sparse equicomb zeroes lambda features that vanish by site symmetry (rounding
+noise below (100 eps L)^2 of the atom's total power), the predictor keeps one descriptor buffer for all lambdas, and the
+CUDA feature kernel builds mu >= 0 only; `SaltedFchkEquicombTests.ExactSymmetryZeroesTheVanishingFeatures` is new.
+`ctest -R "SALTED|Salted|salted"` on a CUDA `release-windows-tests` build: **57 passed, 0 failed** of 57; the full suite
+was not rerun (last full run: 1402 passed of 1416, above). See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-13 (equicomb guard), the sparse SALTED equicomb sums an atom's features directly where its density-matrix norm
 cancels (atoms near symmetric sites), builds features for mu >= 0 only, and the GPU takes the host's norms;
 `SaltedFchkEquicombTests.NearSymmetricSitesKeepTheNorm` is new. `ctest` on a `release-windows-tests` build with CUDA (GPU present)
