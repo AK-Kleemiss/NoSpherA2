@@ -1420,6 +1420,68 @@ TEST(SaltedFchkEquicombTests, ExactSymmetryZeroesTheVanishingFeatures)
 			}
 }
 
+// rel_power against SALTED's own kernels (branch soap-norm-symmetric-sites, 61df639): CH4 with H1 moved 0.01 A along x,
+// rcut 4, sigma 0.3, nrad 4, nang 4, no sparsification; carbon lambda 0-2 divided by its lambda = 0 length
+TEST(SaltedFchkEquicombTests, RelPowerMatchesSalted)
+{
+	equicomb_set_gpu(false);
+	const auto ref = nos_test_repo_root() / "tests" / "SALTED" / "relpower_ch4";
+	const int nrad = 4, nang = 4;
+	SALTED_Utils::FeatomicHyperParameters hp;
+	hp.cutoff_radius = 4.0;
+	hp.max_radial = nrad;
+	hp.max_angular = nang;
+	hp.atomic_gaussian_width = 0.3;
+	hp.species = { "C", "H" };
+	hp.neighspe = { "C", "H" };
+	featomic::SimpleSystem sys;
+	const double a = 0.629118;
+	const std::vector<d3> xyz{ { 0, 0, 0 }, { a + 0.01, a, a }, { -a, -a, a }, { a, -a, -a }, { -a, a, -a } };
+	for (int i = 0; i < 5; i++)
+		sys.add_atom(constants::get_Z_from_label(i == 0 ? "C" : "H") + 1, xyz[i]);
+	const SALTEDDescriptors v = SALTED_Utils::calculate_SALTED_descriptors(sys, hp);
+	const int nchan = v.nchannels();
+	ASSERT_EQ(nchan, 8);
+	std::vector<ivec2> llvec(3);
+	std::vector<cvec2> c2r(3);
+	std::vector<vec> w3j(3);
+	for (int lam = 0; lam <= 2; lam++)
+	{
+		ivec2 ll;
+		for (int l1 = 0; l1 <= nang; l1++)
+			for (int l2 = 0; l2 <= nang; l2++)
+				if ((lam + l1 + l2) % 2 == 0 && std::abs(l2 - lam) <= l1 && l1 <= l2 + lam)
+					ll.push_back({ l1, l2 });
+		llvec[lam] = transpose<int>(ll);
+		c2r[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+		w3j[lam] = salted_w3j(lam, llvec[lam]);
+	}
+	const vec norm0 = equicomb_norms(5, nchan, nchan, v, v, { &w3j[0] }, { llvec[0] }, { c2r[0] }, true)[0];
+	vec raw0;
+	std::filesystem::path rp = ref / "C_raw_lam0.npy";
+	read_npy<double>(rp, raw0);
+	double q0 = 0.0;
+	for (const double x : raw0) q0 += x * x;
+	EXPECT_NEAR(norm0[0] * std::sqrt(q0), 1.0, 1e-13);
+	for (int lam = 0; lam <= 2; lam++)
+	{
+		const int llmax = static_cast<int>(llvec[lam][0].size()), featsize = nchan * nchan * llmax, l21 = 2 * lam + 1;
+		vec p(5 * static_cast<size_t>(l21) * featsize);
+		equicomb(5, nchan, nchan, v, v, w3j[lam], llmax, llvec[lam], lam, c2r[lam], featsize, p, true, norm0.data());
+		vec want;
+		std::filesystem::path wp = ref / ("C_relpower_lam" + std::to_string(lam) + ".npy");
+		read_npy<double>(wp, want);
+		ASSERT_EQ(want.size(), static_cast<size_t>(l21) * featsize);
+		double top = 0.0, dev = 0.0;
+		for (size_t i = 0; i < want.size(); i++)
+		{
+			top = std::max(top, std::abs(want[i]));
+			dev = std::max(dev, std::abs(p[i] - want[i]));
+		}
+		EXPECT_LT(dev, 1e-12 * top) << "lambda " << lam;
+	}
+}
+
 // --------------------------------------------------------- SALTED_predictor
 
 // a coefficient file with an auxiliary basis needs no model: the aux wavefunction is built and the npy returned as is

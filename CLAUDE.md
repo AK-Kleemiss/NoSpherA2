@@ -242,8 +242,8 @@ Key core modules live in `Src/core`:
 As of 2026-11-13 (symmetric-site normalisation, branch `salted-relpower-norm`), the sparse equicomb zeroes lambda
 features that vanish by site symmetry, the empty-environment warning is taken from the density, and a model whose NORM
 block says `rel_power` (VERSION 7) divides every lambda > 0 block by the atom's lambda = 0 length;
-`SaltedFchkPredictorTests.RelPowerIsContinuousAtASymmetricSite` is new. `ctest -R "SALTED|Salted|salted"` on a CUDA
-`release-windows-tests` build: **58 passed, 0 failed** of 58; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+`SaltedFchkPredictorTests.RelPowerIsContinuousAtASymmetricSite` and `SaltedFchkEquicombTests.RelPowerMatchesSalted` (against SALTED's kernels) are new. `ctest -R "SALTED|Salted|salted"` on a CUDA
+`release-windows-tests` build: **59 passed, 0 failed** of 59; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-13 (equicomb follow-ups), the predictor keeps one descriptor buffer for all lambdas and the CUDA feature
 kernel builds mu >= 0 only; the zeroing of features that vanish by site symmetry moved to its own branch with the
