@@ -1002,15 +1002,27 @@ vec SALTEDPredictor::predict()
 		c2r_all[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
 	}
 	// Every lambda's norm in one pass over the atoms, with no density matrices kept for all of
-	// them; the device takes them too
+	// them; the device takes them too. rel_power divides every lambda by the lambda = 0 length,
+	// so it needs that norm alone, for the dense path as well
+	const bool rel_power = config.normalisation == "rel_power";
 	vec2 norms;
-	if (config.sparsify)
+	if (config.sparsify || rel_power)
 	{
 		const auto _t_norm = std::chrono::steady_clock::now();
-		std::vector<const vec *> w3j_all(lmax_max + 1);
-		for (int lam = 0; lam <= lmax_max; lam++)
+		const int nlam = rel_power ? 1 : lmax_max + 1;
+		std::vector<const vec *> w3j_all(nlam);
+		for (int lam = 0; lam < nlam; lam++)
 			w3j_all[lam] = &wigner3j[lam];
-		norms = equicomb_norms(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, w3j_all, llvec_all, c2r_all, v2_is_conj_of_v1);
+		// Positions of size L (Angstrom) are rounded to about eps L, which breaks a site symmetry by that much;
+		// features that vanish by it then carry a squared norm of about (eps L)^2 of the atom's total power
+		double L = 1.0;
+		for (size_t i = 0; i < 3 * featomic_system.size(); i++)
+			L = std::max(L, std::abs(featomic_system.positions()[i]));
+		const double noise = 100.0 * std::numeric_limits<double>::epsilon() * L;
+		norms = equicomb_norms(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, w3j_all,
+			std::vector<ivec2>(llvec_all.begin(), llvec_all.begin() + nlam), std::vector<cvec2>(c2r_all.begin(), c2r_all.begin() + nlam),
+			v2_is_conj_of_v1, noise * noise);
+		norms.resize(lmax_max + 1, norms[0]);
 		const double norm_s = _elapsed(_t_norm);
 		_t_equicomb += norm_s;
 		throughput::record_time("SALTED equicomb", false, 1000.0 * norm_s);
@@ -1052,7 +1064,8 @@ vec SALTEDPredictor::predict()
 		else
 		{
 			p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
-			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
+			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1,
+				rel_power ? norms[lam].data() : nullptr);
 		}
 		_t_equicomb += _elapsed(_t_eq);
 		// The file reads of lambda ran during lambda - 1's kernels; installing the blocks (the

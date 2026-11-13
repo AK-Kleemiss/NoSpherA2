@@ -233,13 +233,31 @@ static double atom_norm2(const lambda_plan &q, const double *m1, const size_t ds
 	return inner;
 }
 
+// Said once per run. An atom with no neighbours still has an l = 0 descriptor, its own density
+// being spherically symmetric; only the equivariant lam >= 1 parts vanish, so zeroing them
+// leaves the atom spherical, which is the right answer for it.
+static void warn_empty(const int empty_environments)
+{
+	static std::atomic<unsigned> warned_empty_environment{0};
+	if (empty_environments > 0 && constants::first_this_run(warned_empty_environment))
+	{
+		std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
+				  << " inside the descriptor cutoff.\n"
+				  << "         Their environment singles out no direction, so their"
+				  << " predicted density stays spherical.\n"
+				  << "         Isolated solvent is the usual cause."
+				  << std::endl;
+	}
+}
+
 // normfact[k][atom] for every plan. The density matrices do not depend on lambda, so each
 // atom's are built once into a per-thread buffer and contracted for all plans, instead of
 // being stored for all atoms (natoms * 2 * sum (2l+1)^2 doubles): no faster, but that memory
 // is never held. The work per atom is fixed, so the norm scales linearly with the atom count.
-// An empty environment keeps 0.
+// An empty environment keeps 0, and so does an atom whose squared norm is below noise2 times
+// tr(A1) tr(A2) / (2 lam + 1) over all l.
 static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
-	const bool v2_is_conj_of_v1, const lambda_plan *const *plans, const size_t nplans)
+	const bool v2_is_conj_of_v1, const lambda_plan *const *plans, const size_t nplans, const double noise2)
 {
 	// u = conj(v1) has conj(A1) as its matrix; with nrad2 == nrad1 that is v1's
 	// own (share) and the pair sum flips the sign of its imaginary part
@@ -254,7 +272,8 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 		"equicomb: the shells need an l the descriptors do not hold", std::cout);
 	const size_t dsz1 = dm_offset(lmax1 + 1), dsz2 = dm_offset(lmax2 + 1);
 	vec2 normfact(nplans, vec(natoms, 0.0));
-	ivec direct(nplans, 0);
+	ivec direct(nplans, 0), zeroed(nplans, 0);
+	int empty = 0;
 #pragma omp parallel
 	{
 		vec m1(2 * dsz1), m2(share ? 0 : 2 * dsz2);
@@ -267,16 +286,18 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 			if (!share)
 				atom_density(u, nrad2, lmax2, iat, dsz2, m2.data(), xr, xi);
 			const double *M2 = share ? m1.data() : m2.data();
-			double tr1[32], tr2[32];
+			double tr1[32], tr2[32], tot1 = 0.0, tot2 = 0.0;
 			for (int l = 0; l <= lmax1; ++l)
 			{
 				tr1[l] = 0.0;
 				for (int a = 0; a <= 2 * l; ++a) tr1[l] += m1[dm_offset(l) + a * (2 * l + 1) + a];
+				tot1 += tr1[l];
 			}
 			for (int l = 0; l <= lmax2; ++l)
 			{
 				tr2[l] = 0.0;
 				for (int a = 0; a <= 2 * l; ++a) tr2[l] += M2[dm_offset(l) + a * (2 * l + 1) + a];
+				tot2 += tr2[l];
 			}
 			for (size_t k = 0; k < nplans; ++k)
 			{
@@ -294,12 +315,25 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 #pragma omp atomic
 					++direct[k];
 				}
+				// Features that vanish by site symmetry come out as rounding noise of the positions
+				// and the descriptors; normalised they would point anywhere, so they are zeroed.
 				// An empty environment gives an all-zero descriptor, so inner is 0 and
 				// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
 				// answer: the kernel contributes nothing and the atom keeps the species
 				// average the model adds separately.
-				if (inner > 0.0) [[likely]]
+				if (inner > 0.0 && inner <= noise2 * tot1 * tot2 / q.l21)
+				{
+#pragma omp atomic
+					++zeroed[k];
+				}
+				else if (inner > 0.0) [[likely]]
 					normfact[k][iat] = 1.0 / sqrt(inner);
+			}
+			// no neighbour: only the atom's own spherical density, every l >= 1 trace exactly zero
+			if (tot1 == tr1[0] && tot2 == tr2[0])
+			{
+#pragma omp atomic
+				++empty;
 			}
 		}
 	}
@@ -308,15 +342,19 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 		std::cout << "[equicomb] direct norms of " << natoms << " atoms, per lambda:";
 		for (size_t k = 0; k < nplans; ++k)
 			std::cout << " " << plans[k]->lam << ":" << direct[k];
+		std::cout << "; zeroed as rounding noise:";
+		for (size_t k = 0; k < nplans; ++k)
+			std::cout << " " << plans[k]->lam << ":" << zeroed[k];
 		std::cout << std::endl;
 	}
+	warn_empty(empty);
 	return normfact;
 }
 
 vec2 equicomb_norms(int natoms, int nrad1, int nrad2,
 	const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
 	const std::vector<const vec *> &w3j, const std::vector<ivec2> &llvec, const std::vector<cvec2> &c2r,
-	bool v2_is_conj_of_v1)
+	bool v2_is_conj_of_v1, double noise2)
 {
 	err_checkf(w3j.size() == llvec.size() && c2r.size() == llvec.size(), "equicomb_norms: one w3j, llvec and c2r per lambda", std::cout);
 	std::vector<lambda_plan> plans;
@@ -325,7 +363,7 @@ vec2 equicomb_norms(int natoms, int nrad1, int nrad2,
 		plans.push_back(make_plan(*w3j[lam], llvec[lam], static_cast<int>(lam), c2r[lam]));
 	std::vector<const lambda_plan *> ptr;
 	for (const lambda_plan &q : plans) ptr.push_back(&q);
-	return plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, ptr.data(), ptr.size());
+	return plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, ptr.data(), ptr.size(), noise2);
 }
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
@@ -392,23 +430,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	//features actually built
 	const _time_point eq_t0 = get_time();
 	vec normfact(natoms, 0.0);
-	// Said once per run, on the first lambda that sees it - NOT gated on lam == 0.
-	// An atom with no neighbours still has an l = 0 descriptor, its own density being
-	// spherically symmetric; only the equivariant lam >= 1 parts vanish, so zeroing
-	// them leaves the atom spherical, which is the right answer for it.
-	auto warn_empty = [](const int empty_environments)
-	{
-		static std::atomic<unsigned> warned_empty_environment{0};
-		if (empty_environments > 0 && constants::first_this_run(warned_empty_environment))
-		{
-			std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
-					  << " inside the descriptor cutoff.\n"
-					  << "         Their environment singles out no direction, so their"
-					  << " predicted density stays spherical.\n"
-					  << "         Isolated solvent is the usual cause."
-					  << std::endl;
-		}
-	};
 	// Features past nrad1*nrad2*llmax stay zero, as they were when ptemp was built in full
 	const int shells_i = static_cast<int>(shells);
 
@@ -419,9 +440,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	else
 	{
 		const lambda_plan *one = &plan;
-		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1)[0];
+		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1, 0.0)[0];
 	}
-	warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
 	if (ProgressBar::report_counts)
 		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
@@ -567,7 +587,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			  ivec2 &llvec, int lam,
 			  cvec2 &c2r, int featsize,
 			  vec &p,
-			  bool v2_is_conj_of_v1)
+			  bool v2_is_conj_of_v1,
+			  const double *norms)
 {
 	if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || llmax < 0 || lam < 0 || featsize < 0)
 	{
@@ -598,7 +619,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	// parameters included. clang enforces that; MSVC's OpenMP 2.0 does not, so a
 	// missing name builds clean on Windows and breaks the macOS and Linux jobs.
 
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, w3j, llmax, llvec, lam, l21, c2r, p, featsize, constants::cnull)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, w3j, llmax, llvec, lam, l21, c2r, p, featsize, norms, constants::cnull)
 	for (iat = 0; iat < natoms; ++iat)
 	{
 		vec2 ptemp(l21, vec(featsize, 0.0));
@@ -653,7 +674,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		}
 		// See the sparsified overload: an empty environment makes this zero and every feature NaN
 		normfact = sqrt(inner);
-		const double inv_normfact = (normfact > 0.0) ? (1.0 / normfact) : 0.0;
+		const double inv_normfact = norms ? norms[iat] : (normfact > 0.0) ? (1.0 / normfact) : 0.0;
 		for (ifeat = 0; ifeat < featsize; ++ifeat)
 		{
 			for (imu = 0; imu < l21; ++imu)

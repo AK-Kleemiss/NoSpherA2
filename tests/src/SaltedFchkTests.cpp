@@ -1140,7 +1140,10 @@ TEST(SaltedFchkEquicombTests, EmptyEnvironmentGivesZeros)
 	EXPECT_NEAR(sparse[0], 0.0, 1e-300);
 	EXPECT_NEAR(dense[0], 0.0, 1e-300);
 	EXPECT_FALSE(std::isnan(sparse[0]));
+	++constants::run_id;
+	testing::internal::CaptureStdout();
 	const vec2 norms = equicomb_norms(1, 1, 1, v, v, { &w3j }, { llvec }, { c2r }, true);
+	EXPECT_NE(testing::internal::GetCapturedStdout().find("1 atom(s) have no neighbour"), std::string::npos);
 	EXPECT_EQ(norms[0][0], 0.0);
 	EXPECT_TRUE(equicomb_norms(0, 1, 1, v, v, { &w3j }, { llvec }, { c2r }, true)[0].empty());
 }
@@ -1335,6 +1338,150 @@ TEST(SaltedFchkEquicombTests, NearSymmetricSitesKeepTheNorm)
 	equicomb_set_gpu(gpu_before);
 }
 
+// CH4 (Td) and SF6 (Oh) at exact symmetry, at the origin and shifted by 100 A: the central atom's lambda 1, 2, 5 (Td) and
+// 1, 2, 3, 5 (Oh) features vanish, and what is computed for them is rounding noise of the positions, which equicomb_norms
+// with noise2 = (100 eps L)^2 zeroes. Every other atom and lambda keeps its norm, and so does the centre when one ligand moves
+// by 1e-8 A (moving the centre alone changes its even-l coefficients only at second order, the shift adding u.grad rho)
+TEST(SaltedFchkEquicombTests, ExactSymmetryZeroesTheVanishingFeatures)
+{
+	equicomb_set_gpu(false);
+	const int nrad = 7, nang = 7, lam_max = 5;
+	const double a = 1.09 / std::sqrt(3.0), s = 1.56;
+	struct molecule { std::vector<std::string> el; std::vector<d3> xyz; std::vector<int> vanish; };
+	const std::vector<molecule> mols{
+		{ { "C", "H", "H", "H", "H" }, { { 0, 0, 0 }, { a, a, a }, { a, -a, -a }, { -a, a, -a }, { -a, -a, a } }, { 1, 2, 5 } },
+		{ { "S", "F", "F", "F", "F", "F", "F" }, { { 0, 0, 0 }, { s, 0, 0 }, { -s, 0, 0 }, { 0, s, 0 }, { 0, -s, 0 }, { 0, 0, s }, { 0, 0, -s } }, { 1, 2, 3, 5 } } };
+	for (const molecule& m : mols)
+		for (const double shift : { 0.0, 100.0 })
+			for (const double d : { 0.0, 1e-8 })
+			{
+				const int n = static_cast<int>(m.el.size());
+				std::vector<std::string> species(m.el.begin(), m.el.begin() + 2);
+				SALTED_Utils::FeatomicHyperParameters hp;
+				hp.cutoff_radius = 4.0;
+				hp.max_radial = nrad;
+				hp.max_angular = nang;
+				hp.atomic_gaussian_width = 0.3;
+				hp.species = species;
+				hp.neighspe = species;
+				featomic::SimpleSystem sys;
+				double L = 1.0;
+				for (int i = 0; i < n; i++)
+				{
+					const double di = i == 1 ? d : 0.0;
+					const d3 r{ m.xyz[i][0] + (shift + 0.8 * di) * 0.6, m.xyz[i][1] - (shift - 0.3 * di) * 0.45, m.xyz[i][2] + (shift + 0.5 * di) * 0.8 };
+					sys.add_atom(constants::get_Z_from_label(m.el[i].c_str()) + 1, r);
+					for (const double x : r)
+						L = std::max(L, std::abs(x));
+				}
+				const SALTEDDescriptors v = SALTED_Utils::calculate_SALTED_descriptors(sys, hp);
+				const int nchan = v.nchannels();
+				std::vector<ivec2> llvec(lam_max + 1);
+				std::vector<cvec2> c2r(lam_max + 1);
+				std::vector<vec> w3j(lam_max + 1);
+				std::vector<const vec*> w3j_ptr(lam_max + 1);
+				for (int lam = 0; lam <= lam_max; lam++)
+				{
+					ivec2 ll;
+					for (int l1 = 0; l1 <= nang; l1++)
+						for (int l2 = 0; l2 <= nang; l2++)
+							if ((lam + l1 + l2) % 2 == 0 && std::abs(l2 - lam) <= l1 && l1 <= l2 + lam)
+								ll.push_back({ l1, l2 });
+					llvec[lam] = transpose<int>(ll);
+					c2r[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+					w3j[lam] = salted_w3j(lam, llvec[lam]);
+					w3j_ptr[lam] = &w3j[lam];
+				}
+				const double noise = 100.0 * std::numeric_limits<double>::epsilon() * L;
+				++constants::run_id;
+				testing::internal::CaptureStdout();
+				const vec2 norms = equicomb_norms(n, nchan, nchan, v, v, w3j_ptr, llvec, c2r, true, noise * noise);
+				EXPECT_EQ(testing::internal::GetCapturedStdout().find("no neighbour"), std::string::npos) << m.el[0] << " shift " << shift << " d " << d;
+				for (int lam = 0; lam <= lam_max; lam++)
+					for (int i = 0; i < n; i++)
+					{
+						const bool zero = i == 0 && d == 0.0 && std::find(m.vanish.begin(), m.vanish.end(), lam) != m.vanish.end();
+						EXPECT_EQ(norms[lam][i] == 0.0, zero) << m.el[0] << " shift " << shift << " d " << d << " lam " << lam << " atom " << i;
+					}
+				// with the centre's norm factor 0 its features are zero, so the kernel gives no coefficient for that lambda
+				const int lam = 2, llmax = static_cast<int>(llvec[lam][0].size()), featsize = nchan * nchan * llmax;
+				std::vector<int64_t> identity(featsize);
+				for (int f = 0; f < featsize; f++)
+					identity[f] = f;
+				vec p(static_cast<size_t>(n) * 5 * featsize, 1.0);
+				equicomb(n, nchan, nchan, v, v, w3j[lam], llvec[lam], lam, c2r[lam], featsize, featsize, identity, p, true, norms[lam].data());
+				double centre = 0.0;
+				for (int f = 0; f < 5 * featsize; f++)
+					centre = std::max(centre, std::abs(p[f]));
+				if (d == 0.0)
+					EXPECT_EQ(centre, 0.0) << m.el[0] << " shift " << shift;
+				else
+					EXPECT_GT(centre, 1e-3) << m.el[0] << " shift " << shift;
+			}
+}
+
+// rel_power against SALTED's own kernels (branch soap-norm-symmetric-sites, 61df639): CH4 with H1 moved 0.01 A along x,
+// rcut 4, sigma 0.3, nrad 4, nang 4, no sparsification; carbon lambda 0-2 divided by its lambda = 0 length
+TEST(SaltedFchkEquicombTests, RelPowerMatchesSalted)
+{
+	equicomb_set_gpu(false);
+	const auto ref = nos_test_repo_root() / "tests" / "SALTED" / "relpower_ch4";
+	const int nrad = 4, nang = 4;
+	SALTED_Utils::FeatomicHyperParameters hp;
+	hp.cutoff_radius = 4.0;
+	hp.max_radial = nrad;
+	hp.max_angular = nang;
+	hp.atomic_gaussian_width = 0.3;
+	hp.species = { "C", "H" };
+	hp.neighspe = { "C", "H" };
+	featomic::SimpleSystem sys;
+	const double a = 0.629118;
+	const std::vector<d3> xyz{ { 0, 0, 0 }, { a + 0.01, a, a }, { -a, -a, a }, { a, -a, -a }, { -a, a, -a } };
+	for (int i = 0; i < 5; i++)
+		sys.add_atom(constants::get_Z_from_label(i == 0 ? "C" : "H") + 1, xyz[i]);
+	const SALTEDDescriptors v = SALTED_Utils::calculate_SALTED_descriptors(sys, hp);
+	const int nchan = v.nchannels();
+	ASSERT_EQ(nchan, 8);
+	std::vector<ivec2> llvec(3);
+	std::vector<cvec2> c2r(3);
+	std::vector<vec> w3j(3);
+	for (int lam = 0; lam <= 2; lam++)
+	{
+		ivec2 ll;
+		for (int l1 = 0; l1 <= nang; l1++)
+			for (int l2 = 0; l2 <= nang; l2++)
+				if ((lam + l1 + l2) % 2 == 0 && std::abs(l2 - lam) <= l1 && l1 <= l2 + lam)
+					ll.push_back({ l1, l2 });
+		llvec[lam] = transpose<int>(ll);
+		c2r[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+		w3j[lam] = salted_w3j(lam, llvec[lam]);
+	}
+	const vec norm0 = equicomb_norms(5, nchan, nchan, v, v, { &w3j[0] }, { llvec[0] }, { c2r[0] }, true)[0];
+	vec raw0;
+	std::filesystem::path rp = ref / "C_raw_lam0.npy";
+	read_npy<double>(rp, raw0);
+	double q0 = 0.0;
+	for (const double x : raw0) q0 += x * x;
+	EXPECT_NEAR(norm0[0] * std::sqrt(q0), 1.0, 1e-13);
+	for (int lam = 0; lam <= 2; lam++)
+	{
+		const int llmax = static_cast<int>(llvec[lam][0].size()), featsize = nchan * nchan * llmax, l21 = 2 * lam + 1;
+		vec p(5 * static_cast<size_t>(l21) * featsize);
+		equicomb(5, nchan, nchan, v, v, w3j[lam], llmax, llvec[lam], lam, c2r[lam], featsize, p, true, norm0.data());
+		vec want;
+		std::filesystem::path wp = ref / ("C_relpower_lam" + std::to_string(lam) + ".npy");
+		read_npy<double>(wp, want);
+		ASSERT_EQ(want.size(), static_cast<size_t>(l21) * featsize);
+		double top = 0.0, dev = 0.0;
+		for (size_t i = 0; i < want.size(); i++)
+		{
+			top = std::max(top, std::abs(want[i]));
+			dev = std::max(dev, std::abs(p[i] - want[i]));
+		}
+		EXPECT_LT(dev, 1e-12 * top) << "lambda " << lam;
+	}
+}
+
 // --------------------------------------------------------- SALTED_predictor
 
 // a coefficient file with an auxiliary basis needs no model: the aux wavefunction is built and the npy returned as is
@@ -1447,6 +1594,66 @@ TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 	// each H gets 0.460 e against 0.807 e in the reference fit of this geometry (reading_SALTED/coefficients_conf0.npy,
 	// same basis, 10.000 e); the Aug and Sep 2026 builds predict the same coefficients to 1e-16
 	EXPECT_NEAR(e[0] + e[1] + e[2], 9.1937, 1e-3);
+}
+
+// rel_power (NORM block): the lambda > 0 features are divided by the lambda = 0 length, so the coefficients of the
+// carbon of CH4 move with one H by about as much at 1e-10 A as the displacement; unit-normalised its lambda 1 and 2
+// blocks jump to full size at any displacement
+TEST(SaltedFchkPredictorTests, RelPowerIsContinuousAtASymmetricSite)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("relpower");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "unit");
+	std::filesystem::create_directories(dir / "rel");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "unit" / "model.salted");
+	{
+		const int32_t head[2] = { 4, 9 };
+		std::string block(reinterpret_cast<const char*>(head), sizeof(head));
+		block += "rel_power";
+		SALTED_BINARY_FILE f(dir / "unit" / "model.salted");
+		f.write_with_blocks(dir / "rel" / "model.salted", 7, {}, { { "NORM", block } });
+	}
+	{
+		SALTEDConfig c{}, u{};
+		SALTED_BINARY_FILE f(dir / "rel" / "model.salted"), g(dir / "unit" / "model.salted");
+		f.populate_config(c);
+		g.populate_config(u);
+		EXPECT_EQ(c.normalisation, "rel_power");
+		EXPECT_EQ(u.normalisation, "unit");
+	}
+	const double a = 1.09 / std::sqrt(3.0);
+	auto predict = [&](const std::string& model, const double d) {
+		const auto xyz = dir / "ch4.xyz";
+		{
+			std::ofstream o(xyz);
+			o << std::setprecision(17) << "5\nCH4\nC 0 0 0\nH " << a + 0.3 * d << " " << a - 0.5 * d << " " << a + 0.8 * d
+			  << "\nH " << a << " " << -a << " " << -a << "\nH " << -a << " " << a << " " << -a << "\nH " << -a << " " << -a << " " << a << "\n";
+		}
+		WFN w(xyz, false);
+		options opt;
+		opt.salted_model_dir = dir / model;
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		return SP.gen_SALTED_densities();
+	};
+	auto dist = [](const vec& x, const vec& y) {
+		double s = 0.0;
+		for (size_t i = 0; i < x.size(); i++) s += (x[i] - y[i]) * (x[i] - y[i]);
+		return std::sqrt(s);
+	};
+	for (const std::string model : { "unit", "rel" })
+	{
+		const vec c0 = predict(model, 0.0), c1 = predict(model, 1e-10), c2 = predict(model, 0.05);
+		ASSERT_EQ(c0.size(), c2.size());
+		const double step = dist(c1, c0) / dist(c2, c0);
+		if (model == "unit")
+			EXPECT_GT(step, 0.1);
+		else
+			EXPECT_LT(step, 1e-6);
+	}
+	std::filesystem::remove_all(dir);
 }
 
 // a .wfx names its atoms "C1", "H2": the species come from the nuclear charge, so it predicts what the same atoms
