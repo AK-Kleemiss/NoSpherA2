@@ -407,8 +407,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		err_checkf(vfps[chk] >= 0 && static_cast<size_t>(vfps[chk]) < static_cast<size_t>(featsize),
 			"equicomb: vfps entry " + std::to_string(chk) + " is outside featsize", std::cout);
 
-	std::fill(p.begin(), p.begin() + static_cast<std::ptrdiff_t>(required_p), 0.0);
-
 	const lambda_plan plan = make_plan(w3j, llvec, lam, c2r);
 	const std::vector<w3j_run> &runs = plan.runs;
 	const size_t total_terms = plan.total_terms;
@@ -522,16 +520,20 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	// Only the nfps selected features are built, as in shell_features; only normfact comes
 	// from the norm above. They are grouped by il so that each (il, mu) run is set up once
 	// for all of them: features start[il]..start[il + 1] have channels sn1, sn2 and go to
-	// column scol of p.
+	// column scol of p. The columns pad past nrad1*nrad2*llmax get zeros, so every element of p is written.
 	ivec start(llmax + 1, 0);
 	for (int i = 0; i < nfps; ++i)
 		if (vfps[i] < shells_i) ++start[vfps[i] % llmax + 1];
 	for (int il = 0; il < llmax; ++il) start[il + 1] += start[il];
-	ivec sn1(start[llmax]), sn2(start[llmax]), scol(start[llmax]), next(start.begin(), start.end() - 1);
+	ivec sn1(start[llmax]), sn2(start[llmax]), scol(start[llmax]), next(start.begin(), start.end() - 1), pad;
 	for (int i = 0; i < nfps; ++i)
 	{
 		const int f = static_cast<int>(vfps[i]);
-		if (f >= shells_i) continue;
+		if (f >= shells_i)
+		{
+			pad.push_back(i);
+			continue;
+		}
 		const int k = next[f % llmax]++;
 		sn1[k] = f / (llmax * nrad2); sn2[k] = (f / llmax) % nrad2; scol[k] = i;
 	}
@@ -545,6 +547,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	{
 		double *pa = p.data() + static_cast<size_t>(iat) * l21 * nfps;
 		const double nf = normfact[iat];
+		for (int imu = 0; imu < l21; ++imu)
+			for (size_t k = 0; k < pad.size(); ++k)
+				pa[static_cast<size_t>(imu) * nfps + pad[k]] = 0.0;
 		for (int il = 0; il < llmax; ++il)
 		{
 			const int l1 = llvec[0][il], l2 = llvec[1][il];
