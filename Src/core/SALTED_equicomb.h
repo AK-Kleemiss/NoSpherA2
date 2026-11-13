@@ -37,7 +37,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	ivec2& llvec, int lam,
 	cvec2& c2r, int featsize,
 	vec& p,
-	bool v2_is_conj_of_v1 = false);
+	bool v2_is_conj_of_v1 = false,
+	// natoms norm factors replacing the block's own 1 / length
+	const double* norms = nullptr);
 
 //GPU path for the descriptor combination; -no_gpu_salted keeps it on the CPU
 void equicomb_set_gpu(bool on);

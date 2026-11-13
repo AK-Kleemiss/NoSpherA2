@@ -587,7 +587,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			  ivec2 &llvec, int lam,
 			  cvec2 &c2r, int featsize,
 			  vec &p,
-			  bool v2_is_conj_of_v1)
+			  bool v2_is_conj_of_v1,
+			  const double *norms)
 {
 	if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || llmax < 0 || lam < 0 || featsize < 0)
 	{
@@ -618,7 +619,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	// parameters included. clang enforces that; MSVC's OpenMP 2.0 does not, so a
 	// missing name builds clean on Windows and breaks the macOS and Linux jobs.
 
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, w3j, llmax, llvec, lam, l21, c2r, p, featsize, constants::cnull)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, w3j, llmax, llvec, lam, l21, c2r, p, featsize, norms, constants::cnull)
 	for (iat = 0; iat < natoms; ++iat)
 	{
 		vec2 ptemp(l21, vec(featsize, 0.0));
@@ -673,7 +674,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		}
 		// See the sparsified overload: an empty environment makes this zero and every feature NaN
 		normfact = sqrt(inner);
-		const double inv_normfact = (normfact > 0.0) ? (1.0 / normfact) : 0.0;
+		const double inv_normfact = norms ? norms[iat] : (normfact > 0.0) ? (1.0 / normfact) : 0.0;
 		for (ifeat = 0; ifeat < featsize; ++ifeat)
 		{
 			for (imu = 0; imu < l21; ++imu)

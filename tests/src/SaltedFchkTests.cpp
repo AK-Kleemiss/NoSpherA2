@@ -1534,6 +1534,66 @@ TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 	EXPECT_NEAR(e[0] + e[1] + e[2], 9.1937, 1e-3);
 }
 
+// rel_power (NORM block): the lambda > 0 features are divided by the lambda = 0 length, so the coefficients of the
+// carbon of CH4 move with one H by about as much at 1e-10 A as the displacement; unit-normalised its lambda 1 and 2
+// blocks jump to full size at any displacement
+TEST(SaltedFchkPredictorTests, RelPowerIsContinuousAtASymmetricSite)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("relpower");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "unit");
+	std::filesystem::create_directories(dir / "rel");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "unit" / "model.salted");
+	{
+		const int32_t head[2] = { 4, 9 };
+		std::string block(reinterpret_cast<const char*>(head), sizeof(head));
+		block += "rel_power";
+		SALTED_BINARY_FILE f(dir / "unit" / "model.salted");
+		f.write_with_blocks(dir / "rel" / "model.salted", 7, {}, { { "NORM", block } });
+	}
+	{
+		SALTEDConfig c{}, u{};
+		SALTED_BINARY_FILE f(dir / "rel" / "model.salted"), g(dir / "unit" / "model.salted");
+		f.populate_config(c);
+		g.populate_config(u);
+		EXPECT_EQ(c.normalisation, "rel_power");
+		EXPECT_EQ(u.normalisation, "unit");
+	}
+	const double a = 1.09 / std::sqrt(3.0);
+	auto predict = [&](const std::string& model, const double d) {
+		const auto xyz = dir / "ch4.xyz";
+		{
+			std::ofstream o(xyz);
+			o << std::setprecision(17) << "5\nCH4\nC 0 0 0\nH " << a + 0.3 * d << " " << a - 0.5 * d << " " << a + 0.8 * d
+			  << "\nH " << a << " " << -a << " " << -a << "\nH " << -a << " " << a << " " << -a << "\nH " << -a << " " << -a << " " << a << "\n";
+		}
+		WFN w(xyz, false);
+		options opt;
+		opt.salted_model_dir = dir / model;
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		return SP.gen_SALTED_densities();
+	};
+	auto dist = [](const vec& x, const vec& y) {
+		double s = 0.0;
+		for (size_t i = 0; i < x.size(); i++) s += (x[i] - y[i]) * (x[i] - y[i]);
+		return std::sqrt(s);
+	};
+	for (const std::string model : { "unit", "rel" })
+	{
+		const vec c0 = predict(model, 0.0), c1 = predict(model, 1e-10), c2 = predict(model, 0.05);
+		ASSERT_EQ(c0.size(), c2.size());
+		const double step = dist(c1, c0) / dist(c2, c0);
+		if (model == "unit")
+			EXPECT_GT(step, 0.1);
+		else
+			EXPECT_LT(step, 1e-6);
+	}
+	std::filesystem::remove_all(dir);
+}
+
 // a .wfx names its atoms "C1", "H2": the species come from the nuclear charge, so it predicts what the same atoms
 // named by element do. Read from the label, no atom matched a species and the model predicted nothing
 TEST(SaltedFchkPredictorTests, WfxLabelsPredictLikeElements)
