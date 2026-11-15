@@ -577,7 +577,7 @@ TEST(SaltedFchkIoTests, SyntheticModelIndexAndLoadBlock)
 }
 
 // load_blocks reads every block of the shipped model as load_block does, byte for byte, with one reader and with several
-// whose pieces (an odd size, so they cut doubles) cross the blocks; a block past the end of the file still stops the run
+// whose pieces (an odd size, so they cut doubles) cross the blocks, more of them than blocks; a block past the end of the file still stops the run
 TEST(SaltedFchkIoTests, ParallelReadMatchesLoadBlock)
 {
 	const auto p = nos_test_repo_root() / "tests" / "SALTED" / "Model" / "model.salted";
@@ -586,7 +586,7 @@ TEST(SaltedFchkIoTests, ParallelReadMatchesLoadBlock)
 	for (const std::string key : { "FEATS", "PROJ" })
 		for (const auto& [k, r] : f.index_lambda_based_data(key)) refs.push_back(r);
 	refs.insert(refs.begin() + 3, SALTED_BINARY_FILE::block_ref{});
-	for (const std::size_t readers : { 1, 2, 7 })
+	for (const std::size_t readers : { 1, 2, 7, 64 })
 		for (const std::size_t piece : { std::size_t(4u << 20), std::size_t(1001) })
 		{
 			f.readers = readers;

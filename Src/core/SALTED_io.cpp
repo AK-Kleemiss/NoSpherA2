@@ -671,26 +671,51 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 	return out;
 }
 
-// `readers` threads (the run's -cpus) take `piece` sized slices of the blocks through read_at, straight across block
-// boundaries, while this thread allocates the blocks ahead of them: from page cache a single reader is a serial copy.
+// `readers` threads (the run's -cpus) first allocate the blocks, largest first, then take `piece` sized slices of them
+// through read_at, straight across block boundaries: from page cache the first touch of the pages is the cost, so the
+// allocations (which zero the pages) and the copies are both spread over the threads.
 // Android: the model usually sits on a microSD card behind sdcardfs, cold one stream gets ~68 MB/s and four readers
 // taking 4 MB pieces ~76 MB/s (SM-T585, combo_v6, -cpus 4: model wait 6.18-6.44 -> 5.35-5.43 s, with a fd per reader).
 std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
 	using ext_t = typename dMatrix2::extents_type;
 	struct span { std::size_t block, from, bytes; };
 	std::vector<span> spans;
+	std::vector<std::size_t> order(refs.size());
 	for (std::size_t i = 0; i < refs.size(); i++)
+	{
+		order[i] = i;
 		for (std::size_t n = refs[i].rows * refs[i].cols * sizeof(double), from = 0; from < n; from += piece)
 			spans.push_back({ i, from, std::min(piece, n - from) });
+	}
+	std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return refs[a].rows * refs[a].cols > refs[b].rows * refs[b].cols; });
 	std::vector<dMatrix2> out(refs.size());
 	std::vector<std::atomic<bool>> failed(refs.size());
-	std::atomic<std::size_t> filled{ 0 }, next{ 0 };   // filled > refs.size(): the fill threw, stop
+	std::vector<std::atomic<int>> state(refs.size());   // 0 until the block is allocated or an allocation threw
+	std::atomic<std::size_t> made{ 0 }, next{ 0 };
+	std::atomic<bool> stop{ false };
+	std::exception_ptr err;
 	auto reader = [&] {
+		try
+		{
+			for (std::size_t b; (b = made++) < refs.size();)
+			{
+				const std::size_t i = order[b];
+				if (refs[i].rows != 0 && refs[i].cols != 0)
+					out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
+				state[i].store(1, std::memory_order_release);
+				state[i].notify_all();
+			}
+		}
+		catch (...)
+		{
+			if (!stop.exchange(true)) err = std::current_exception();
+			for (auto& st : state) { int z = 0; st.compare_exchange_strong(z, 2); st.notify_all(); }
+		}
 		for (std::size_t s; (s = next++) < spans.size();)
 		{
 			const span& p = spans[s];
-			for (std::size_t f; (f = filled.load(std::memory_order_acquire)) <= p.block;) filled.wait(f);
-			if (filled.load() > refs.size()) break;
+			state[p.block].wait(0, std::memory_order_acquire);
+			if (stop) break;
 			if (!read_at(refs[p.block].offset + static_cast<std::streamoff>(p.from), reinterpret_cast<char*>(out[p.block].data()) + p.from, p.bytes))
 				failed[p.block] = true;
 		}
@@ -699,22 +724,14 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_re
 	try
 	{
 		for (std::size_t t = 0; t < std::min(std::max<std::size_t>(readers, 1), spans.size()); t++) pool.emplace_back(reader);
-		for (std::size_t i = 0; i < refs.size(); i++)
-		{
-			if (refs[i].rows != 0 && refs[i].cols != 0)
-				out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
-			filled.store(i + 1, std::memory_order_release);
-			filled.notify_all();
-		}
 	}
 	catch (...)
 	{
-		filled.store(refs.size() + 1);
-		filled.notify_all();
 		for (auto& t : pool) t.join();
 		throw;
 	}
 	for (auto& t : pool) t.join();
+	if (err) std::rethrow_exception(err);
 	for (std::size_t i = 0; i < refs.size(); i++)
 		if (failed[i]) out[i] = load_block(refs[i]);   // the stream fallback
 	return out;
