@@ -80,22 +80,31 @@ static void set_occ_df_budget(occ::io::OccInput &config, const options &opt)
 	if (avail > 0.0) config.method.df_store_memory_mb = avail / 2;
 }
 
-//Seconds since the process started (Linux to the 10 ms of its clock ticks), -1 where that is not cheap to have
+//Field 22 of a /proc/<pid>/stat line, the start time in clock ticks after boot; -1 for a line that is not one
+double stat_start_ticks(const std::string &stat)
+{
+	const size_t p = stat.rfind(')');
+	if (p == std::string::npos || p + 2 > stat.size()) return -1.0;
+	std::istringstream rest(stat.substr(p + 2));
+	std::string f;
+	for (int i = 3; i < 22; i++) rest >> f;
+	double start = -1.0;
+	return (rest >> start) && start >= 0.0 ? start : -1.0;
+}
+
+//Seconds since the process started (Linux to the 10 ms of its clock ticks), -1 where that is not known
 static double process_age_s()
 {
 #if defined(__linux__)
 	std::ifstream st("/proc/self/stat"), up("/proc/uptime");
 	const std::string s((std::istreambuf_iterator<char>(st)), std::istreambuf_iterator<char>());
-	std::istringstream rest(s.substr(s.rfind(')') + 2));
-	std::string f;
-	for (int i = 3; i < 22; i++) rest >> f;
-	double uptime = 0.0, start = 0.0;
-	rest >> start;
-	up >> uptime;
+	const double start = stat_start_ticks(s);
+	double uptime = 0.0;
+	if (start < 0.0 || !(up >> uptime)) return -1.0;
 	return uptime - start / sysconf(_SC_CLK_TCK);
 #elif defined(_WIN32)
 	FILETIME c, e, k, u, now;
-	GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u);
+	if (!GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u)) return -1.0;
 	GetSystemTimePreciseAsFileTime(&now);
 	auto sec = [](const FILETIME& t) { return (double)(((unsigned long long)t.dwHighDateTime << 32) | t.dwLowDateTime) * 1e-7; };
 	return sec(now) - sec(c);
@@ -200,15 +209,16 @@ static int run_app_impl(int argc, char **argv)
 	struct run_timer
 	{
 		std::ostream& out;
-		double age;
 		std::chrono::steady_clock::time_point t0;
 		~run_timer()
 		{
-			if (ProgressBar::report_counts)
-				out << std::defaultfloat << std::setprecision(6) << "[stages] process age at run_app " << age << " s, run_app "
-					<< std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s" << std::endl;
+			if (!ProgressBar::report_counts) return;
+			const double run = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), age = process_age_s();
+			out << std::defaultfloat << std::setprecision(6) << "[stages] ";
+			if (age >= 0.0) out << "process age at run_app " << age - run << " s, ";
+			out << "run_app " << run << " s" << std::endl;
 		}
-	} time_run{log_file, process_age_s(), std::chrono::steady_clock::now()};
+	} time_run{log_file, std::chrono::steady_clock::now()};
 
 	//Header before the options are read: the bonding jobs run inside digest_options() and return without reaching
 	//the job code, and a job that fails reading its input would otherwise leave an empty log
