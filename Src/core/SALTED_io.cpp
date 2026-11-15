@@ -515,6 +515,7 @@ void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>&
 	err_checkf(size <= kMaxSaltedDatasetValues,
 		"SALTED dataset is unreasonably large: " + std::to_string(size) + " values", std::cout);
 	data.resize(size);
+	dataset_bytes += size * sizeof(T);
 	if (size > 0)
 		read_exact_bytes(file, data.data(), static_cast<std::streamsize>(size * sizeof(T)), "dataset payload");
 }
@@ -673,7 +674,7 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 // before read_at overwrites it, and the disk idles meanwhile. Filling block i+1 while a helper
 // reads block i hides that; one read in flight keeps the access sequential.
 // Sucrose, 650 MB, cold on the Pi 4: 2.66 -> 2.14 s.
-std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
 	using ext_t = typename dMatrix2::extents_type;
 	std::vector<dMatrix2> out(refs.size());
 	std::vector<std::future<bool>> raw(refs.size());   // after out: destroyed first, waits for the reads
@@ -698,7 +699,7 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_re
 // window) taking 4 MB pieces straight across block boundaries get ~76 MB/s. The fill still
 // runs ahead on this thread, ~10x faster than the card, so the readers rarely wait for it.
 // Sucrose, combo_v6 from the card, cold, -cpus 4: model wait 6.18-6.44 -> 5.35-5.43 s, same tscb.
-std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
 	using ext_t = typename dMatrix2::extents_type;
 	constexpr std::size_t piece = 4u << 20;
 	struct span { std::size_t block, from, bytes; };
@@ -754,6 +755,15 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_re
 	return out;
 }
 #endif
+
+std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+	const auto t0 = std::chrono::steady_clock::now();
+	std::vector<dMatrix2> out = read_blocks(refs);
+	lazy_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+	for (size_t i = 0; i < refs.size(); i++)
+		lazy_bytes += refs[i].rows * refs[i].cols * sizeof(double), lazy_blocks += refs[i].rows * refs[i].cols != 0;
+	return out;
+}
 
 // Every block but `drop` is copied byte for byte in file order, a block running from its table offset up
 // to the next one, then `add` (name, bytes from the datatype word on) is appended. What lies between the

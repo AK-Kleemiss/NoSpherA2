@@ -80,6 +80,30 @@ static void set_occ_df_budget(occ::io::OccInput &config, const options &opt)
 	if (avail > 0.0) config.method.df_store_memory_mb = avail / 2;
 }
 
+//Seconds since the process started (Linux to the 10 ms of its clock ticks), -1 where that is not cheap to have
+static double process_age_s()
+{
+#if defined(__linux__)
+	std::ifstream st("/proc/self/stat"), up("/proc/uptime");
+	const std::string s((std::istreambuf_iterator<char>(st)), std::istreambuf_iterator<char>());
+	std::istringstream rest(s.substr(s.rfind(')') + 2));
+	std::string f;
+	for (int i = 3; i < 22; i++) rest >> f;
+	double uptime = 0.0, start = 0.0;
+	rest >> start;
+	up >> uptime;
+	return uptime - start / sysconf(_SC_CLK_TCK);
+#elif defined(_WIN32)
+	FILETIME c, e, k, u, now;
+	GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u);
+	GetSystemTimePreciseAsFileTime(&now);
+	auto sec = [](const FILETIME& t) { return (double)(((unsigned long long)t.dwHighDateTime << 32) | t.dwLowDateTime) * 1e-7; };
+	return sec(now) - sec(c);
+#else
+	return -1.0;
+#endif
+}
+
 //Wrapper so an exception from deep inside a file parser reports instead of fail-fast
 int run_app(int argc, char **argv)
 {
@@ -172,6 +196,19 @@ static int run_app_impl(int argc, char **argv)
 		std::ostream& out;
 		~throughput_reporter() { throughput::report(out); }
 	} report_throughput{log_file};
+	//-v: start-up before this run and the run itself, so an outside clock can tell them and the exit apart
+	struct run_timer
+	{
+		std::ostream& out;
+		double age;
+		std::chrono::steady_clock::time_point t0;
+		~run_timer()
+		{
+			if (ProgressBar::report_counts)
+				out << std::defaultfloat << std::setprecision(6) << "[stages] process age at run_app " << age << " s, run_app "
+					<< std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s" << std::endl;
+		}
+	} time_run{log_file, process_age_s(), std::chrono::steady_clock::now()};
 
 	//Header before the options are read: the bonding jobs run inside digest_options() and return without reaching
 	//the job code, and a job that fails reading its input would otherwise leave an empty log
@@ -642,6 +679,7 @@ static int run_app_impl(int argc, char **argv)
 				}
 				else if (opt.SALTED)
 				{
+					const auto t0 = std::chrono::steady_clock::now();
 					std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
 					filesystem::path salted_model_path = temp_pred->get_salted_filename();
 					log_file << "Using " << salted_model_path << " for the prediction" << endl;
@@ -654,6 +692,7 @@ static int run_app_impl(int argc, char **argv)
 
 					if (opt.debug)
 						log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+					const auto t1 = std::chrono::steady_clock::now();
 					result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
 						opt,
 						*temp_pred,
@@ -662,6 +701,9 @@ static int run_app_impl(int argc, char **argv)
 						i,
 						&known_kpts),
 						log_file);
+					if (ProgressBar::report_counts)
+						std::cout << "[stages] part " << i + 1 << ": predictor " << std::chrono::duration<double>(t1 - t0).count()
+								  << " s, factors " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count() << " s" << endl;
 				}
 			}
 		};
@@ -685,6 +727,7 @@ static int run_app_impl(int argc, char **argv)
 		known_scatterer = result.get_scatterers_string();
 		log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
 		_time_point start = get_time();
+		const auto t_write = std::chrono::steady_clock::now();
 		log_file << "Writing tsc file... " << flush;
 		if (opt.binary_tsc)
 			result.write_tscb_file();
@@ -693,6 +736,8 @@ static int run_app_impl(int argc, char **argv)
 			result.write_tsc_file(opt.cif);
 		}
 		log_file << " ... done!" << endl;
+		if (ProgressBar::report_counts)
+			std::cout << "[stages] write table " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_write).count() << " s" << endl;
 		if (!opt.no_date)
 		{
 			_time_point end_write = get_time();
@@ -922,6 +967,7 @@ static int run_app_impl(int argc, char **argv)
 					// Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
 					// const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 
+					const auto t0 = std::chrono::steady_clock::now();
 					std::unique_ptr<SALTEDPredictor> temp_pred = std::make_unique<SALTEDPredictor>(wavy[0], opt);
 					string df_basis_name = temp_pred->get_dfbasis_name();
 					filesystem::path salted_model_path = temp_pred->get_salted_filename();
@@ -933,12 +979,16 @@ static int run_app_impl(int argc, char **argv)
 
 					if (opt.debug)
 						log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+					const auto t1 = std::chrono::steady_clock::now();
 					res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
 						opt,
 						*temp_pred,
 						log_file,
 						empty,
 						0);
+					if (ProgressBar::report_counts)
+						std::cout << "[stages] predictor " << std::chrono::duration<double>(t1 - t0).count()
+								  << " s, factors " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count() << " s" << endl;
 				}
 			};
 			compute();
@@ -953,6 +1003,7 @@ static int run_app_impl(int argc, char **argv)
 			}
 			else
 			{
+				const auto t_write = std::chrono::steady_clock::now();
 				log_file << "Writing tsc file... " << flush;
 				if (opt.binary_tsc)
 					res.write_tscb_file();
@@ -961,6 +1012,8 @@ static int run_app_impl(int argc, char **argv)
 					res.write_tsc_file(opt.cif);
 				}
 				log_file << " ... done!" << endl;
+				if (ProgressBar::report_counts)
+					std::cout << "[stages] write table " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_write).count() << " s" << endl;
 				if (opt.write_CIF)
 					write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
 			}

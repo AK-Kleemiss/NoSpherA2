@@ -104,8 +104,10 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	wavy = wavy_in;
 	if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
 	_path = _path / config.salted_filename;
+	const auto _t_config = std::chrono::steady_clock::now();
 	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
 	file.populate_config(config);
+	eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_config).count();
 
 	const auto _t_filter = std::chrono::steady_clock::now();
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
@@ -160,10 +162,13 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 
 	wavy.delete_basis_set();
 	if (file.basis_set_defined()) {
+		const auto _t_basis = std::chrono::steady_clock::now();
 		model_basis = file.read_basis_set();
+		eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_basis).count();
 		load_basis_into_WFN(wavy, model_basis);
 		bbasis_set_loaded = true;
 	}
+	eager_bytes += file.dataset_bytes;
 }
 
 void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vector<char>& use_thakkar, options& opt_in)
@@ -808,6 +813,8 @@ void SALTEDPredictor::read_model_data() {
 
 	if (config.average) av_coefs = file.read_averages();
 	if (config.sparsify) vfps = file.read_fps();
+	eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_model).count();
+	eager_bytes += file.dataset_bytes;
 
 
 	// Only present species need their model data; absent ones are needed for their
@@ -973,7 +980,7 @@ vec SALTEDPredictor::predict()
 	const auto _t_predict_start = std::chrono::steady_clock::now();
 	auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
 	{ return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
-	double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_wait = 0.0, _t_model_work = 0.0;
+	double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_wait = 0.0, _t_model_install = 0.0;
 	bool gpu_equicomb = false;
 #ifdef NOSPHERA2_USE_GPU
 	gpu_equicomb = equicomb_gpu_enabled() && salted_gpu_available();
@@ -1060,12 +1067,13 @@ vec SALTEDPredictor::predict()
 		// on a second thread gave that thread its own OpenMP/MKL team, whose spin-wait then cost
 		// the kernels below more than the overlap could ever hide
 		const auto _t_wait = std::chrono::steady_clock::now();
-		install_model_lambda(next_lambda.get(), lam);
+		lambda_blocks blocks = next_lambda.get();
+		_t_model_wait += _elapsed(_t_wait);
+		const auto _t_install = std::chrono::steady_clock::now();
+		install_model_lambda(std::move(blocks), lam);
 		if (lam < lmax_max && !score_only)
 			next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, lam + 1);
-		const double model_wait = _elapsed(_t_wait);
-		_t_model_wait += model_wait;
-		_t_model_work += model_wait;
+		_t_model_install += _elapsed(_t_install);
 		const auto _t_kn = std::chrono::steady_clock::now();
 #if defined(NSA2_OPENBLAS) && !defined(NSA2_ARMPL) && !defined(__ANDROID__)
 		// pch.h keeps a pthreads OpenBLAS serial, as it cannot see an enclosing OpenMP region
@@ -1187,7 +1195,7 @@ vec SALTEDPredictor::predict()
 		free_model_lambda(lam);
 		if (score_only) return {};
 	}
-
+	const auto _t_assemble = std::chrono::steady_clock::now();
 	unordered_map<string, dMatrix1> C{};
 	unordered_map<string, int> ispe{};
 	for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
@@ -1321,15 +1329,16 @@ vec SALTEDPredictor::predict()
 	// npy::write_npy("folder_model.npy", coeffs);
 	if (ProgressBar::report_counts)
 	{
-		const double total = std::chrono::duration<double>(
-			std::chrono::steady_clock::now() - _t_predict_start).count();
-		std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb
-				  << " s (" << (100.0 * _t_equicomb / total) << "%) + kernels "
-				  << _t_kernels << " s (" << (100.0 * _t_kernels / total)
-				  << "%) + model wait " << _t_model_wait << " s ("
-				  << (100.0 * _t_model_wait / total) << "%) + rest "
-				  << (total - _t_equicomb - _t_kernels - _t_model_wait) << " s; model preparation "
-				  << _t_model_work << " s" << std::endl;
+		const double total = _elapsed(_t_predict_start), assemble = _elapsed(_t_assemble);
+		auto part = [total](const char* what, const double s) { std::cout << " + " << what << " " << s << " s (" << 100.0 * s / total << "%)"; };
+		std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb << " s (" << 100.0 * _t_equicomb / total << "%)";
+		part("kernels", _t_kernels);
+		part("model wait", _t_model_wait);
+		part("model install", _t_model_install);
+		part("assemble", assemble);
+		std::cout << " + rest " << total - _t_equicomb - _t_kernels - _t_model_wait - _t_model_install - assemble << " s" << std::endl;
+		std::cout << "[model] payload read " << model_file->lazy_s << " s on the prefetch thread, " << model_file->lazy_bytes
+				  << " bytes in " << model_file->lazy_blocks << " blocks; eager blocks " << eager_s << " s, " << eager_bytes << " bytes" << std::endl;
 	}
 	return pred_coefs;
 }

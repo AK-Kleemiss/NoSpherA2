@@ -92,6 +92,9 @@ private:
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> g_index{};
 	// Held open for the whole prediction, indexed by (species, lambda)
 	std::unique_ptr<SALTED_BINARY_FILE> model_file{};
+	// For -v: time and dataset bytes of the blocks read whole (CONFG, BASIS, WEIGH, WIG, AVERG, FPS)
+	double eager_s = 0.0;
+	size_t eager_bytes = 0;
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> feat_index{};
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> proj_index{};
 	std::unordered_set<std::string> model_species{};

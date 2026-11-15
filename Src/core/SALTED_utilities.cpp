@@ -283,7 +283,9 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 #endif
 	}
 #endif
+	const auto t0 = std::chrono::steady_clock::now();
 	auto calculator = featomic::Calculator("spherical_expansion", modif_param.to_json().c_str());
+	const auto t1 = std::chrono::steady_clock::now();
 
 	featomic::CalculationOptions calc_opts;
 	calc_opts.selected_keys = keys_selection;
@@ -293,7 +295,11 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 	// run the calculation
 	// one block per (o3_lambda, o3_sigma, center_type, neighbor_type); get_expansion_coeffs
 	// densifies them itself
-	return calculator.compute(featomic_system, calc_opts);
+	metatensor::TensorMap out = calculator.compute(featomic_system, calc_opts);
+	if (ProgressBar::report_counts)
+		std::cout << "[stages] featomic calculator " << std::chrono::duration<double>(t1 - t0).count() << " s, compute "
+				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count() << " s" << std::endl;
+	return out;
 }
 
 static size_t label_column(const metatensor::Labels& labels, const char* name)

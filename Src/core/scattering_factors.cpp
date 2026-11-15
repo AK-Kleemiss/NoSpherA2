@@ -4069,9 +4069,17 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	//each predictor replaces opt.spherical_fill_charges with its part's EEQ charges; the fill below needs every part's
 	std::vector<std::vector<std::array<double, 4>>> charges(n_parts);
 	svec known;
+	auto mark = std::chrono::steady_clock::now();
+	auto lap = [&mark](const std::string& what) {
+		const auto now = std::chrono::steady_clock::now();
+		if (ProgressBar::report_counts)
+			std::cout << "[stages] " << what << " " << std::chrono::duration<double>(now - mark).count() << " s" << std::endl;
+		mark = now;
+	};
 	for (size_t i = 0; i < n_parts; i++)
 	{
 		auto pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+		lap("part " + std::to_string(i + 1) + ": predictor");
 		charges[i] = opt.spherical_fill_charges;
 		if (!pred->basis_set_loaded())
 			load_basis_into_WFN(pred->wavy, BasisSetLibrary::get_basis_set(pred->get_dfbasis_name()));
@@ -4088,6 +4096,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		}
 		preds.push_back(pred);
 		preps.push_back(std::move(prep));
+		lap("part " + std::to_string(i + 1) + ": prediction and setup");
 	}
 
 	//atoms the model cannot predict (unknown species, or nothing inside the descriptor cutoff) become extra rows here
@@ -4138,6 +4147,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		}
 		file << "Spherical remainder: " << n_filled
 			 << " atom(s) the model cannot predict" << std::endl;
+		lap("spherical fill");
 	}
 
 	//each spherical remainder straight after its own predicted atoms, as the sequential path appends it per part;
@@ -4185,6 +4195,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			}
 			return combined;
 		});
+	lap("factors and table, streamed");
 	return true;
 }
 

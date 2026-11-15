@@ -15,6 +15,7 @@
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
 #include <random>
+#include <regex>
 #undef I
 
 namespace
@@ -1447,6 +1448,57 @@ TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 	// each H gets 0.460 e against 0.807 e in the reference fit of this geometry (reading_SALTED/coefficients_conf0.npy,
 	// same basis, 10.000 e); the Aug and Sep 2026 builds predict the same coefficients to 1e-16
 	EXPECT_NEAR(e[0] + e[1] + e[2], 9.1937, 1e-3);
+}
+
+// -v accounts for the prediction: the payload line names exactly the bytes of the H and O blocks of the shipped model
+// and the eager line those of the datasets read whole; without -v none of the stage lines is written
+TEST(SaltedFchkPredictorTests, VerboseStagesCountThePayload)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto run = [&root](const bool verbose) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = verbose;
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		SP.gen_SALTED_densities();
+		const std::string out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return out;
+	};
+	SALTED_BINARY_FILE f(root / "SALTED" / "Model" / "model.salted");
+	SALTEDConfig c{};
+	f.populate_config(c);
+	ASSERT_FALSE(f.has_block("FEATL") || f.has_block("ENVW") || f.has_block("GENV"));
+	size_t bytes = 0, blocks = 0;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key))
+		{
+			const std::string spe = k.substr(0, k.size() - 1);
+			if (spe != "H" && spe != "O") continue;
+			bytes += r.rows * r.cols * sizeof(double);
+			blocks += r.rows * r.cols != 0;
+		}
+	f.read_weights();
+	f.read_wigners();
+	if (c.average) f.read_averages();
+	if (c.sparsify) f.read_fps();
+	const std::string out = run(true);
+	for (const char* line : { "[stages] featomic calculator ", "[stages] featomic descriptors ", "[stages] predict ", " + model install ", " + assemble " })
+		EXPECT_NE(out.find(line), std::string::npos) << line << " missing in\n" << out;
+	std::smatch m;
+	ASSERT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s on the prefetch thread, (\\d+) bytes in (\\d+) blocks; eager blocks \\S+ s, (\\d+) bytes"))) << out;
+	EXPECT_EQ(std::stoull(m[1]), bytes);
+	EXPECT_EQ(std::stoull(m[2]), blocks);
+	EXPECT_EQ(std::stoull(m[3]), f.dataset_bytes);
+	const std::string quiet = run(false);
+	EXPECT_EQ(quiet.find("[stages]"), std::string::npos) << quiet;
+	EXPECT_EQ(quiet.find("[model]"), std::string::npos) << quiet;
 }
 
 // a .wfx names its atoms "C1", "H2": the species come from the nuclear charge, so it predicts what the same atoms
