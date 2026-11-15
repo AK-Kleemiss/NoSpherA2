@@ -1147,7 +1147,7 @@ vec SALTEDPredictor::predict()
 			{
 				// GENV (fold_salted_file): psi W^T[(a,m), n] = sum_f p[(a,m), f] H[a, n ncut + f] with H = k0 G,
 				// no kernel and no k0 scaling over (2l + 1)^2 blocks
-				const dMatrix2 H = dot_split(kernell0[spe_idx], *power_env_sparse[key], false);
+				const dMatrix2 H = dot(kernell0[spe_idx], *power_env_sparse[key], false, false);
 				const size_t nm = nmax[key], nc = featsize[lam];
 				err_checkf(H.extent(1) == nm * nc, "The GENV block of " + key + " does not fit the descriptors", std::cout);
 				dMatrix2 psi(pvec_lam.extent(0), nm);
@@ -1168,7 +1168,7 @@ vec SALTEDPredictor::predict()
 			//The regression GEMM stays on the CPU: the device barely wins, because fp64 runs
 			//at a sixty-fourth rate on a consumer part and each call ships its own operands.
 			//It would pay on a datacentre part.
-			dMatrix2 kernel_nm = dot_split(pvec_lam, *power_env_sparse[spe + to_string(lam)], true);
+			dMatrix2 kernel_nm = dot(pvec_lam, *power_env_sparse[spe + to_string(lam)], false, true);
 			if (lam == 0)
 			{
 				// Each atom's closest reference environment as a cosine in the sparsified feature space (the stored
