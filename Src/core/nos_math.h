@@ -84,8 +84,8 @@ T1 flatten(const T2& vecND);
 //BLAS implementation of matrix multiplication
 template <typename T>
 T dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = false);
-// dot(A, B, false, true) with B's rows split over the threads
-dMatrix2 dot_split_rows(const dMatrix2& A, const dMatrix2& B);
+// dot(A, B, false, transp2) with B's columns (rows) split over the threads
+dMatrix2 dot_split(const dMatrix2& A, const dMatrix2& B, const bool transp2);
 
 //BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>
