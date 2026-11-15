@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-15 (SALTED model load, branch `salted-load-time`), `-v` accounts for the model reads, the parts of a run share
+one load of the model (`SALTED_model_store`) and the blocks are read with the run's threads; three gtests are new. The SALTED
+selection of `ctest --preset release-linux-tests` on a CPU-only GCC build: **59 passed, 0 failed** of 59; the full suite was
+not rerun. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-13 (equicomb follow-ups), the predictor keeps one descriptor buffer for all lambdas and the CUDA feature
 kernel builds mu >= 0 only; the zeroing of features that vanish by site symmetry moved to its own branch with the
 normalisation fix. `ctest -R "SALTED|Salted|salted"` on a CUDA `release-windows-tests` build: **56 passed, 0 failed** of 56; the full suite
