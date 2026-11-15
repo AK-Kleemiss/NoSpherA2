@@ -3742,10 +3742,13 @@ tsc_block_type calculate_scattering_factors(
 		time_descriptions.push_back("Calculation of Charges");
 		if (tshb_only) {
 			//keyed as the table's rows, the core as the table adds it: the model's ECP mode
+			const auto t_rec = std::chrono::steady_clock::now();
 			ScattererLabels keys;
 			append_scatterer_ids(keys, opt, labels, *wavy, asym_atom_list);
 			opt.tshb->append(ml->tshb(labels, keys, asym_atom_list, *wavy, calculator.wavy.get_ECP_mode(), opt.electron_diffraction), file);
 			file << labels.size() << " atom(s) go into the .tshb, no table" << endl;
+			if (ProgressBar::report_counts)
+				std::cout << "[stages] tshb records " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_rec).count() << " s" << endl;
 		}
 
 		if (prep_out != NULL)
@@ -4004,8 +4007,10 @@ tsc_block_type calculate_scattering_factors(
 	{
 		file << "Performing the remaining calculation of spherical atoms..." << std::endl;
 		opt.needs_Thakkar_fill = false;
+		const auto t_fill = std::chrono::steady_clock::now();
 		std::vector<WFN> tempy;
 		const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
+		const auto t_wfn = std::chrono::steady_clock::now();
 		//no_date is not part of spherical_fill_scope: only this caller suppresses the banner
 		const bool no_date_was = opt.no_date;
 		opt.no_date = true;
@@ -4018,7 +4023,12 @@ tsc_block_type calculate_scattering_factors(
 				calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr, kpts, &spherical);
 			}
 			opt.no_date = no_date_was;
+			const auto t_atoms = std::chrono::steady_clock::now();
 			fill_tshb(spherical, tempy[fill_nr], opt, file);
+			if (ProgressBar::report_counts)
+				std::cout << "[stages] fill: wavefunctions " << std::chrono::duration<double>(t_wfn - t_fill).count()
+						  << " s, atoms " << std::chrono::duration<double>(t_atoms - t_wfn).count()
+						  << " s, records " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_atoms).count() << " s" << endl;
 		}
 		else
 		{

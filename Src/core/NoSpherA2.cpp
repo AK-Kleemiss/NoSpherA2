@@ -686,7 +686,7 @@ static int run_app_impl(int argc, char **argv)
 					temp_pred->share_model(model_store);
 					filesystem::path salted_model_path = temp_pred->get_salted_filename();
 					log_file << "Using " << salted_model_path << " for the prediction" << endl;
-
+					const auto t_basis = std::chrono::steady_clock::now();
 					if (!temp_pred->basis_set_loaded()) {
 						string df_basis_name = temp_pred->get_dfbasis_name();
 						std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
@@ -706,7 +706,7 @@ static int run_app_impl(int argc, char **argv)
 						log_file);
 					if (ProgressBar::report_counts)
 						std::cout << "[stages] part " << i + 1 << ": predictor " << std::chrono::duration<double>(t1 - t0).count()
-								  << " s, factors " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count() << " s" << endl;
+								  << " s (aux basis " << std::chrono::duration<double>(t1 - t_basis).count() << " s), factors " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count() << " s" << endl;
 				}
 			}
 		};
