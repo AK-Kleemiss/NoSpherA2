@@ -1501,6 +1501,63 @@ TEST(SaltedFchkPredictorTests, VerboseStagesCountThePayload)
 	EXPECT_EQ(quiet.find("[model]"), std::string::npos) << quiet;
 }
 
+// Two parts sharing one model store (as -mtc does): water, then cysteine. The second reads only the blocks of the species
+// water lacks, each block of the run comes from the file once, and both predict what a predictor of their own predicts
+TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const std::filesystem::path xyz[2] = { root / "reading_SALTED" / "water_monomer.xyz", root / "SALTED" / "test_cysteine.xyz" };
+	auto predict = [&root](const std::filesystem::path& p, const std::shared_ptr<SALTED_model_store>& s, std::string& out) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		WFN w(p, false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		SP.share_model(s);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		const vec c = SP.gen_SALTED_densities();
+		out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return c;
+	};
+	auto payload = [](const std::string& out) {
+		std::smatch m;
+		EXPECT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s on the prefetch thread, (\\d+) bytes in (\\d+) blocks"))) << out;
+		return m.empty() ? std::array<size_t, 2>{} : std::array<size_t, 2>{ std::stoull(m[1]), std::stoull(m[2]) };
+	};
+	SALTED_BINARY_FILE f(root / "SALTED" / "Model" / "model.salted");
+	std::map<std::string, std::array<size_t, 2>> per_species;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key))
+		{
+			auto& b = per_species[k.substr(0, k.size() - 1)];
+			b[0] += r.rows * r.cols * sizeof(double);
+			b[1] += r.rows * r.cols != 0;
+		}
+	ASSERT_TRUE(per_species.count("C") && per_species.count("N"));
+	const std::array<size_t, 2> water = { per_species["H"][0] + per_species["O"][0], per_species["H"][1] + per_species["O"][1] };
+	std::array<size_t, 2> new_in_cys{};
+	for (const std::string spe : { "C", "N", "S" })
+		if (per_species.count(spe)) new_in_cys[0] += per_species[spe][0], new_in_cys[1] += per_species[spe][1];
+	std::string out;
+	const vec alone0 = predict(xyz[0], nullptr, out), alone1 = predict(xyz[1], nullptr, out);
+	auto store = std::make_shared<SALTED_model_store>();
+	const vec shared0 = predict(xyz[0], store, out);
+	EXPECT_EQ(payload(out), water);
+	const vec shared1 = predict(xyz[1], store, out);
+	EXPECT_EQ(payload(out), new_in_cys);
+	EXPECT_EQ(store->files.size(), 1u);
+	EXPECT_EQ(store->files.begin()->second->lazy_blocks, water[1] + new_in_cys[1]);
+	ASSERT_EQ(shared0.size(), alone0.size());
+	ASSERT_EQ(shared1.size(), alone1.size());
+	for (size_t i = 0; i < alone0.size(); i++) ASSERT_EQ(shared0[i], alone0[i]) << i;
+	for (size_t i = 0; i < alone1.size(); i++) ASSERT_EQ(shared1[i], alone1[i]) << i;
+}
+
 // a .wfx names its atoms "C1", "H2": the species come from the nuclear charge, so it predicts what the same atoms
 // named by element do. Read from the label, no atom matched a species and the model predicted nothing
 TEST(SaltedFchkPredictorTests, WfxLabelsPredictLikeElements)

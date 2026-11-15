@@ -4076,9 +4076,11 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			std::cout << "[stages] " << what << " " << std::chrono::duration<double>(now - mark).count() << " s" << std::endl;
 		mark = now;
 	};
+	std::shared_ptr<SALTED_model_store> model_store = std::make_shared<SALTED_model_store>();
 	for (size_t i = 0; i < n_parts; i++)
 	{
 		auto pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+		pred->share_model(model_store);
 		lap("part " + std::to_string(i + 1) + ": predictor");
 		charges[i] = opt.spherical_fill_charges;
 		if (!pred->basis_set_loaded())
@@ -4098,6 +4100,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		preps.push_back(std::move(prep));
 		lap("part " + std::to_string(i + 1) + ": prediction and setup");
 	}
+	model_store.reset();
 
 	//atoms the model cannot predict (unknown species, or nothing inside the descriptor cutoff) become extra rows here
 	//every part must be walked: a part file only yields atoms of the parts it covers, so part 0 alone drops the rest

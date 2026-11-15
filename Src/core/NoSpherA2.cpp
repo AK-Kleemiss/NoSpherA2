@@ -658,6 +658,8 @@ static int run_app_impl(int argc, char **argv)
 		//every part into the table, or into the .tshb while opt.tshb is set; a part supplies only the atoms no earlier part did
 		auto run_parts = [&]()
 		{
+			//one load of the model for all parts, released after the last; a single part frees each lambda after use
+			const std::shared_ptr<SALTED_model_store> model_store = opt.SALTED && opt.combined_tsc_calc_files.size() > 1 ? std::make_shared<SALTED_model_store>() : nullptr;
 			for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
 			{
 				known_scatterer = opt.tshb ? opt.tshb->get_scatterers_string() : result.get_scatterers_string();
@@ -681,6 +683,7 @@ static int run_app_impl(int argc, char **argv)
 				{
 					const auto t0 = std::chrono::steady_clock::now();
 					std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+					temp_pred->share_model(model_store);
 					filesystem::path salted_model_path = temp_pred->get_salted_filename();
 					log_file << "Using " << salted_model_path << " for the prediction" << endl;
 
