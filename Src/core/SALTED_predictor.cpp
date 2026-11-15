@@ -1090,7 +1090,7 @@ vec SALTEDPredictor::predict()
 			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
 		}
 		_t_equicomb += _elapsed(_t_eq);
-		// Read in line, not beside the kernels: they then have the -cpus cores to themselves, and all -cpus threads read
+		// Read in line by the OpenMP team, not beside the kernels: never more than -cpus threads busy
 		const auto _t_wait = std::chrono::steady_clock::now();
 		lambda_blocks blocks = read_model_lambda(lam);
 		_t_model_wait += _elapsed(_t_wait);

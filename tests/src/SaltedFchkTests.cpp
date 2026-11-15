@@ -1586,7 +1586,8 @@ TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
 	for (size_t i = 0; i < alone1.size(); i++) ASSERT_EQ(shared1[i], alone1[i]) << i;
 }
 
-// The predicting thread reads every lambda's blocks itself, with -cpus readers: a read beside the kernels takes their cores
+// Every lambda's blocks are read by an OpenMP team of at most -cpus threads: reader threads of their own (a team of one
+// each) run while the team's workers still spin, beyond -cpus
 TEST(SaltedFchkPredictorTests, ModelIsReadInLineWithCpusReaders)
 {
 	equicomb_set_gpu(false);
@@ -1606,8 +1607,9 @@ TEST(SaltedFchkPredictorTests, ModelIsReadInLineWithCpusReaders)
 		ASSERT_EQ(store->files.size(), 1u);
 		const SALTED_BINARY_FILE& f = *store->files.begin()->second;
 		EXPECT_GT(f.lazy_blocks, 0u);
-		EXPECT_EQ(f.caller, std::this_thread::get_id()) << n;
 		EXPECT_EQ(f.readers, (size_t)n);
+		if (n == 1) EXPECT_EQ(f.team, 1);
+		else EXPECT_TRUE(f.team > 1 && f.team <= n) << f.team;
 	}
 	omp_set_num_threads(before);
 }

@@ -3,7 +3,6 @@
 #include <cstring>
 #include <filesystem>
 #include <atomic>
-#include <thread>
 #include <iostream>
 #include "nos_math.h"
 #include "basis_set.h"
@@ -676,9 +675,9 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 	return out;
 }
 
-// `readers` threads (the run's -cpus) first allocate the blocks, largest first, then take `piece` sized slices of them
-// through read_at, straight across block boundaries: from page cache the first touch of the pages is the cost, so the
-// allocations (which zero the pages) and the copies are both spread over the threads.
+// `readers` threads of the OpenMP team (the run's -cpus) first allocate the blocks, largest first, then take `piece`
+// sized slices of them through read_at, straight across block boundaries: from page cache the first touch of the pages
+// is the cost, so the allocations (which zero the pages) and the copies are both spread over the threads.
 // Android: the model usually sits on a microSD card behind sdcardfs, where several readers taking 4 MB pieces beat one stream.
 std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
 	using ext_t = typename dMatrix2::extents_type;
@@ -724,17 +723,13 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_re
 				failed[p.block] = true;
 		}
 	};
-	std::vector<std::thread> pool;
-	try
+	// A span waits only on a block some thread has claimed and allocates without waiting, so any team size finishes
+	const int n = static_cast<int>(std::max<std::size_t>(std::min(readers, spans.size()), 1));
+#pragma omp parallel num_threads(n)
 	{
-		for (std::size_t t = 0; t < std::min(std::max<std::size_t>(readers, 1), spans.size()); t++) pool.emplace_back(reader);
+		if (omp_get_thread_num() == 0) team = std::max(team, omp_get_num_threads());
+		reader();
 	}
-	catch (...)
-	{
-		for (auto& t : pool) t.join();
-		throw;
-	}
-	for (auto& t : pool) t.join();
 	if (err) std::rethrow_exception(err);
 	for (std::size_t i = 0; i < refs.size(); i++)
 		if (failed[i]) out[i] = load_block(refs[i]);   // the stream fallback
@@ -743,7 +738,6 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_re
 
 std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
 	const auto t0 = std::chrono::steady_clock::now();
-	caller = std::this_thread::get_id();
 	std::vector<dMatrix2> out = read_blocks(refs);
 	lazy_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 	for (size_t i = 0; i < refs.size(); i++)

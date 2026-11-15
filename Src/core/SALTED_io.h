@@ -4,7 +4,6 @@
 #include <unordered_set>
 #include <array>
 #include <set>
-#include <thread>
 #include "npy.h"
 
 // A model folder holds one lead model, the first .salted by name that is not named after an element, and per-element
@@ -170,7 +169,7 @@ public:
 	// For -v: wall time, bytes and blocks of load_blocks, and the bytes read_dataset read
 	double lazy_s = 0.0;
 	size_t lazy_bytes = 0, lazy_blocks = 0, dataset_bytes = 0;
-	std::thread::id caller;   // of the last load_blocks
+	int team = 0;   // the largest OpenMP team that ran read_blocks
 
 	const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
 	bool has_block(const std::string& key) const { return table_of_contents.count(key) != 0; }
