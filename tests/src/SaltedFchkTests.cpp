@@ -1587,8 +1587,8 @@ TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
 }
 
 // A merged folder (the model and a copy of it as an alternative in a subfolder): the l = 0 blocks the SOAP score reads
-// are kept for the prediction, so a run without a store reads every block once, as many as a run whose store holds
-// every block, and predicts the same
+// are kept for the prediction, so in a run without a store the predictions read no more blocks than in a run whose
+// store holds every block (the score passes print no payload line), and predict the same
 TEST(SaltedFchkPredictorTests, MergedScoreReadsLambda0Once)
 {
 	equicomb_set_gpu(false);
@@ -1617,14 +1617,12 @@ TEST(SaltedFchkPredictorTests, MergedScoreReadsLambda0Once)
 		for (std::sregex_iterator m(out.begin(), out.end(), re), e; m != e; ++m) blocks += std::stoull((*m)[1]);
 		return c;
 	};
-	size_t alone_blocks = 0, held_blocks = 0, in_files = 0;
+	size_t alone_blocks = 0, held_blocks = 0;
 	const vec alone = predict(nullptr, alone_blocks);
 	auto store = std::make_shared<SALTED_model_store>();
 	const vec held = predict(store, held_blocks);
 	EXPECT_EQ(store->files.size(), 2u);
-	for (const auto& [p, f] : store->files) in_files += f->lazy_blocks;
 	EXPECT_GT(alone_blocks, 0u);
-	EXPECT_EQ(held_blocks, in_files);
 	EXPECT_EQ(alone_blocks, held_blocks);
 	ASSERT_EQ(alone.size(), held.size());
 	for (size_t i = 0; i < alone.size(); i++) ASSERT_EQ(alone[i], held[i]) << i;
