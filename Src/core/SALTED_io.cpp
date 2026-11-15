@@ -275,8 +275,9 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
 void SALTED_BINARY_FILE::open_raw() {
 #ifdef _WIN32
 	if (raw_handle_) return;
+	// overlapped: synchronous reads on one handle are serialised by the I/O manager, and the reader threads share it
 	HANDLE fh = CreateFileW(filepath.wstring().c_str(), GENERIC_READ, FILE_SHARE_READ,
-		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 	if (fh != INVALID_HANDLE_VALUE) raw_handle_ = fh;
 #else
 	if (raw_fd_ >= 0) return;
@@ -305,8 +306,13 @@ bool SALTED_BINARY_FILE::read_at(std::streamoff offset, void* dest, std::size_t 
 		const unsigned long long at = static_cast<unsigned long long>(offset) + done;
 		ov.Offset = static_cast<DWORD>(at & 0xFFFFFFFFull);
 		ov.OffsetHigh = static_cast<DWORD>(at >> 32);
+		ov.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
 		DWORD got = 0;
-		if (!ReadFile(static_cast<HANDLE>(raw_handle_), out + done, want, &got, &ov) || got == 0)
+		const HANDLE fh = static_cast<HANDLE>(raw_handle_);
+		const bool ok = ov.hEvent && (ReadFile(fh, out + done, want, NULL, &ov) || GetLastError() == ERROR_IO_PENDING)
+			&& GetOverlappedResult(fh, &ov, &got, TRUE);
+		if (ov.hEvent) CloseHandle(ov.hEvent);
+		if (!ok || got == 0)
 			return false;
 		done += got;
 	}
