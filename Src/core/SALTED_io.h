@@ -164,6 +164,8 @@ public:
 	dMatrix2 load_block(const block_ref& ref);
 	std::vector<dMatrix2> load_blocks(const std::vector<block_ref>& refs);
 	std::vector<dMatrix2> read_blocks(const std::vector<block_ref>& refs);   // load_blocks without the counting
+	// read_blocks: threads and bytes per read
+	std::size_t readers = 1, piece = 4u << 20;
 	// For -v: wall time, bytes and blocks of load_blocks, and the bytes read_dataset read
 	double lazy_s = 0.0;
 	size_t lazy_bytes = 0, lazy_blocks = 0, dataset_bytes = 0;

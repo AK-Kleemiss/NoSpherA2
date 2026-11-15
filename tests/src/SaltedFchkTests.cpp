@@ -576,6 +576,34 @@ TEST(SaltedFchkIoTests, SyntheticModelIndexAndLoadBlock)
 	std::filesystem::remove(p);
 }
 
+// load_blocks reads every block of the shipped model as load_block does, byte for byte, with one reader and with several
+// whose pieces (an odd size, so they cut doubles) cross the blocks; a block past the end of the file still stops the run
+TEST(SaltedFchkIoTests, ParallelReadMatchesLoadBlock)
+{
+	const auto p = nos_test_repo_root() / "tests" / "SALTED" / "Model" / "model.salted";
+	SALTED_BINARY_FILE f(p);
+	std::vector<SALTED_BINARY_FILE::block_ref> refs;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key)) refs.push_back(r);
+	refs.insert(refs.begin() + 3, SALTED_BINARY_FILE::block_ref{});
+	for (const std::size_t readers : { 1, 2, 7 })
+		for (const std::size_t piece : { std::size_t(4u << 20), std::size_t(1001) })
+		{
+			f.readers = readers;
+			f.piece = piece;
+			const std::vector<dMatrix2> got = f.load_blocks(refs);
+			ASSERT_EQ(got.size(), refs.size());
+			for (size_t i = 0; i < refs.size(); i++)
+			{
+				const dMatrix2 want = f.load_block(refs[i]);
+				ASSERT_EQ(got[i].size(), want.size()) << i;
+				EXPECT_EQ(std::memcmp(got[i].data(), want.data(), want.size() * sizeof(double)), 0) << i << " readers " << readers << " piece " << piece;
+			}
+		}
+	const SALTED_BINARY_FILE::block_ref past{ static_cast<std::streamoff>(std::filesystem::file_size(p)) - 800, 10, 20 };
+	EXPECT_EXIT({ f.readers = 4; f.piece = 1001; f.load_blocks({ refs[0], past }); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+}
+
 // -salted_fold's writer: PROJ becomes PROJW, the blocks behind it move and still read back; a block
 // dropped without a replacement is gone
 TEST(SaltedFchkIoTests, BlockReplacedCopy)

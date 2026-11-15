@@ -813,6 +813,7 @@ void SALTEDPredictor::read_model_data() {
 	}
 	else model_file = std::make_shared<SALTED_BINARY_FILE>(_SALTEDpath);
 	SALTED_BINARY_FILE &file = *model_file;
+	file.readers = omp_get_max_threads();   // read on the prefetch thread, which does not see -cpus
 	const size_t dataset_bytes0 = file.dataset_bytes;
 	if (config.field) {
 		err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);

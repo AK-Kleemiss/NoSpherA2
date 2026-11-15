@@ -2,7 +2,9 @@
 #include "SALTED_io.h"
 #include <cstring>
 #include <filesystem>
+#include <atomic>
 #include <future>
+#include <thread>
 #include <iostream>
 #include "nos_math.h"
 #include "basis_set.h"
@@ -669,39 +671,12 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 	return out;
 }
 
-#ifndef __ANDROID__
-// A new dMatrix2 is zero-filled (std::vector value-initialises it, faulting in every page)
-// before read_at overwrites it, and the disk idles meanwhile. Filling block i+1 while a helper
-// reads block i hides that; one read in flight keeps the access sequential.
-// Sucrose, 650 MB, cold on the Pi 4: 2.66 -> 2.14 s.
+// `readers` threads (the run's -cpus) take `piece` sized slices of the blocks through read_at, straight across block
+// boundaries, while this thread allocates the blocks ahead of them: from page cache a single reader is a serial copy.
+// Android: the model usually sits on a microSD card behind sdcardfs, cold one stream gets ~68 MB/s and four readers
+// taking 4 MB pieces ~76 MB/s (SM-T585, combo_v6, -cpus 4: model wait 6.18-6.44 -> 5.35-5.43 s, with a fd per reader).
 std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
 	using ext_t = typename dMatrix2::extents_type;
-	std::vector<dMatrix2> out(refs.size());
-	std::vector<std::future<bool>> raw(refs.size());   // after out: destroyed first, waits for the reads
-	for (std::size_t i = 0; i < refs.size(); i++)
-	{
-		if (refs[i].rows != 0 && refs[i].cols != 0)
-			out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
-		if (i > 0) raw[i - 1].wait();
-		raw[i] = std::async(std::launch::async, [this, &refs, &out, i] {
-			return read_at(refs[i].offset, out[i].data(), refs[i].rows * refs[i].cols * sizeof(double));
-			});
-	}
-	for (std::size_t i = 0; i < refs.size(); i++)
-		if (!raw[i].get()) out[i] = load_block(refs[i]);   // the stream fallback
-	return out;
-}
-#else
-#include <atomic>
-#include <thread>
-// Android: the model usually sits on a microSD card behind sdcardfs. Cold on the SM-T585 one
-// sequential stream gets ~68 MB/s; four readers with their own fd (so their own readahead
-// window) taking 4 MB pieces straight across block boundaries get ~76 MB/s. The fill still
-// runs ahead on this thread, ~10x faster than the card, so the readers rarely wait for it.
-// Sucrose, combo_v6 from the card, cold, -cpus 4: model wait 6.18-6.44 -> 5.35-5.43 s, same tscb.
-std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
-	using ext_t = typename dMatrix2::extents_type;
-	constexpr std::size_t piece = 4u << 20;
 	struct span { std::size_t block, from, bytes; };
 	std::vector<span> spans;
 	for (std::size_t i = 0; i < refs.size(); i++)
@@ -711,29 +686,19 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_re
 	std::vector<std::atomic<bool>> failed(refs.size());
 	std::atomic<std::size_t> filled{ 0 }, next{ 0 };   // filled > refs.size(): the fill threw, stop
 	auto reader = [&] {
-		const int fd = ::open(filepath.string().c_str(), O_RDONLY);
 		for (std::size_t s; (s = next++) < spans.size();)
 		{
 			const span& p = spans[s];
 			for (std::size_t f; (f = filled.load(std::memory_order_acquire)) <= p.block;) filled.wait(f);
 			if (filled.load() > refs.size()) break;
-			char* dst = reinterpret_cast<char*>(out[p.block].data()) + p.from;
-			std::size_t done = 0;
-			while (fd >= 0 && done < p.bytes)
-			{
-				const ssize_t got = ::pread(fd, dst + done, p.bytes - done,
-					static_cast<off_t>(refs[p.block].offset) + static_cast<off_t>(p.from + done));
-				if (got <= 0) break;
-				done += static_cast<std::size_t>(got);
-			}
-			if (done < p.bytes) failed[p.block] = true;
+			if (!read_at(refs[p.block].offset + static_cast<std::streamoff>(p.from), reinterpret_cast<char*>(out[p.block].data()) + p.from, p.bytes))
+				failed[p.block] = true;
 		}
-		if (fd >= 0) ::close(fd);
 	};
 	std::vector<std::thread> pool;
 	try
 	{
-		for (int t = 0; t < 4; t++) pool.emplace_back(reader);
+		for (std::size_t t = 0; t < std::min(std::max<std::size_t>(readers, 1), spans.size()); t++) pool.emplace_back(reader);
 		for (std::size_t i = 0; i < refs.size(); i++)
 		{
 			if (refs[i].rows != 0 && refs[i].cols != 0)
@@ -754,7 +719,6 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_re
 		if (failed[i]) out[i] = load_block(refs[i]);   // the stream fallback
 	return out;
 }
-#endif
 
 std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
 	const auto t0 = std::chrono::steady_clock::now();
