@@ -9,6 +9,7 @@
 using salted_block = std::shared_ptr<const dMatrix2>;
 //The model of one run held for its parts, so a later part reads neither the file nor a block again: open files and
 //(species, lambda) blocks by model file, shared and never copied. keep = false: a block is handed out once and dropped
+// shortcut: keeps every block of the run until the last part, not bounded by -mem; release per lambda if models outgrow desktop memory
 struct SALTED_model_store
 {
 	std::map<std::filesystem::path, std::shared_ptr<SALTED_BINARY_FILE>> files;
@@ -124,7 +125,7 @@ private:
 	void read_model_data();
 	// Drop the model matrices of one lambda; read_model_data() only indexes
 	void free_model_lambda(const int lam);
-	// (species+lambda key, projector, features); read and install split for the prefetch
+	// (species+lambda key, projector, features)
 	using lambda_blocks = std::vector<std::tuple<std::string, salted_block, salted_block>>;
 	lambda_blocks read_model_lambda(const int lam);
 	void install_model_lambda(lambda_blocks blocks, const int lam);

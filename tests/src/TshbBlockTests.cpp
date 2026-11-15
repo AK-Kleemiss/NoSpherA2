@@ -608,7 +608,7 @@ TEST(TshbJointTests, SaltedSharedPart0AtomsAreFilledOnce)
 		"-mtc_mult", "1", "1", "-mtc_charge", "0", "0", "-mtc_ECP", "0", "0", "-v" };
 	auto payload = [](const std::string& log) {
 		std::vector<size_t> b;
-		const std::regex re("\\[model\\] payload read \\S+ s on the prefetch thread, (\\d+) bytes");
+		const std::regex re("\\[model\\] payload read \\S+ s, (\\d+) bytes");
 		for (std::sregex_iterator m(log.begin(), log.end(), re), e; m != e; ++m) b.push_back(std::stoull((*m)[1]));
 		return b;
 	};

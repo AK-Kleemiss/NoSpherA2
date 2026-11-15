@@ -1520,7 +1520,7 @@ TEST(SaltedFchkPredictorTests, VerboseStagesCountThePayload)
 	for (const char* line : { "[stages] featomic calculator ", "[stages] featomic descriptors ", "[stages] predict ", " + model install ", " + assemble " })
 		EXPECT_NE(out.find(line), std::string::npos) << line << " missing in\n" << out;
 	std::smatch m;
-	ASSERT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s on the prefetch thread, (\\d+) bytes in (\\d+) blocks; eager blocks \\S+ s, (\\d+) bytes"))) << out;
+	ASSERT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s, (\\d+) bytes in (\\d+) blocks; eager blocks \\S+ s, (\\d+) bytes"))) << out;
 	EXPECT_EQ(std::stoull(m[1]), bytes);
 	EXPECT_EQ(std::stoull(m[2]), blocks);
 	EXPECT_EQ(std::stoull(m[3]), f.dataset_bytes);
@@ -1554,7 +1554,7 @@ TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
 	};
 	auto payload = [](const std::string& out) {
 		std::smatch m;
-		EXPECT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s on the prefetch thread, (\\d+) bytes in (\\d+) blocks"))) << out;
+		EXPECT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s, (\\d+) bytes in (\\d+) blocks"))) << out;
 		return m.empty() ? std::array<size_t, 2>{} : std::array<size_t, 2>{ std::stoull(m[1]), std::stoull(m[2]) };
 	};
 	SALTED_BINARY_FILE f(root / "SALTED" / "Model" / "model.salted");
@@ -1586,6 +1586,32 @@ TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
 	for (size_t i = 0; i < alone1.size(); i++) ASSERT_EQ(shared1[i], alone1[i]) << i;
 }
 
+// The predicting thread reads every lambda's blocks itself, with -cpus readers: a read beside the kernels takes their cores
+TEST(SaltedFchkPredictorTests, ModelIsReadInLineWithCpusReaders)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const int before = omp_get_max_threads();
+	for (const int n : { 1, 4 })
+	{
+		omp_set_num_threads(n);
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		auto store = std::make_shared<SALTED_model_store>();
+		SALTEDPredictor SP(w, opt);
+		SP.share_model(store);
+		EXPECT_FALSE(SP.gen_SALTED_densities().empty());
+		ASSERT_EQ(store->files.size(), 1u);
+		const SALTED_BINARY_FILE& f = *store->files.begin()->second;
+		EXPECT_GT(f.lazy_blocks, 0u);
+		EXPECT_EQ(f.caller, std::this_thread::get_id()) << n;
+		EXPECT_EQ(f.readers, (size_t)n);
+	}
+	omp_set_num_threads(before);
+}
+
 // A merged folder (the model and a copy of it as an alternative in a subfolder): the l = 0 blocks the SOAP score reads
 // are kept for the prediction, so in a run without a store the predictions read no more blocks than in a run whose
 // store holds every block (the score passes print no payload line), and predict the same
@@ -1613,7 +1639,7 @@ TEST(SaltedFchkPredictorTests, MergedScoreReadsLambda0Once)
 		ProgressBar::report_counts = before;
 		EXPECT_NE(out.find("Combining 2 SALTED models"), std::string::npos) << out;
 		blocks = 0;
-		const std::regex re("\\[model\\] payload read \\S+ s on the prefetch thread, \\d+ bytes in (\\d+) blocks");
+		const std::regex re("\\[model\\] payload read \\S+ s, \\d+ bytes in (\\d+) blocks");
 		for (std::sregex_iterator m(out.begin(), out.end(), re), e; m != e; ++m) blocks += std::stoull((*m)[1]);
 		return c;
 	};

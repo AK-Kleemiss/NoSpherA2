@@ -16,7 +16,6 @@
 #include "citations.h"
 #include <cstring>
 #include <filesystem>
-#include <future>
 
 
 // inorganic: no carbon bonded to H, C or a metal (carbonate, cyanide and carbide stay inorganic); organometallic: such
@@ -813,7 +812,7 @@ void SALTEDPredictor::read_model_data() {
 	}
 	else model_file = std::make_shared<SALTED_BINARY_FILE>(_SALTEDpath);
 	SALTED_BINARY_FILE &file = *model_file;
-	file.readers = omp_get_max_threads();   // read on the prefetch thread, which does not see -cpus
+	file.readers = omp_get_max_threads();
 	const size_t dataset_bytes0 = file.dataset_bytes;
 	if (config.field) {
 		err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
@@ -926,7 +925,6 @@ void SALTEDPredictor::read_model_data() {
 
 // Model matrices are loaded per lambda and dropped after use: nothing rereads them, the weight
 // offsets come from the projector shapes
-// File reads only, touching no member the kernels use, so it can run on another thread
 SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 {
 	lambda_blocks out;
@@ -1024,11 +1022,6 @@ vec SALTEDPredictor::predict()
 		sf_gpu_warmup_wait();
 #endif
 	const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
-	// Reading a lambda's blocks takes about as long as its kernels (V6 sucrose: ~180 ms from page
-	// cache on x64, 65-140 MB/s from Android flash), so read lambda + 1 while lambda's kernels run.
-	// Plain file reads, so no OpenMP team of its own (see below); its -cpus reader threads run beside the kernels' team;
-	// holds two lambdas at once, ~100 MB more at the peak for the V6 model. Output is identical
-	std::future<lambda_blocks> next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, 0);
 	// The (l1, l2) pairs and complex-to-real matrix of every lambda, which the norm wants up front
 	std::vector<ivec2> llvec_all(lmax_max + 1);
 	std::vector<cvec2> c2r_all(lmax_max + 1);
@@ -1097,31 +1090,22 @@ vec SALTEDPredictor::predict()
 			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
 		}
 		_t_equicomb += _elapsed(_t_eq);
-		// The file reads of lambda ran during lambda - 1's kernels; installing the blocks (the
-		// projector products) stays in line, also with the descriptors on the device: doing that
-		// on a second thread gave that thread its own OpenMP/MKL team, whose spin-wait then cost
-		// the kernels below more than the overlap could ever hide
+		// Read in line, not beside the kernels: they then have the -cpus cores to themselves, and all -cpus threads read
 		const auto _t_wait = std::chrono::steady_clock::now();
-		lambda_blocks blocks = next_lambda.get();
+		lambda_blocks blocks = read_model_lambda(lam);
 		_t_model_wait += _elapsed(_t_wait);
 		const auto _t_install = std::chrono::steady_clock::now();
 		install_model_lambda(std::move(blocks), lam);
-		if (lam < lmax_max && !score_only)
-			next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, lam + 1);
 		_t_model_install += _elapsed(_t_install);
 		const auto _t_kn = std::chrono::steady_clock::now();
 #if defined(NSA2_OPENBLAS) && !defined(NSA2_ARMPL) && !defined(__ANDROID__)
 		// pch.h keeps a pthreads OpenBLAS serial, as it cannot see an enclosing OpenMP region
 		// (Android's OpenMP OpenBLAS keeps the count pch.h caps to cpu0's cluster, so not there).
-		// This loop is outside one (its parallel for calls no BLAS), so its GEMMs may take every core,
-		// but one while lambda + 1 is read: OpenBLAS splits a GEMM evenly, so a thread the reader
-		// pushes off its core holds back all of them (Pi 4, -cpus 4: kernels 1.9 -> 3.0 s)
-		const int blas_n = lam < lmax_max ? std::max(1, std::min(omp_get_max_threads(), omp_get_num_procs() - 1))
-		                                  : omp_get_max_threads();
+		// This loop is outside one (its parallel for calls no BLAS), so its GEMMs may take every core
 		struct blas_threads_scope {
 			explicit blas_threads_scope(const int n) { openblas_set_num_threads(n); }
 			~blas_threads_scope() { openblas_set_num_threads(1); }
-		} blas_threads(blas_n);
+		} blas_threads(omp_get_max_threads());
 #endif
 		// Species-outer within the group, so a species keeps its sparse matrices hot
 		for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
@@ -1372,7 +1356,7 @@ vec SALTEDPredictor::predict()
 		part("model install", _t_model_install);
 		part("assemble", assemble);
 		std::cout << " + rest " << total - _t_equicomb - _t_kernels - _t_model_wait - _t_model_install - assemble << " s" << std::endl;
-		std::cout << "[model] payload read " << model_file->lazy_s - lazy_s0 << " s on the prefetch thread, " << model_file->lazy_bytes - lazy_bytes0
+		std::cout << "[model] payload read " << model_file->lazy_s - lazy_s0 << " s, " << model_file->lazy_bytes - lazy_bytes0
 				  << " bytes in " << model_file->lazy_blocks - lazy_blocks0 << " blocks; eager blocks " << eager_s << " s, " << eager_bytes << " bytes" << std::endl;
 	}
 	return pred_coefs;

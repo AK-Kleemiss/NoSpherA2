@@ -3,7 +3,6 @@
 #include <cstring>
 #include <filesystem>
 #include <atomic>
-#include <future>
 #include <thread>
 #include <iostream>
 #include "nos_math.h"
@@ -744,6 +743,7 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_re
 
 std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
 	const auto t0 = std::chrono::steady_clock::now();
+	caller = std::this_thread::get_id();
 	std::vector<dMatrix2> out = read_blocks(refs);
 	lazy_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 	for (size_t i = 0; i < refs.size(); i++)
