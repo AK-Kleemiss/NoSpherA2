@@ -674,8 +674,7 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 // `readers` threads (the run's -cpus) first allocate the blocks, largest first, then take `piece` sized slices of them
 // through read_at, straight across block boundaries: from page cache the first touch of the pages is the cost, so the
 // allocations (which zero the pages) and the copies are both spread over the threads.
-// Android: the model usually sits on a microSD card behind sdcardfs, cold one stream gets ~68 MB/s and four readers
-// taking 4 MB pieces ~76 MB/s (SM-T585, combo_v6, -cpus 4: model wait 6.18-6.44 -> 5.35-5.43 s, with a fd per reader).
+// Android: the model usually sits on a microSD card behind sdcardfs, where several readers taking 4 MB pieces beat one stream.
 std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
 	using ext_t = typename dMatrix2::extents_type;
 	struct span { std::size_t block, from, bytes; };

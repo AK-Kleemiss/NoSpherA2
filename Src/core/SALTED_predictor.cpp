@@ -1026,7 +1026,7 @@ vec SALTEDPredictor::predict()
 	const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
 	// Reading a lambda's blocks takes about as long as its kernels (V6 sucrose: ~180 ms from page
 	// cache on x64, 65-140 MB/s from Android flash), so read lambda + 1 while lambda's kernels run.
-	// Plain file reads, so no OpenMP team of its own (see below). One thread on top of -cpus;
+	// Plain file reads, so no OpenMP team of its own (see below); its -cpus reader threads run beside the kernels' team;
 	// holds two lambdas at once, ~100 MB more at the peak for the V6 model. Output is identical
 	std::future<lambda_blocks> next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, 0);
 	// The (l1, l2) pairs and complex-to-real matrix of every lambda, which the norm wants up front
