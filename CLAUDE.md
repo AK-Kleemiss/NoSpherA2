@@ -239,10 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
-As of 2026-11-15 (later, branch `salted-load-time`), the reader threads allocate the SALTED model blocks themselves and
-the two large kernel products are split over the model block per thread (`dot_split`, coefficients move at rounding level);
-`SaltedFchkPredictorTests.SplitProductMatchesDot` is new. The SALTED selection on a CPU-only GCC build: **60 passed, 0 failed**
-of 60; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+As of 2026-11-15 (latest, branch `salted-load-time`), the reader threads allocate the SALTED model blocks themselves, the
+split kernel products (`dot_split`) are reverted, the text tsc is formatted with `to_chars` in per-thread chunks (byte-identical)
+and a `-mtc` part's spherical fill skips the atoms of earlier parts; `ScatteringFactorBlockTests.ChunkedTextWriterMatchesTheStream`
+and `TshbJointTests.SaltedSharedPart0AtomsAreFilledOnce` are new. The SALTED, tsc and tshb selection (109 tests) on a CPU-only
+GCC build: **109 passed, 0 failed**; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-15 (SALTED model load, branch `salted-load-time`), `-v` accounts for the model reads, the parts of a run share
 one load of the model (`SALTED_model_store`) and the blocks are read with the run's threads; three gtests are new. The SALTED
