@@ -239,6 +239,8 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-15 (review fixes, branch `salted-load-time`), a run without /proc no longer exits from the process-age read, the text tsc writer has room for any double index, and the shared model, the -v lines and the merged score store are covered by tests (`ProcessAgeTests.StatStartTicksOfAnUnreadableLineIsNotKnown`, `SaltedFchkPredictorTests.MergedScoreReadsLambda0Once` are new). Full suite on `427a9606`, CPU-only GCC 11.5 build, one process per test as ctest runs them: **1394 passed, 0 failed, 23 skipped** (2 disabled) of 1419. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-15 (latest, branch `salted-load-time`), the reader threads allocate the SALTED model blocks themselves, the
 split kernel products (`dot_split`) are reverted, the text tsc is formatted with `to_chars` in per-thread chunks (byte-identical)
 and a `-mtc` part's spherical fill skips the atoms of earlier parts; `ScatteringFactorBlockTests.ChunkedTextWriterMatchesTheStream`
