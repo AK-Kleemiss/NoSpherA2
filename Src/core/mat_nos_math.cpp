@@ -147,6 +147,27 @@ T dot(const T& mat1, const T& mat2, bool transp1, bool transp2)
 template dMatrix2 dot(const dMatrix2& mat1, const dMatrix2& mat2, bool transp1, bool transp2);
 template cMatrix2 dot(const cMatrix2& mat1, const cMatrix2& mat2, bool transp1, bool transp2);
 
+// A B^T, B's rows cut into one slice per thread with a serial GEMM each (MKL runs serial inside a parallel region):
+// a threaded GEMM hardly splits a product whose left operand has few rows, so the large right one streams through one core
+dMatrix2 dot_split_rows(const dMatrix2& A, const dMatrix2& B)
+{
+#if defined(NSA2_OPENBLAS) && !defined(NSA2_ARMPL) && !defined(__ANDROID__)
+	return dot(A, B, false, true);   // a pthreads OpenBLAS threads the whole GEMM where the SALTED predictor allows it
+#else
+	const int m = (int)A.extent(0), n = (int)B.extent(0), k = (int)A.extent(1), nt = std::min(omp_get_max_threads(), n);
+	if (nt <= 1 || m >= n || A.size() == 0 || B.size() == 0) return dot(A, B, false, true);
+	err_checkf(k == (int)B.extent(1), "Inner matrix dimensions must agree.", std::cout);
+	dMatrix2 C(m, n);
+#pragma omp parallel for num_threads(nt)
+	for (int t = 0; t < nt; t++)
+	{
+		const int j0 = (int)((long long)n * t / nt), j1 = (int)((long long)n * (t + 1) / nt);
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, j1 - j0, k, 1.0, A.data(), k, B.data() + (size_t)j0 * k, k, 0.0, C.data() + j0, n);
+	}
+	return C;
+#endif
+}
+
 
 template <typename T>
 Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2)

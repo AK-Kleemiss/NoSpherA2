@@ -1168,7 +1168,7 @@ vec SALTEDPredictor::predict()
 			//The regression GEMM stays on the CPU: the device barely wins, because fp64 runs
 			//at a sixty-fourth rate on a consumer part and each call ships its own operands.
 			//It would pay on a datacentre part.
-			dMatrix2 kernel_nm = dot(pvec_lam, *power_env_sparse[spe + to_string(lam)], false, true);
+			dMatrix2 kernel_nm = dot_split_rows(pvec_lam, *power_env_sparse[spe + to_string(lam)]);
 			if (lam == 0)
 			{
 				// Each atom's closest reference environment as a cosine in the sparsified feature space (the stored

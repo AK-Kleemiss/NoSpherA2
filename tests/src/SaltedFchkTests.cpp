@@ -604,6 +604,30 @@ TEST(SaltedFchkIoTests, ParallelReadMatchesLoadBlock)
 	EXPECT_EXIT({ f.readers = 4; f.piece = 1001; f.load_blocks({ refs[0], past }); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
+// the kernel product split over B's rows equals dot(A, B, false, true): rows not divisible by the threads, one row,
+// more threads than rows, and a left operand as large as the right one (plain dot)
+TEST(SaltedFchkPredictorTests, SplitRowProductMatchesDot)
+{
+	std::mt19937 gen(11);
+	std::uniform_real_distribution<double> u(-1.0, 1.0);
+	const int threads = omp_get_max_threads();
+	for (const int nt : { 1, 3, 8 })
+		for (const std::array<int, 3> s : { std::array<int, 3>{ 15, 1001, 67 }, { 9, 37, 130 }, { 5, 1, 12 }, { 3, 2, 40 }, { 40, 30, 8 } })
+		{
+			dMatrix2 A(s[0], s[2]), B(s[1], s[2]);
+			for (size_t i = 0; i < A.size(); i++) A.data()[i] = u(gen);
+			for (size_t i = 0; i < B.size(); i++) B.data()[i] = u(gen);
+			omp_set_num_threads(nt);
+			const dMatrix2 got = dot_split_rows(A, B), want = dot(A, B, false, true);
+			ASSERT_EQ(got.extent(0), want.extent(0));
+			ASSERT_EQ(got.extent(1), want.extent(1));
+			double d = 0.0, w = 0.0;
+			for (size_t i = 0; i < want.size(); i++) d = std::max(d, std::abs(got.data()[i] - want.data()[i])), w = std::max(w, std::abs(want.data()[i]));
+			EXPECT_LE(d, 1e-14 * w) << s[0] << "x" << s[1] << "x" << s[2] << " threads " << nt;
+		}
+	omp_set_num_threads(threads);
+}
+
 // -salted_fold's writer: PROJ becomes PROJW, the blocks behind it move and still read back; a block
 // dropped without a replacement is gone
 TEST(SaltedFchkIoTests, BlockReplacedCopy)
