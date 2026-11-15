@@ -1586,6 +1586,51 @@ TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
 	for (size_t i = 0; i < alone1.size(); i++) ASSERT_EQ(shared1[i], alone1[i]) << i;
 }
 
+// A merged folder (the model and a copy of it as an alternative in a subfolder): the l = 0 blocks the SOAP score reads
+// are kept for the prediction, so a run without a store reads every block once, as many as a run whose store holds
+// every block, and predicts the same
+TEST(SaltedFchkPredictorTests, MergedScoreReadsLambda0Once)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("merged");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "alt");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "model.salted");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "alt" / "model.salted");
+	auto predict = [&](const std::shared_ptr<SALTED_model_store>& s, size_t& blocks) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = dir;
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		if (s) SP.share_model(s);
+		const vec c = SP.gen_SALTED_densities();
+		const std::string out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		EXPECT_NE(out.find("Combining 2 SALTED models"), std::string::npos) << out;
+		blocks = 0;
+		const std::regex re("\\[model\\] payload read \\S+ s on the prefetch thread, \\d+ bytes in (\\d+) blocks");
+		for (std::sregex_iterator m(out.begin(), out.end(), re), e; m != e; ++m) blocks += std::stoull((*m)[1]);
+		return c;
+	};
+	size_t alone_blocks = 0, held_blocks = 0, in_files = 0;
+	const vec alone = predict(nullptr, alone_blocks);
+	auto store = std::make_shared<SALTED_model_store>();
+	const vec held = predict(store, held_blocks);
+	EXPECT_EQ(store->files.size(), 2u);
+	for (const auto& [p, f] : store->files) in_files += f->lazy_blocks;
+	EXPECT_GT(alone_blocks, 0u);
+	EXPECT_EQ(held_blocks, in_files);
+	EXPECT_EQ(alone_blocks, held_blocks);
+	ASSERT_EQ(alone.size(), held.size());
+	for (size_t i = 0; i < alone.size(); i++) ASSERT_EQ(alone[i], held[i]) << i;
+	std::filesystem::remove_all(dir);
+}
+
 // a .wfx names its atoms "C1", "H2": the species come from the nuclear charge, so it predicts what the same atoms
 // named by element do. Read from the label, no atom matched a species and the model predicted nothing
 TEST(SaltedFchkPredictorTests, WfxLabelsPredictLikeElements)
