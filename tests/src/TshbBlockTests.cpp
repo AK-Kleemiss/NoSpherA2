@@ -594,6 +594,27 @@ TEST(TshbJointTests, SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile)
 	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
 }
 
+//THPP's 20 PART 0 atoms, the two F the model lacks among them, are in both parts' wavefunctions: the second part's fill
+//skips what the first part wrote, so the fill writes its records once, and the file still matches the table
+TEST(TshbJointTests, SaltedSharedPart0AtomsAreFilledOnce)
+{
+	const std::string cif = fs::absolute(fixture("disorder/thpp.cif")).string();
+	std::vector<std::string> a{ "-SALTED", fixture("SALTED/Model"), "-cif", cif, "-dmin", "0.9", "-no_date", "-mtc",
+		fixture("disorder/olex2/Wfn_job/Part_1/thpp.wfx"), "0.1", fixture("disorder/olex2/Wfn_job/Part_2/thpp.wfx"), "0.2",
+		"-mtc_mult", "1", "1", "-mtc_charge", "0", "0", "-mtc_ECP", "0", "0" };
+	joint_against_table("salted_thpp", a, cif);
+	a.push_back("-tshb");
+	app_dir run("salted_thpp_fill");
+	ASSERT_EQ(run.run(a), 0);
+	const std::string log = run.log();
+	int n = 0;
+	for (size_t p = log.find("as Slater records"); p != std::string::npos; p = log.find("as Slater records", p + 1))
+		n++;
+	EXPECT_EQ(n, 1) << log;
+	EXPECT_NE(log.find("Spherical fill: 2 atom(s) go into the .tshb as Slater records"), std::string::npos) << log;
+	EXPECT_EQ(tshb_block(run.dir / "experimental.tshb").scatterer_size(), 32u);
+}
+
 //a part without orbitals (an .xyz) in a -ri_fit -tshb run: its atoms go in as the fill's spherical records, neutral and at
 //full occupancy, and match the table of the run without -tshb, which takes IAM for that part; the file is complete, and
 //the per-part files merged with the CIF are the joint file byte for byte

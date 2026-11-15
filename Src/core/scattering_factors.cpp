@@ -3026,7 +3026,8 @@ std::vector<Thakkar> make_spherical_evaluators(const ivec& atom_type_list)
 }
 
 //the file list a spherical fill runs over, and the index into it; nr also selects opt.groups[nr] and the part's cif,
-//so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed
+//so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed;
+//only tempy[nr] is read, the other parts stay empty
 int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>& tempy)
 {
 	if (!opt.wfn.empty())
@@ -3034,8 +3035,11 @@ int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>&
 		tempy.emplace_back(opt.wfn);
 		return 0;
 	}
-	for (const std::filesystem::path& part_file : opt.combined_tsc_calc_files)
-		tempy.emplace_back(part_file);
+	for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++)
+		if (i == nr)
+			tempy.emplace_back(opt.combined_tsc_calc_files[i]);
+		else
+			tempy.emplace_back();
 	return nr;
 }
 
@@ -4014,13 +4018,16 @@ tsc_block_type calculate_scattering_factors(
 		//no_date is not part of spherical_fill_scope: only this caller suppresses the banner
 		const bool no_date_was = opt.no_date;
 		opt.no_date = true;
+		//the atoms of earlier parts too: the table and the .tshb keep the first copy of a key, so a fill of them was discarded
+		svec fill_known(known_atoms);
+		fill_known.insert(fill_known.end(), labels.begin(), labels.end());
 		if (tshb_only)
 		{
 			//the atoms alone: their records need no reflections
 			salted_part_prep spherical;
 			{
 				const spherical_fill_scope fill(opt, hkl);
-				calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr, kpts, &spherical);
+				calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, fill_known, fill_nr, kpts, &spherical);
 			}
 			opt.no_date = no_date_was;
 			const auto t_atoms = std::chrono::steady_clock::now();
@@ -4035,10 +4042,11 @@ tsc_block_type calculate_scattering_factors(
 			tsc_block<int, cdouble> blocky_thakkar;
 			{
 				const spherical_fill_scope fill(opt, hkl);
-				blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
+				blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, fill_known, fill_nr);
 			}
 			opt.no_date = no_date_was;
-			blocky.append(std::move(blocky_thakkar), file);
+			if (!blocky_thakkar.is_empty())
+				blocky.append(std::move(blocky_thakkar), file);
 		}
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Spherical Atoms");
