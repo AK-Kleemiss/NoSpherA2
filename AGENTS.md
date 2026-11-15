@@ -297,6 +297,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-15 (later, branch `salted-load-time`), the reader threads allocate the SALTED model blocks themselves and
+the two large kernel products are split over the model block per thread (`dot_split`, coefficients move at rounding level);
+`SaltedFchkPredictorTests.SplitProductMatchesDot` is new. The SALTED selection on a CPU-only GCC build: **60 passed, 0 failed**
+of 60; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-15 (SALTED model load, branch `salted-load-time`), `-v` accounts for the model reads, the parts of a run share
 one load of the model (`SALTED_model_store`) and the blocks are read with the run's threads; three gtests are new. The SALTED
 selection of `ctest --preset release-linux-tests` on a CPU-only GCC build: **59 passed, 0 failed** of 59; the full suite was
