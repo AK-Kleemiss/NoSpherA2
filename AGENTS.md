@@ -297,6 +297,8 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-15 (on-demand model reads, branch `salted-load-time`), the SALTED predictor reads each lambda's model blocks in line with all `-cpus` threads instead of prefetching lambda + 1 beside the kernels; `SaltedFchkPredictorTests.ModelIsReadInLineWithCpusReaders` is new. `ctest -j4` on a CUDA `release-windows-tests` build: **1410 passed, 0 failed, 12 skipped** (2 disabled) of 1424; full suite on a CPU-only GCC 11.5 build, one process per test as ctest runs them: **1395 passed, 0 failed, 23 skipped** (2 disabled) of 1420. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-15 (Windows, branch `salted-load-time`), the SALTED model reader opens its shared Windows handle overlapped, so its threads read in parallel (synchronous reads on one handle are serialised), and `MergedScoreReadsLambda0Once` closes its model store before removing the folder. `ctest -j4` on a CUDA `release-windows-tests` build (MSVC 14.51, device present): **1409 passed, 0 failed, 12 skipped** (2 disabled) of 1423. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-15 (review fixes, branch `salted-load-time`), a run without /proc no longer exits from the process-age read, the text tsc writer has room for any double index, and the shared model, the -v lines and the merged score store are covered by tests (`ProcessAgeTests.StatStartTicksOfAnUnreadableLineIsNotKnown`, `SaltedFchkPredictorTests.MergedScoreReadsLambda0Once` are new). Full suite on `427a9606`, CPU-only GCC 11.5 build, one process per test as ctest runs them: **1394 passed, 0 failed, 23 skipped** (2 disabled) of 1419. See `UNIT_TESTS_STATUS.md`.
