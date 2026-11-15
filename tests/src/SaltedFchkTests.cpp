@@ -1626,6 +1626,7 @@ TEST(SaltedFchkPredictorTests, MergedScoreReadsLambda0Once)
 	EXPECT_EQ(alone_blocks, held_blocks);
 	ASSERT_EQ(alone.size(), held.size());
 	for (size_t i = 0; i < alone.size(); i++) ASSERT_EQ(alone[i], held[i]) << i;
+	store.reset();   // the store keeps both files open, and Windows deletes no open file
 	std::filesystem::remove_all(dir);
 }
 
