@@ -976,7 +976,8 @@ TEST(ScatteringFactorBlockTests, ChunkedTextWriterMatchesTheStream)
 	std::uniform_real_distribution<double> mant(-10.0, 10.0);
 	std::uniform_int_distribution<int> ex(-300, 300), hkl(-60, 60);
 	const vec special{ 0.0, -0.0, 5e-324, -2.2250738585072014e-308, 1.7976931348623157e308, 9.999999995, -9.9999999949999,
-		1e-5, 123456789.0, std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity() };
+		1e-5, 123456789.0, std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+		std::numeric_limits<double>::quiet_NaN(), -std::numeric_limits<double>::quiet_NaN() };
 	cvec2 sf(ns, cvec(nr));
 	for (int a = 0; a < ns; a++)
 		for (int r = 0; r < nr; r++)
@@ -993,6 +994,8 @@ TEST(ScatteringFactorBlockTests, ChunkedTextWriterMatchesTheStream)
 			idx[d][r] = hkl(gen);
 			idx_d[d][r] = r % 7 == d ? -0.0 : idx[d][r] * 0.25 - 0.0005 * d;
 		}
+	//indices longer than 40 characters, and a NaN index
+	idx_d[0][1] = 1e36, idx_d[1][2] = -1.7976931348623157e308, idx_d[2][3] = std::numeric_limits<double>::quiet_NaN();
 	const block b(sf, labels, idx);
 	const tsc_block<double, cdouble> bd(sf, labels, idx_d);
 	const std::string expected = stream_tsc_rows(idx, sf), expected_d = stream_tsc_rows(idx_d, sf);

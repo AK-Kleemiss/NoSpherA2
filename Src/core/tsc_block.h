@@ -377,7 +377,7 @@ private:
 			{
 				std::string& s = text[t];
 				s.clear();
-				char buf[40];
+				char buf[320];   // DBL_MAX in fixed, 3 decimals: 314 characters
 				const std::size_t end = std::min(nr, r0 + (t + 1) * rows);
 				for (std::size_t r = r0 + t * rows; r < end; r++)
 				{
@@ -684,7 +684,7 @@ public:
 			name,
 			[](std::string& out, char* buf, numtype_index value)
 			{
-				out.append(buf, std::to_chars(buf, buf + 40, value).ptr);
+				out.append(buf, std::to_chars(buf, buf + 320, value).ptr);
 			});
 	}
 
@@ -698,9 +698,9 @@ public:
 			[](std::string& out, char* buf, numtype_index value)
 			{
 				if constexpr (std::is_integral_v<numtype_index>)
-					out.append(buf, std::to_chars(buf, buf + 40, value).ptr);
+					out.append(buf, std::to_chars(buf, buf + 320, value).ptr);
 				else
-					out.append(buf, std::to_chars(buf, buf + 40, value, std::chars_format::fixed, 3).ptr);
+					out.append(buf, std::to_chars(buf, buf + 320, value, std::chars_format::fixed, 3).ptr);
 			});
 	}
 
