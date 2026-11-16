@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-16 (ECP table core), the table core of an ECP the reader detected without `-ECP` is the wavefunction's mode
+(def2 Thakkar), not the option's default mode 0; `TomlIntegrationTests.EcpAutoCore` and
+`EcpCoreTests.StreamedRiTableTakesTheReadersEcpMode` are new. `ctest --preset release-windows` on a CPU-only build reports
+**1403 passed, 0 failed, 12 skipped** (2 disabled) of 1417. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-28 (RI .tshb), XCW's RI `.tshb` is the RI partition's own fit and the first step matches the table's scatterers
 to atoms by id; `XcwPartitionTests.RiTshbIsTheRiTable` is new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM
 reports **1328 passed, 0 failed, 23 skipped** (2 disabled) of 1353. See `UNIT_TESTS_STATUS.md`.

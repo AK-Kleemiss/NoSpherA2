@@ -487,6 +487,22 @@ dmin = 0.84
 acc = 1
 ECP = 1
 
+# The same Rh gbw without -ECP: the reader finds the def2 ECP and sets the wavefunction's
+# mode to 1, and the table must get that core too. The golden is the text tsc made with
+# -ECP 1. Before the fix the table took the core from the option's default (mode 0), which
+# put f(Rh) up to 12 % too high at high resolution and 1.4 % too low at low; the comparison
+# tolerance is 1 %. Rh_ECP_subset.hkl is every 40th reflection to d = 0.84 A (90 of 3561).
+[ECP_auto_core]
+directory = "TFVC"
+actual = "experimental.tsc"
+
+[ECP_auto_core.args]
+wfn = "Rh.gbw"
+cif = "Rh.cif"
+hkl = "Rh_ECP_subset.hkl"
+acc = 1
+old_tsc = true
+
 [RGBI_Groups_NH3BH3_sym]
 directory = "RGBI_groups"
 good = "NH3BH3_sym.good"

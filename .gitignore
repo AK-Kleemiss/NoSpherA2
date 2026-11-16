@@ -110,6 +110,7 @@ tests/intermolecular_nci/unit_surrounding_plot.py
 .vs/
 # outputs of the epoxide_gbw / isosurface / partition / SALTED integration tests
 tests/epoxide_gbw/experimental.tsc
+tests/TFVC/experimental.tsc
 tests/epoxide_gbw/combined.tsc
 tests/epoxide_gbw/epoxide.gbw_bondwise_laplacian_*.dat
 tests/epoxide_gbw/*.mtl

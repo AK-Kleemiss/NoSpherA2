@@ -425,6 +425,36 @@ TEST(TshbJointTests, HybridModeMatchesItsTable)
 		"-mtc_mult", "1", "1", "-mtc_charge", "0", "0", "-mtc_ECP", "0", "0", "-no_date" }, cif);
 }
 
+//An ECP gbw run without -ECP: the reader sets the wavefunction's mode to 1, and the streamed RI blocks must add that
+//core, not the -ECP option's default 0. The same run with -ECP 1 is the reference. The non-streamed table is the
+//ECP_auto_core TOML test; this covers the streamed call, which only writes the binary .tscb
+TEST(EcpCoreTests, StreamedRiTableTakesTheReadersEcpMode)
+{
+	const std::vector<std::string> args = { "-wfn", fixture("TFVC/Rh.gbw"), "-cif", fixture("TFVC/Rh.cif"),
+		"-hkl", fixture("TFVC/Rh_ECP_subset.hkl"), "-acc", "1", "-ri_fit", "def2-universal-jkfit", "-tsc_block", "30",
+		"-no_date" };
+	app_dir run("ecp_stream");
+	ASSERT_EQ(run.run(args), 0);
+	EXPECT_NE(run.log().find("ECP block removes 28 core electrons"), std::string::npos) << run.log();
+	EXPECT_NE(run.log().find("Streaming tsc in blocks of 30 reflections"), std::string::npos) << run.log();
+	const itsc_block detected(run.dir / "experimental.tscb");
+	std::vector<std::string> explicit_mode = args;
+	explicit_mode.insert(explicit_mode.end(), { "-ECP", "1" });
+	ASSERT_EQ(run.run(explicit_mode), 0);
+	const itsc_block reference(run.dir / "experimental.tscb");
+	ASSERT_EQ(detected.scatterer_size(), reference.scatterer_size());
+	ASSERT_EQ(detected.reflection_size(), reference.reflection_size());
+	double f_max = 0.0, worst = 0.0;
+	for (size_t a = 0; a < reference.scatterer_size(); a++)
+		for (size_t r = 0; r < reference.reflection_size(); r++)
+		{
+			f_max = std::max(f_max, std::abs(reference.get_sf_for_scatterer(a)[r]));
+			worst = std::max(worst, std::abs(detected.get_sf_for_scatterer(a)[r] - reference.get_sf_for_scatterer(a)[r]));
+		}
+	EXPECT_GT(f_max, 10.0);
+	EXPECT_LT(worst, 1e-8) << "max |df| between the detected and the explicit ECP mode";
+}
+
 //-cmtc: four fragments with their own CIFs; C_3, N_3 and O_3 are the same PART 0 atoms in fragments 2 and 3
 static std::vector<std::string> rubredoxin_fragment(const int f, const std::string& groups)
 {

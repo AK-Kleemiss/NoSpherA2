@@ -3942,7 +3942,7 @@ tsc_block_type calculate_scattering_factors(
 							vec stl(hi - lo);
 							for (size_t s = lo; s < hi; s++)
 								stl[s - lo] = unit_cell.get_stl_of_hkl(hkl_v[s]);
-							add_ECP_contribution(asym_atom_list, *wavy, chunk, stl, file, opt.ECP_mode, false);
+							add_ECP_contribution(asym_atom_list, *wavy, chunk, stl, file, wavy->get_ECP_mode(), false);
 						}
 						if (opt.electron_diffraction)
 							convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
@@ -3969,7 +3969,7 @@ tsc_block_type calculate_scattering_factors(
 				unit_cell,
 				hkl,
 				file,
-				opt.ECP_mode,
+				wavy->get_ECP_mode(),
 				opt.debug);
 		}
 	}

@@ -43,6 +43,7 @@ set_tests_properties(
 set_tests_properties(
     TomlIntegrationTests.TFVC
     TomlIntegrationTests.TFVCEcp
+    TomlIntegrationTests.EcpAutoCore
     PROPERTIES
         RESOURCE_LOCK integration_TFVC
 )
