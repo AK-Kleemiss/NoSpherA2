@@ -3422,6 +3422,36 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	}
 }
 
+//rho and its Laplacian along each traced path to <stem>_bond_path_<a>_<b>.dat, a BPL/GPL line per path to log if given
+static void write_bond_path_profiles(const WFN &wavy, const std::vector<topology::bond_path> &paths, const std::string &stem, std::ostream *log)
+{
+	std::map<std::pair<int, int>, int> seen; //a second path between one pair must not overwrite the first
+	for (const topology::bond_path &bp : paths) {
+		if (bp.a < 0) continue;
+		std::string name = stem + "_bond_path_" + std::to_string(bp.a) + "_" + std::to_string(bp.b);
+		if (const int n = seen[{ bp.a, bp.b }]++) name += "_" + std::to_string(n + 1);
+		if (log) {
+			*log << "Bond path " << bp.a << " (" << wavy.get_atom_charge(bp.a) << ") - " << bp.b << " (" << wavy.get_atom_charge(bp.b)
+				<< "): BPL " << std::fixed << std::setprecision(4) << bp.bpl << " GPL " << bp.gpl << " BPL-GPL " << bp.bpl - bp.gpl << " bohr";
+			if (bp.gap_a > 0.0 || bp.gap_b > 0.0)
+				*log << ", end maxima " << bp.gap_a << " / " << bp.gap_b << " bohr off the nuclei";
+			*log << "\n";
+		}
+		std::ofstream result(std::filesystem::current_path() / std::filesystem::path(name + ".dat"), std::ios::out);
+		result << "# s x y z rho laplacian, bohr and a.u.; the bond critical point is point " << bp.bcp_index + 1 << "\n";
+		double s = 0.0;
+		for (size_t k = 0; k < bp.points.size(); k++) {
+			if (k) s += array_length(bp.points[k], bp.points[k - 1]);
+			d3 grad{ 0.0, 0.0, 0.0 };
+			double lap = 0.0;
+			const double rho = calculate_density(wavy, bp.points[k], grad, lap);
+			result << std::scientific << std::setprecision(6) << std::setw(14) << s;
+			for (int c = 0; c < 3; c++) result << std::setw(14) << bp.points[k][c];
+			result << std::setw(14) << rho << std::setw(14) << lap << "\n";
+		}
+	}
+}
+
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name, const bool along_path)
 {
 	WFN wavy(wfn_name);
@@ -3441,29 +3471,7 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name, const bool along_
 #pragma omp parallel for schedule(dynamic)
 		for (int k = 0; k < (int)bcps.size(); k++)
 			paths[k] = topology::trace_bond_path(wavy, bcps[k], nuclei);
-		std::map<std::pair<int, int>, int> seen; //a second path between one pair must not overwrite the first
-		for (const topology::bond_path &bp : paths) {
-			if (bp.a < 0) continue;
-			std::string name = wfn_name.string() + "_bond_path_" + std::to_string(bp.a) + "_" + std::to_string(bp.b);
-			if (const int n = seen[{ bp.a, bp.b }]++) name += "_" + std::to_string(n + 1);
-			std::cout << "Bond path " << bp.a << " (" << wavy.get_atom_charge(bp.a) << ") - " << bp.b << " (" << wavy.get_atom_charge(bp.b)
-				<< "): BPL " << std::fixed << std::setprecision(4) << bp.bpl << " GPL " << bp.gpl << " BPL-GPL " << bp.bpl - bp.gpl << " bohr";
-			if (bp.gap_a > 0.0 || bp.gap_b > 0.0)
-				std::cout << ", end maxima " << bp.gap_a << " / " << bp.gap_b << " bohr off the nuclei";
-			std::cout << "\n";
-			std::ofstream result(std::filesystem::current_path() / std::filesystem::path(name + ".dat"), std::ios::out);
-			result << "# s x y z rho laplacian, bohr and a.u.; the bond critical point is point " << bp.bcp_index + 1 << "\n";
-			double s = 0.0;
-			for (size_t k = 0; k < bp.points.size(); k++) {
-				if (k) s += array_length(bp.points[k], bp.points[k - 1]);
-				d3 grad{ 0.0, 0.0, 0.0 };
-				double lap = 0.0;
-				const double rho = calculate_density(wavy, bp.points[k], grad, lap);
-				result << std::scientific << std::setprecision(6) << std::setw(14) << s;
-				for (int c = 0; c < 3; c++) result << std::setw(14) << bp.points[k][c];
-				result << std::setw(14) << rho << std::setw(14) << lap << "\n";
-			}
-		}
+		write_bond_path_profiles(wavy, paths, wfn_name.string(), &std::cout);
 		return;
 	}
 
@@ -4085,6 +4093,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				if (density_critical_points[i].type == "bond")
 					bond_paths[i] = topology::trace_bond_path(l_w, density_critical_points[i].position, nuclei);
 		}
+		if (opt.fba) write_bond_path_profiles(l_w, bond_paths, opt.wfn.string(), nullptr); //beside the straight-line profiles
 		for (size_t i = 0; i < density_critical_points.size(); i++) {
 			const critical_point &cp = density_critical_points[i];
 
