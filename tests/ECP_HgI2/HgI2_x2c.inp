@@ -1,0 +1,8 @@
+! PBE X2C x2c-SVPall SARC/J TightSCF
+%pal nprocs 4 end
+%maxcore 3000
+* xyz 0 1
+Hg   6.000000   6.000000   6.000000
+I    8.553000   6.000000   6.000000
+I    3.447000   6.000000   6.000000
+*
