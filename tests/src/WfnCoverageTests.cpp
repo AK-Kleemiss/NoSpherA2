@@ -446,6 +446,22 @@ namespace
 		std::filesystem::remove_all(dir);
 	}
 
+	//pTB is a valence method: a file whose atoms carry pTB cores declares them in mode 3 without -ECP, so the table,
+	//the charge table and the .tshb add them; hydrogen has none, and its file stays all-electron
+	TEST(WfnCoverageIoTests, PtbDeclaresItsCoresInModeThree)
+	{
+		const std::filesystem::path root = nos_test_repo_root() / "tests";
+		WFN w(root / "sucrose_IAM_SF" / "wfn.xtb", false);
+		EXPECT_TRUE(w.get_has_ECPs());
+		EXPECT_EQ(w.get_ECP_mode(), 3);
+		EXPECT_EQ(w.get_nr_ECP_electrons(), 46u);
+		EXPECT_EQ(w.get_nr_electrons() - w.get_nr_ECP_electrons(), 136u);
+		WFN h(root / "ptb_H_file" / "wfn.xtb", false);
+		EXPECT_FALSE(h.get_has_ECPs());
+		EXPECT_EQ(h.get_ECP_mode(), 0);
+		EXPECT_EQ(h.get_nr_ECP_electrons(), 0u);
+	}
+
 	//the gbw ECP branch reads its section pointer from byte 32; an all-electron file of the classic layout
 	//stores 0 there, which is fatal
 	TEST(WfnCoverageIoDeathTest, GbwEcpPointerZeroExits)

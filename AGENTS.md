@@ -297,6 +297,34 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-16 (pTB cores), a pTB file (`.xtb`, `.stda`) declares its cores in mode 3 without `-ECP 3`;
+`WfnCoverageIoTests.PtbDeclaresItsCoresInModeThree` and `TomlIntegrationTests.SucrosePtbNoEcp` are new. `ctest` on a CUDA
+`release-windows-tests` build (GPU present) reports **1414 passed, 0 failed, 12 skipped** (2 disabled) of 1428. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (`-coef` with `-ECP`), the table of a coefficient file adds the `-ECP` core as its charge table and `.tshb`
+do, in the same mode; `EcpCoreTests.CoefficientFileTakesTheEcpCoreEverywhere` is new. `ctest` on a CUDA `release-windows-tests`
+build (GPU present) reports **1412 passed, 0 failed, 12 skipped** (2 disabled) of 1426. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (ECP fixes combined: the table core, the HgI2 fixture and the SALTED cores on `fix-ecp-auto-detected-core`),
+`ctest --preset release-windows` on a CPU-only build reports **1411 passed, 0 failed, 12 skipped** (2 disabled) of 1425.
+See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (SALTED ECP cores, branch `fix-salted-ecp-double-core`), the SALTED predictor takes no ECP core from its input:
+an all-electron model run with `-ECP`, `-mtc_ECP` or an ECP gbw adds none, a model with an ECP block only its own table's;
+`SaltedFchkPredictorTests.OnlyTheModelDeclaresACore` and two `SaltedFchkCliTests` are new. `ctest` on a CUDA `release-windows-tests`
+build (GPU present) reports **1404 passed, 0 failed, 12 skipped** (2 disabled) of 1418. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (ECP fixture HgI2), `tests/ECP_HgI2` (2.4 MB, 230 kB compressed) pins the def2 core for a 60- and a
+28-electron ECP four ways (`TomlIntegrationTests.HgI2Ecp*`, incl. a one-part `-mtc`) and against an all-electron X2C
+wavefunction (`EcpCoreTests.Def2CoreMatchesAllElectronX2c`). `ctest --preset release-windows` on a CPU-only build reports
+**1408 passed, 0 failed, 12 skipped** (2 disabled) of 1422. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (ECP table core), the table core of an ECP the reader detected without `-ECP` is the wavefunction's mode
+(def2 Thakkar), not the option's default mode 0; `TomlIntegrationTests.EcpAutoCore` and
+`EcpCoreTests.StreamedRiTableTakesTheReadersEcpMode` are new. `ctest --preset release-windows` on a CPU-only build reports
+**1403 passed, 0 failed, 12 skipped** (2 disabled) of 1417. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-15 (OpenMP-team model reads, branch `salted-load-time`), the SALTED model reader reads each lambda's blocks with the OpenMP team instead of fresh `std::thread`s, so the model read keeps to the `-cpus` threads; `SaltedFchkPredictorTests.ModelIsReadInLineWithCpusReaders` checks the team. Exclusive A/B (AKL032, n = 10, pinned to `-cpus` cores): 16-40 % faster than the `std::thread` reader and 9-30 % faster than the prefetch `86cd31c9` at `-cpus` 2/4/8; with idle cores beyond `-cpus` (unpinned) it is 17-27 % slower than the prefetch on the small cases (AKL032 and AKL046), which the `-cpus` pool rule gives up; tables byte-identical to `d5a31f3f`. `ctest -j4` on a CUDA `release-windows-tests` build: **1410 passed, 0 failed, 12 skipped** (2 disabled) of 1424; full suite on a CPU-only GCC 11.5 build: **1395 passed, 0 failed, 23 skipped** (2 disabled) of 1420. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-15 (on-demand model reads, branch `salted-load-time`), the SALTED predictor reads each lambda's model blocks in line with all `-cpus` threads instead of prefetching lambda + 1 beside the kernels; `SaltedFchkPredictorTests.ModelIsReadInLineWithCpusReaders` is new. `ctest -j4` on a CUDA `release-windows-tests` build: **1410 passed, 0 failed, 12 skipped** (2 disabled) of 1424; full suite on a CPU-only GCC 11.5 build, one process per test as ctest runs them: **1395 passed, 0 failed, 23 skipped** (2 disabled) of 1420. See `UNIT_TESTS_STATUS.md`.

@@ -51,6 +51,8 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	if (opt_in.salted_model_dir.empty() && opt_in.coef_file != "") {
 		std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
 		wavy = generate_aux_wfn(wavy_in, opt_in.aux_basis);
+		// the coefficients fit the input's valence density: its cores (counts on the atoms) go back on in its mode
+		wavy.set_has_ECPs(wavy_in.get_has_ECPs(), false, wavy_in.get_ECP_mode());
 		bbasis_set_loaded = true;
 		config.dfbasis = opt_in.aux_basis[0]->get_name();
 		config.salted_filename = "coefficient file";
@@ -101,6 +103,9 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	}
 
 	wavy = wavy_in;
+	// the input's cores belong to its own basis: only the model's ECP block declares one
+	wavy.set_has_ECPs(false, false, 0);
+	for (int a = 0; a < wavy.get_ncen(); a++) wavy.set_atom_ECP_electrons(a, 0);
 	if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
 	_path = _path / config.salted_filename;
 	const auto _t_config = std::chrono::steady_clock::now();
@@ -306,6 +311,8 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 	}
 
 	wavy = wavy_in;
+	wavy.set_has_ECPs(false, false, 0);
+	for (int a = 0; a < wavy.get_ncen(); a++) wavy.set_atom_ECP_electrons(a, 0);
 	atom_model.assign(wavy_in.get_ncen(), -1);
 	atom_in_model.assign(wavy_in.get_ncen(), -1);
 	for (int a = 0; a < wavy_in.get_ncen(); a++)
