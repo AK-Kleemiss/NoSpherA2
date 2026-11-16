@@ -52,7 +52,7 @@ need the virtuals).
 | `-hkl <file>` | 1 | Reflection list to compute form factors for. |
 | `-b <basis>` | 1 | Basis set name, needed when the input file does not carry one (`.ffn`, some `.fchk` paths). |
 | `-d <dir>` | 1 | Directory the basis-set files are looked up in. |
-| `-coef <file>` | 1 | Pre-computed density-fitting coefficient file. |
+| `-coef <file> [aux basis...]` | 1+ | Pre-computed density-fitting coefficient file (`.npy`) and the auxiliary basis set(s) it was fitted in, read as `-ri_fit` reads them (`auto_aux` when none is given). With `-ECP N`, or a wavefunction whose reader found ECPs, the coefficients are taken as the fit of the valence density: the table, the charge table and the `.tshb` add the mode-N core alike. |
 | `-fchk <file>` | 1 | Write a Gaussian-format checkpoint file. |
 | `-wfn_cif <file>` | 1 | Write the wavefunction geometry and basis into a CIF. |
 | `-gbw2wfn <file>` | 1 | Convert an ORCA `.gbw` into a `.wfn`. |
@@ -95,7 +95,7 @@ you are memory-constrained.
 | `-all_charges` | 0 | off | Print every atomic charge, not just a summary. |
 | `-Anion <"Z Z ...">` | 1+ | | Elements to treat as anions when picking spherical references. |
 | `-Cation <"Z Z ...">` | 1+ | | Elements to treat as cations. |
-| `-ECP <0..3>` | 1 | `0` | ECP treatment. `1` = ORCA-style def2-ECP, `3` = pTB. Also spelled `-ecp`, `-Ecp`. |
+| `-ECP [0..3]` | 0-1 | `0` | ECP treatment. `1` = ORCA-style def2-ECP, `2` = xTB, `3` = pTB; `0` (also a bare `-ECP`) adds a Gaussian core shape. Also spelled `-ecp`, `-Ecp`. A pTB file (`.xtb`, `.stda`) declares its mode-3 cores without it; `-ECP 0` there would replace them with the Gaussian shape. |
 | `-method <name>` | 1 | | Record the QM method used (goes into the table header). |
 | `-refine [acc]` | 0-1 | `0.1` | Numerical integral accuracy for the refinement path. |
 | `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "mp2"`, `"mp3"`, `"mp4(sdq)"`, `"mp4"`, `"ccsd"` or `"ccsd(t)"` the density is the correlated one (relaxed MP2, unrelaxed MP3 / MP4 / CCSD / CCSD(T)), not the SCF one; see [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt) for methods, backends and keys. |

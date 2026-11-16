@@ -822,6 +822,12 @@ TEST(TomlIntegrationTests, SucrosePtb)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, SucrosePtbNoEcp)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_ptb_no_ECP");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, SucroseSF)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF");
@@ -855,6 +861,36 @@ TEST(TomlIntegrationTests, TFVC)
 TEST(TomlIntegrationTests, TFVCEcp)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "TFVC_ECP");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, EcpAutoCore)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ECP_auto_core");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, HgI2Ecp)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, HgI2EcpAuto)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP_auto");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, HgI2EcpMtc)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP_mtc");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, HgI2EcpMtcAuto)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP_mtc_auto");
 	EXPECT_TRUE(result.success) << result.message;
 }
 

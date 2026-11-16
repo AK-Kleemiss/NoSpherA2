@@ -13,6 +13,9 @@
 #include "core/GridManager.h"
 #include "core/AtomGrid.h"
 #include "core/wfn_class.h"
+#include "core/basis_set.h"
+#include "core/SALTED_utilities.h"
+#include "core/npy.h"
 
 #include <complex>
 #include <fstream>
@@ -423,6 +426,162 @@ TEST(TshbJointTests, HybridModeMatchesItsTable)
 	joint_against_table("hybrid", { "-cif", cif, "-dmin", "0.9", "-acc", "1", "-ri_fit", "combo_basis_fit",
 		"-mtc", fixture("Hybrid/ZP2_part1.gbw"), "0.1", fixture("Hybrid/ZP2_part2.gbw"), "0.2",
 		"-mtc_mult", "1", "1", "-mtc_charge", "0", "0", "-mtc_ECP", "0", "0", "-no_date" }, cif);
+}
+
+//An ECP gbw run without -ECP: the reader sets the wavefunction's mode to 1, and the streamed RI blocks must add that
+//core, not the -ECP option's default 0. The same run with -ECP 1 is the reference. The non-streamed table is the
+//ECP_auto_core TOML test; this covers the streamed call, which only writes the binary .tscb
+TEST(EcpCoreTests, StreamedRiTableTakesTheReadersEcpMode)
+{
+	const std::vector<std::string> args = { "-wfn", fixture("TFVC/Rh.gbw"), "-cif", fixture("TFVC/Rh.cif"),
+		"-hkl", fixture("TFVC/Rh_ECP_subset.hkl"), "-acc", "1", "-ri_fit", "def2-universal-jkfit", "-tsc_block", "30",
+		"-no_date" };
+	app_dir run("ecp_stream");
+	ASSERT_EQ(run.run(args), 0);
+	EXPECT_NE(run.log().find("ECP block removes 28 core electrons"), std::string::npos) << run.log();
+	EXPECT_NE(run.log().find("Streaming tsc in blocks of 30 reflections"), std::string::npos) << run.log();
+	const itsc_block detected(run.dir / "experimental.tscb");
+	ASSERT_TRUE(fs::remove(run.dir / "experimental.tscb"));
+	std::vector<std::string> explicit_mode = args;
+	explicit_mode.insert(explicit_mode.end(), { "-ECP", "1" });
+	ASSERT_EQ(run.run(explicit_mode), 0);
+	const itsc_block reference(run.dir / "experimental.tscb");
+	ASSERT_EQ(detected.scatterer_size(), reference.scatterer_size());
+	ASSERT_EQ(detected.reflection_size(), reference.reflection_size());
+	double f_max = 0.0, worst = 0.0;
+	for (size_t a = 0; a < reference.scatterer_size(); a++)
+		for (size_t r = 0; r < reference.reflection_size(); r++)
+		{
+			f_max = std::max(f_max, std::abs(reference.get_sf_for_scatterer(a)[r]));
+			worst = std::max(worst, std::abs(detected.get_sf_for_scatterer(a)[r] - reference.get_sf_for_scatterer(a)[r]));
+		}
+	EXPECT_GT(f_max, 10.0);
+	EXPECT_LT(worst, 1e-8) << "max |df| between the detected and the explicit ECP mode";
+}
+
+//The def2 ECP valence density plus the def2 core against an all-electron X2C wavefunction of the same HgI2 (Hg 60, I 28
+//core electrons), Hirshfeld, s = 0.18-0.71 A^-1: they agree to 0.062 e. The mode-0 core was 11 e off on Hg, 1.2 e on I
+TEST(EcpCoreTests, Def2CoreMatchesAllElectronX2c)
+{
+	const std::vector<std::string> common = { "-cif", fixture("ECP_HgI2/HgI2.cif"), "-hkl", fixture("ECP_HgI2/HgI2_subset.hkl"),
+		"-acc", "1", "-no_date" };
+	const std::string x2c = fixture("ECP_HgI2/HgI2_x2c.gbw"), def2_gbw = fixture("ECP_HgI2/HgI2_def2.gbw");
+	app_dir run("ecp_x2c");
+	std::vector<std::string> args = common;
+	args.insert(args.end(), { "-wfn", x2c });
+	ASSERT_EQ(run.run(args), 0);
+	EXPECT_EQ(run.log().find("ECP block removes"), std::string::npos) << run.log();
+	const itsc_block all_electron(run.dir / "experimental.tscb");
+	ASSERT_TRUE(fs::remove(run.dir / "experimental.tscb"));
+	args = common;
+	args.insert(args.end(), { "-wfn", def2_gbw });
+	ASSERT_EQ(run.run(args), 0);
+	EXPECT_NE(run.log().find("ECP block removes 116 core electrons"), std::string::npos) << run.log();
+	const itsc_block def2(run.dir / "experimental.tscb");
+	ASSERT_EQ(def2.get_scatterers_string(), all_electron.get_scatterers_string());
+	ASSERT_EQ(def2.reflection_size(), all_electron.reflection_size());
+	ASSERT_EQ(def2.scatterer_size(), 3u);
+	for (size_t a = 0; a < def2.scatterer_size(); a++)
+	{
+		double f_max = 0.0, worst = 0.0;
+		for (size_t r = 0; r < def2.reflection_size(); r++)
+		{
+			f_max = std::max(f_max, std::abs(all_electron.get_sf_for_scatterer(a)[r]));
+			worst = std::max(worst, std::abs(def2.get_sf_for_scatterer(a)[r] - all_electron.get_sf_for_scatterer(a)[r]));
+		}
+		EXPECT_GT(f_max, 30.0) << def2.get_scatterers_string()[a];
+		EXPECT_LT(worst, 0.15) << def2.get_scatterers_string()[a] << ": max |df| def2 + core against all-electron";
+	}
+}
+
+//-coef with -ECP 2: the coefficients fit the valence density, so the table, the charge table and the .tshb all add
+//cysteine's 22 xTB core electrons, in mode 2; the table without -ECP is the one without core. Below Rb modes 1 and 2
+//add the same core, so an iodine atom with zero coefficients, whose table is its core alone, tells them apart
+TEST(EcpCoreTests, CoefficientFileTakesTheEcpCoreEverywhere)
+{
+	//the core add_ECP_contribution adds in mode m for the xTB core counts -ECP 2 puts on the atoms
+	auto core = [](const int Z, const int m, const double stl) {
+		const int n = constants::ECP_core_electrons(constants::ECP_electrons_xTB, Z);
+		const double k = constants::FOUR_PI * constants::bohr2ang(stl);
+		if (n == 0) return 0.0;
+		if (m == 0) return n * std::exp(-stl / 4.0);
+		return Thakkar(Z, m).get_core_form_factor(k, n) + Spherical_Gaussian_Density(Z, m).get_form_factor(k);
+	};
+	const std::string cif = fixture("SALTED/test_cysteine.cif");
+	const std::vector<std::string> base = { "-wfn", fixture("SALTED/test_cysteine.xyz"), "-cif", cif, "-dmin", "0.73",
+		"-coef", fixture("SALTED/test_cysteine.npy"), "cc-pvqz-jkfit", "-no_gpu_salted", "-no_date" };
+	auto electrons = [](const std::string& log) {
+		const size_t p = log.rfind("Total number of analytical Electrons: ");
+		EXPECT_NE(p, std::string::npos) << log;
+		return p == std::string::npos ? 0.0 : std::stod(log.substr(p + 38));
+	};
+	app_dir run("coef_ecp");
+	ASSERT_EQ(run.run(base), 0);
+	const double n0 = electrons(run.log());
+	const itsc_block none(run.dir / "experimental.tscb");
+	ASSERT_TRUE(fs::remove(run.dir / "experimental.tscb"));
+	std::vector<std::string> ecp = base;
+	ecp.insert(ecp.end(), { "-ECP", "2" });
+	ASSERT_EQ(run.run(ecp), 0);
+	const double n2 = electrons(run.log());
+	const itsc_block table(run.dir / "experimental.tscb");
+	ecp.push_back("-tshb");
+	ASSERT_EQ(run.run(ecp), 0);
+	const tshb_block tshb(run.dir / "experimental.tshb");
+	EXPECT_NEAR(n2 - n0, 22.0, 1e-3);
+	const cell unit_cell(cif, std::cout, false);
+	ASSERT_EQ(table.get_scatterers_string(), none.get_scatterers_string());
+	ASSERT_EQ(table.reflection_size(), none.reflection_size());
+	//every reflection, so also the highest s, where the mode-0 core lies 3.7 e above the mode-2 one
+	size_t high = 0;
+	double worst = 0.0, sum[4] = { 0, 0, 0, 0 };
+	for (size_t r = 0; r < table.reflection_size(); r++)
+		if (unit_cell.get_stl_of_hkl(table.get_indices(r)) > unit_cell.get_stl_of_hkl(table.get_indices(high))) high = r;
+	for (size_t a = 0; a < table.scatterer_size(); a++)
+		for (size_t r = 0; r < table.reflection_size(); r++)
+		{
+			const double s = unit_cell.get_stl_of_hkl(table.get_indices(r));
+			const cdouble d = table.get_sf_for_scatterer(a)[r] - none.get_sf_for_scatterer(a)[r];
+			worst = std::max(worst, std::abs(d - core(std::get<atomID>(table.get_scatterer(a)).Z(), 2, s)));
+			if (r != high) continue;
+			sum[3] += d.real();
+			for (int m = 0; m < 3; m++) sum[m] += core(std::get<atomID>(table.get_scatterer(a)).Z(), m, s);
+		}
+	std::cout << "core at s = " << unit_cell.get_stl_of_hkl(table.get_indices(high)) << ": table " << sum[3] << ", mode 0 "
+		<< sum[0] << ", mode 1 " << sum[1] << ", mode 2 " << sum[2] << ", max |df| against mode 2 " << worst << std::endl;
+	EXPECT_LT(worst, 1e-6) << "max |df| of the table's core against the mode-2 core";
+	double f_max = 0.0;
+	EXPECT_LT(compare_with_table(tshb, table, unit_cell, f_max), 1e-8);
+	EXPECT_GT(f_max, 1.0);
+	npy::npy_data<double> zero;
+	WFN iodine(e_origin::NOT_YET_DEFINED);
+	iodine.push_back_atom("I", 0.0, 0.0, 0.0, 53);
+	std::vector<std::shared_ptr<BasisSet>> aux{ BasisSetLibrary::get_basis_set("def2-universal-jkfit") };
+	zero.data.assign(aux_density_table(generate_aux_wfn(iodine, aux).get_atoms()).n_coef, 0.0);
+	zero.shape = { static_cast<unsigned long>(zero.data.size()) };
+	npy::write_npy<double>("I.npy", zero);
+	std::ofstream("I.xyz") << "1\n\nI 0.0 0.0 0.0\n";
+	std::ofstream("I.cif") << "data_I\nloop_\n _space_group_symop_id\n _space_group_symop_operation_xyz\n 1 +X,+Y,+Z\n"
+		"_cell_length_a 10.0\n_cell_length_b 10.0\n_cell_length_c 10.0\n_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n"
+		"_cell_volume 1000.0\nloop_\n _atom_site_label\n _atom_site_type_symbol\n _atom_site_fract_x\n _atom_site_fract_y\n"
+		" _atom_site_fract_z\n _atom_site_U_iso_or_equiv\nI1 I 0.0 0.0 0.0 0.02\n";
+	ASSERT_EQ(run.run({ "-wfn", "I.xyz", "-cif", "I.cif", "-dmin", "0.73", "-coef", "I.npy", "def2-universal-jkfit", "-ECP", "2",
+		"-no_gpu_salted", "-no_date" }), 0);
+	const itsc_block i_table(run.dir / "experimental.tscb");
+	const cell i_cell(run.dir / "I.cif", std::cout, false);
+	ASSERT_EQ(i_table.scatterer_size(), 1u);
+	high = 0;
+	worst = 0.0;
+	for (size_t r = 0; r < i_table.reflection_size(); r++)
+	{
+		const double s = i_cell.get_stl_of_hkl(i_table.get_indices(r));
+		worst = std::max(worst, std::abs(i_table.get_sf_for_scatterer(0)[r] - core(53, 2, s)));
+		if (s > i_cell.get_stl_of_hkl(i_table.get_indices(high))) high = r;
+	}
+	const double s = i_cell.get_stl_of_hkl(i_table.get_indices(high));
+	std::cout << "iodine at s = " << s << ": table " << i_table.get_sf_for_scatterer(0)[high].real() << ", mode 0 " << core(53, 0, s)
+		<< ", mode 1 " << core(53, 1, s) << ", mode 2 " << core(53, 2, s) << ", max |df| against mode 2 " << worst << std::endl;
+	EXPECT_LT(worst, 1e-6) << "max |df| of iodine's table against its mode-2 core";
 }
 
 //-cmtc: four fragments with their own CIFs; C_3, N_3 and O_3 are the same PART 0 atoms in fragments 2 and 3
