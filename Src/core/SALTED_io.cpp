@@ -2,7 +2,7 @@
 #include "SALTED_io.h"
 #include <cstring>
 #include <filesystem>
-#include <future>
+#include <atomic>
 #include <iostream>
 #include "nos_math.h"
 #include "basis_set.h"
@@ -278,8 +278,9 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
 void SALTED_BINARY_FILE::open_raw() {
 #ifdef _WIN32
 	if (raw_handle_) return;
+	// overlapped: synchronous reads on one handle are serialised by the I/O manager, and the reader threads share it
 	HANDLE fh = CreateFileW(filepath.wstring().c_str(), GENERIC_READ, FILE_SHARE_READ,
-		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 	if (fh != INVALID_HANDLE_VALUE) raw_handle_ = fh;
 #else
 	if (raw_fd_ >= 0) return;
@@ -308,8 +309,13 @@ bool SALTED_BINARY_FILE::read_at(std::streamoff offset, void* dest, std::size_t 
 		const unsigned long long at = static_cast<unsigned long long>(offset) + done;
 		ov.Offset = static_cast<DWORD>(at & 0xFFFFFFFFull);
 		ov.OffsetHigh = static_cast<DWORD>(at >> 32);
+		ov.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
 		DWORD got = 0;
-		if (!ReadFile(static_cast<HANDLE>(raw_handle_), out + done, want, &got, &ov) || got == 0)
+		const HANDLE fh = static_cast<HANDLE>(raw_handle_);
+		const bool ok = ov.hEvent && (ReadFile(fh, out + done, want, NULL, &ov) || GetLastError() == ERROR_IO_PENDING)
+			&& GetOverlappedResult(fh, &ov, &got, TRUE);
+		if (ov.hEvent) CloseHandle(ov.hEvent);
+		if (!ok || got == 0)
 			return false;
 		done += got;
 	}
@@ -532,6 +538,7 @@ void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>&
 	err_checkf(size <= kMaxSaltedDatasetValues,
 		"SALTED dataset is unreasonably large: " + std::to_string(size) + " values", std::cout);
 	data.resize(size);
+	dataset_bytes += size * sizeof(T);
 	if (size > 0)
 		read_exact_bytes(file, data.data(), static_cast<std::streamsize>(size * sizeof(T)), "dataset payload");
 }
@@ -685,92 +692,75 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 	return out;
 }
 
-#ifndef __ANDROID__
-// A new dMatrix2 is zero-filled (std::vector value-initialises it, faulting in every page)
-// before read_at overwrites it, and the disk idles meanwhile. Filling block i+1 while a helper
-// reads block i hides that; one read in flight keeps the access sequential.
-// Sucrose, 650 MB, cold on the Pi 4: 2.66 -> 2.14 s.
-std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+// `readers` threads of the OpenMP team (the run's -cpus) first allocate the blocks, largest first, then take `piece`
+// sized slices of them through read_at, straight across block boundaries: from page cache the first touch of the pages
+// is the cost, so the allocations (which zero the pages) and the copies are both spread over the threads.
+// Android: the model usually sits on a microSD card behind sdcardfs, where several readers taking 4 MB pieces beat one stream.
+std::vector<dMatrix2> SALTED_BINARY_FILE::read_blocks(const std::vector<block_ref>& refs) {
 	using ext_t = typename dMatrix2::extents_type;
-	std::vector<dMatrix2> out(refs.size());
-	std::vector<std::future<bool>> raw(refs.size());   // after out: destroyed first, waits for the reads
-	for (std::size_t i = 0; i < refs.size(); i++)
-	{
-		if (refs[i].rows != 0 && refs[i].cols != 0)
-			out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
-		if (i > 0) raw[i - 1].wait();
-		raw[i] = std::async(std::launch::async, [this, &refs, &out, i] {
-			return read_at(refs[i].offset, out[i].data(), refs[i].rows * refs[i].cols * sizeof(double));
-			});
-	}
-	for (std::size_t i = 0; i < refs.size(); i++)
-		if (!raw[i].get()) out[i] = load_block(refs[i]);   // the stream fallback
-	return out;
-}
-#else
-#include <atomic>
-#include <thread>
-// Android: the model usually sits on a microSD card behind sdcardfs. Cold on the SM-T585 one
-// sequential stream gets ~68 MB/s; four readers with their own fd (so their own readahead
-// window) taking 4 MB pieces straight across block boundaries get ~76 MB/s. The fill still
-// runs ahead on this thread, ~10x faster than the card, so the readers rarely wait for it.
-// Sucrose, combo_v6 from the card, cold, -cpus 4: model wait 6.18-6.44 -> 5.35-5.43 s, same tscb.
-std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
-	using ext_t = typename dMatrix2::extents_type;
-	constexpr std::size_t piece = 4u << 20;
 	struct span { std::size_t block, from, bytes; };
 	std::vector<span> spans;
+	std::vector<std::size_t> order(refs.size());
 	for (std::size_t i = 0; i < refs.size(); i++)
+	{
+		order[i] = i;
 		for (std::size_t n = refs[i].rows * refs[i].cols * sizeof(double), from = 0; from < n; from += piece)
 			spans.push_back({ i, from, std::min(piece, n - from) });
+	}
+	std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return refs[a].rows * refs[a].cols > refs[b].rows * refs[b].cols; });
 	std::vector<dMatrix2> out(refs.size());
 	std::vector<std::atomic<bool>> failed(refs.size());
-	std::atomic<std::size_t> filled{ 0 }, next{ 0 };   // filled > refs.size(): the fill threw, stop
+	std::vector<std::atomic<int>> state(refs.size());   // 0 until the block is allocated or an allocation threw
+	std::atomic<std::size_t> made{ 0 }, next{ 0 };
+	std::atomic<bool> stop{ false };
+	std::exception_ptr err;
 	auto reader = [&] {
-		const int fd = ::open(filepath.string().c_str(), O_RDONLY);
+		try
+		{
+			for (std::size_t b; (b = made++) < refs.size();)
+			{
+				const std::size_t i = order[b];
+				if (refs[i].rows != 0 && refs[i].cols != 0)
+					out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
+				state[i].store(1, std::memory_order_release);
+				state[i].notify_all();
+			}
+		}
+		catch (...)
+		{
+			if (!stop.exchange(true)) err = std::current_exception();
+			for (auto& st : state) { int z = 0; st.compare_exchange_strong(z, 2); st.notify_all(); }
+		}
 		for (std::size_t s; (s = next++) < spans.size();)
 		{
 			const span& p = spans[s];
-			for (std::size_t f; (f = filled.load(std::memory_order_acquire)) <= p.block;) filled.wait(f);
-			if (filled.load() > refs.size()) break;
-			char* dst = reinterpret_cast<char*>(out[p.block].data()) + p.from;
-			std::size_t done = 0;
-			while (fd >= 0 && done < p.bytes)
-			{
-				const ssize_t got = ::pread(fd, dst + done, p.bytes - done,
-					static_cast<off_t>(refs[p.block].offset) + static_cast<off_t>(p.from + done));
-				if (got <= 0) break;
-				done += static_cast<std::size_t>(got);
-			}
-			if (done < p.bytes) failed[p.block] = true;
+			state[p.block].wait(0, std::memory_order_acquire);
+			if (stop) break;
+			if (!read_at(refs[p.block].offset + static_cast<std::streamoff>(p.from), reinterpret_cast<char*>(out[p.block].data()) + p.from, p.bytes))
+				failed[p.block] = true;
 		}
-		if (fd >= 0) ::close(fd);
 	};
-	std::vector<std::thread> pool;
-	try
+	// A span waits only on a block some thread has claimed and allocates without waiting, so any team size finishes
+	const int n = static_cast<int>(std::max<std::size_t>(std::min(readers, spans.size()), 1));
+#pragma omp parallel num_threads(n)
 	{
-		for (int t = 0; t < 4; t++) pool.emplace_back(reader);
-		for (std::size_t i = 0; i < refs.size(); i++)
-		{
-			if (refs[i].rows != 0 && refs[i].cols != 0)
-				out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
-			filled.store(i + 1, std::memory_order_release);
-			filled.notify_all();
-		}
+		if (omp_get_thread_num() == 0) team = std::max(team, omp_get_num_threads());
+		reader();
 	}
-	catch (...)
-	{
-		filled.store(refs.size() + 1);
-		filled.notify_all();
-		for (auto& t : pool) t.join();
-		throw;
-	}
-	for (auto& t : pool) t.join();
+	if (err) std::rethrow_exception(err);
 	for (std::size_t i = 0; i < refs.size(); i++)
 		if (failed[i]) out[i] = load_block(refs[i]);   // the stream fallback
 	return out;
 }
-#endif
+
+std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+	const auto t0 = std::chrono::steady_clock::now();
+	std::vector<dMatrix2> out = read_blocks(refs);
+	lazy_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+	for (size_t i = 0; i < refs.size(); i++)
+		lazy_bytes += refs[i].rows * refs[i].cols * sizeof(double), lazy_blocks += refs[i].rows * refs[i].cols != 0;
+	return out;
+}
 
 // Every block but `drop` is copied byte for byte in file order, a block running from its table offset up
 // to the next one, then `add` (name, bytes from the datatype word on) is appended. What lies between the

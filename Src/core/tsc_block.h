@@ -2,6 +2,7 @@
 
 #include "convenience.h"
 
+#include <charconv>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -365,21 +366,38 @@ private:
 		write_scatterer_text(out);
 		out << "\nDATA:\n";
 
-		for (std::size_t reflection = 0; reflection < reflection_size(); ++reflection)
+		// %.8e through to_chars, byte-identical to the stream's scientific/8; chunks of about 4 MB per thread, written in order
+		const std::size_t nr = reflection_size(), rows = std::max<std::size_t>(1, (4u << 20) / (32 * sf_.size() + 64));
+		const int nt = std::max(1, omp_get_max_threads());
+		std::vector<std::string> text(nt);
+		for (std::size_t r0 = 0; r0 < nr; r0 += nt * rows)
 		{
-			for (std::size_t dimension = 0; dimension < 3; ++dimension)
+#pragma omp parallel for schedule(static, 1)
+			for (int t = 0; t < nt; t++)
 			{
-				write_index(out, indices_[dimension][reflection]);
-				out << ' ';
+				std::string& s = text[t];
+				s.clear();
+				char buf[320];   // DBL_MAX in fixed, 3 decimals: 314 characters
+				const std::size_t end = std::min(nr, r0 + (t + 1) * rows);
+				for (std::size_t r = r0 + t * rows; r < end; r++)
+				{
+					for (int d = 0; d < 3; d++)
+					{
+						write_index(s, buf, indices_[d][r]);
+						s.push_back(' ');
+					}
+					for (const auto& row : sf_)
+					{
+						s.append(buf, std::to_chars(buf, buf + sizeof(buf), std::real(row[r]), std::chars_format::scientific, 8).ptr);
+						s.push_back(',');
+						s.append(buf, std::to_chars(buf, buf + sizeof(buf), std::imag(row[r]), std::chars_format::scientific, 8).ptr);
+						s.push_back(' ');
+					}
+					s.push_back('\n');
+				}
 			}
-
-			for (const auto& scatterer_sf : sf_)
-			{
-				out << std::scientific << std::setprecision(8)
-					<< std::real(scatterer_sf[reflection]) << ','
-					<< std::imag(scatterer_sf[reflection]) << ' ';
-			}
-			out << '\n';
+			for (int t = 0; t < nt; t++)
+				out.write(text[t].data(), text[t].size());
 		}
 	}
 
@@ -664,9 +682,9 @@ public:
 		write_text_file(
 			cif,
 			name,
-			[](std::ostream& out, numtype_index value)
+			[](std::string& out, char* buf, numtype_index value)
 			{
-				out << value;
+				out.append(buf, std::to_chars(buf, buf + 320, value).ptr);
 			});
 	}
 
@@ -677,9 +695,12 @@ public:
 		write_text_file(
 			cif,
 			name,
-			[](std::ostream& out, numtype_index value)
+			[](std::string& out, char* buf, numtype_index value)
 			{
-				out << std::fixed << std::setprecision(3) << value;
+				if constexpr (std::is_integral_v<numtype_index>)
+					out.append(buf, std::to_chars(buf, buf + 320, value).ptr);
+				else
+					out.append(buf, std::to_chars(buf, buf + 320, value, std::chars_format::fixed, 3).ptr);
 			});
 	}
 

@@ -169,6 +169,13 @@ public:
 	std::unordered_map<std::string, block_ref> index_lambda_based_data(const std::string& key);
 	dMatrix2 load_block(const block_ref& ref);
 	std::vector<dMatrix2> load_blocks(const std::vector<block_ref>& refs);
+	std::vector<dMatrix2> read_blocks(const std::vector<block_ref>& refs);   // load_blocks without the counting
+	// read_blocks: threads and bytes per read
+	std::size_t readers = 1, piece = 4u << 20;
+	// For -v: wall time, bytes and blocks of load_blocks, and the bytes read_dataset read
+	double lazy_s = 0.0;
+	size_t lazy_bytes = 0, lazy_blocks = 0, dataset_bytes = 0;
+	int team = 0;   // the largest OpenMP team that ran read_blocks
 
 	const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
 	bool has_block(const std::string& key) const { return table_of_contents.count(key) != 0; }

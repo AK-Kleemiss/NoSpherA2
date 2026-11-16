@@ -245,6 +245,13 @@ symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index o
 Slurm job 1795253, GCC 11.5 `release-linux-tests`, CPU only, one process per test) **1403 passed, 0 failed, 23 skipped**
 (2 disabled) of 1428. See `UNIT_TESTS_STATUS.md`.
 
+As of 2026-11-16 (merge of `814e9a9c`, branch `salted-load-time`), the SALTED load-time branch carries PR #240's head
+(master with PR #242, the ECP table core) in merge `a6954443`; the shared model store keeps #242's cores (an all-electron
+model takes none from its input, `-coef` takes the input's mode, the table core follows the wavefunction's mode). `ctest -j4`
+on a CUDA `release-windows-tests` build: **1423 passed, 0 failed, 12 skipped** (2 disabled) of 1437; full suite on a CPU-only
+GCC 11.5 build: **1408 passed, 0 failed, 23 skipped** (2 disabled) of 1433. `.tshb`, `.tscb` and `.tsc` of DBA, 2011412 and
+2230007 at `-cpus` 1 and 8 are byte-identical to `814e9a9c`. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (pTB cores), a pTB file (`.xtb`, `.stda`) declares its cores in mode 3 without `-ECP 3`;
 `WfnCoverageIoTests.PtbDeclaresItsCoresInModeThree` and `TomlIntegrationTests.SucrosePtbNoEcp` are new. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1414 passed, 0 failed, 12 skipped** (2 disabled) of 1428. See
@@ -278,6 +285,25 @@ features that vanish by site symmetry, the empty-environment warning is taken fr
 block says `rel_power` (VERSION 7) divides every lambda > 0 block by the atom's lambda = 0 length;
 `SaltedFchkPredictorTests.RelPowerIsContinuousAtASymmetricSite` and `SaltedFchkEquicombTests.RelPowerMatchesSalted` (against SALTED's kernels) are new. `ctest -R "SALTED|Salted|salted"` on a CUDA
 `release-windows-tests` build: **59 passed, 0 failed** of 59; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-15 (OpenMP-team model reads, branch `salted-load-time`), the SALTED model reader reads each lambda's blocks with the OpenMP team instead of fresh `std::thread`s, so the model read keeps to the `-cpus` threads; `SaltedFchkPredictorTests.ModelIsReadInLineWithCpusReaders` checks the team. Exclusive A/B (AKL032, n = 10, pinned to `-cpus` cores): 16-40 % faster than the `std::thread` reader and 9-30 % faster than the prefetch `86cd31c9` at `-cpus` 2/4/8; with idle cores beyond `-cpus` (unpinned) it is 17-27 % slower than the prefetch on the small cases (AKL032 and AKL046), which the `-cpus` pool rule gives up; tables byte-identical to `d5a31f3f`. `ctest -j4` on a CUDA `release-windows-tests` build: **1410 passed, 0 failed, 12 skipped** (2 disabled) of 1424; full suite on a CPU-only GCC 11.5 build: **1395 passed, 0 failed, 23 skipped** (2 disabled) of 1420. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-15 (on-demand model reads, branch `salted-load-time`), the SALTED predictor reads each lambda's model blocks in line with all `-cpus` threads instead of prefetching lambda + 1 beside the kernels; `SaltedFchkPredictorTests.ModelIsReadInLineWithCpusReaders` is new. `ctest -j4` on a CUDA `release-windows-tests` build: **1410 passed, 0 failed, 12 skipped** (2 disabled) of 1424; full suite on a CPU-only GCC 11.5 build, one process per test as ctest runs them: **1395 passed, 0 failed, 23 skipped** (2 disabled) of 1420. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-15 (Windows, branch `salted-load-time`), the SALTED model reader opens its shared Windows handle overlapped, so its threads read in parallel (synchronous reads on one handle are serialised), and `MergedScoreReadsLambda0Once` closes its model store before removing the folder. `ctest -j4` on a CUDA `release-windows-tests` build (MSVC 14.51, device present): **1409 passed, 0 failed, 12 skipped** (2 disabled) of 1423. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-15 (review fixes, branch `salted-load-time`), a run without /proc no longer exits from the process-age read, the text tsc writer has room for any double index, and the shared model, the -v lines and the merged score store are covered by tests (`ProcessAgeTests.StatStartTicksOfAnUnreadableLineIsNotKnown`, `SaltedFchkPredictorTests.MergedScoreReadsLambda0Once` are new). Full suite on `427a9606`, CPU-only GCC 11.5 build, one process per test as ctest runs them: **1394 passed, 0 failed, 23 skipped** (2 disabled) of 1419. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-15 (latest, branch `salted-load-time`), the reader threads allocate the SALTED model blocks themselves, the
+split kernel products (`dot_split`) are reverted, the text tsc is formatted with `to_chars` in per-thread chunks (byte-identical)
+and a `-mtc` part's spherical fill skips the atoms of earlier parts; `ScatteringFactorBlockTests.ChunkedTextWriterMatchesTheStream`
+and `TshbJointTests.SaltedSharedPart0AtomsAreFilledOnce` are new. The SALTED, tsc and tshb selection (109 tests) on a CPU-only
+GCC build: **109 passed, 0 failed**; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-15 (SALTED model load, branch `salted-load-time`), `-v` accounts for the model reads, the parts of a run share
+one load of the model (`SALTED_model_store`) and the blocks are read with the run's threads; three gtests are new. The SALTED
+selection of `ctest --preset release-linux-tests` on a CPU-only GCC build: **59 passed, 0 failed** of 59; the full suite was
+not rerun. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-13 (equicomb follow-ups), the predictor keeps one descriptor buffer for all lambdas and the CUDA feature
 kernel builds mu >= 0 only; the zeroing of features that vanish by site symmetry moved to its own branch with the

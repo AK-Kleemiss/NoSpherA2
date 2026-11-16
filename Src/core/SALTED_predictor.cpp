@@ -16,7 +16,6 @@
 #include "citations.h"
 #include <cstring>
 #include <filesystem>
-#include <future>
 
 
 // inorganic: no carbon bonded to H, C or a metal (carbonate, cyanide and carbide stay inorganic); organometallic: such
@@ -109,8 +108,10 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	for (int a = 0; a < wavy.get_ncen(); a++) wavy.set_atom_ECP_electrons(a, 0);
 	if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
 	_path = _path / config.salted_filename;
+	const auto _t_config = std::chrono::steady_clock::now();
 	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
 	file.populate_config(config);
+	eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_config).count();
 
 	const auto _t_filter = std::chrono::steady_clock::now();
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
@@ -165,10 +166,13 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 
 	wavy.delete_basis_set();
 	if (file.basis_set_defined()) {
+		const auto _t_basis = std::chrono::steady_clock::now();
 		model_basis = file.read_basis_set();
+		eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_basis).count();
 		load_basis_into_WFN(wavy, model_basis);
 		bbasis_set_loaded = true;
 	}
+	eager_bytes += file.dataset_bytes;
 }
 
 void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vector<char>& use_thakkar, options& opt_in)
@@ -470,12 +474,15 @@ vec SALTEDPredictor::merge_predictions()
 	std::vector<ivec> at(nm);
 	for (const auto& alt : atom_alt)
 		for (const auto& c : alt) at[c.first].push_back(c.second);
+	// the l = 0 blocks the score reads are kept for the prediction, which takes them once (unless a run's store holds them)
+	std::vector<std::shared_ptr<SALTED_model_store>> score_store(nm);
 	for (int m = 0; m < nm; m++)
 	{
 		if (at[m].empty()) continue;
 		std::sort(at[m].begin(), at[m].end());
 		at[m].erase(std::unique(at[m].begin(), at[m].end()), at[m].end());
 		auto& sub = *sub_models[m];
+		if (sub.store.expired()) sub.store = score_store[m] = std::make_shared<SALTED_model_store>();
 		sub.centres = at[m];
 		sub.score_only = true;
 		sub.setup_atomic_environment();
@@ -483,6 +490,7 @@ vec SALTEDPredictor::merge_predictions()
 		sub.predict();
 		sub.shrink_intermediate_vectors();
 		sub.score_only = false;
+		if (score_store[m]) score_store[m]->keep = false;
 	}
 	// Subgroups: an atom goes to the alternative whose reference environments it is closest to, the default on a tie
 	// ponytail: cosines of models with different rcut/sig/neighspe are compared as they are; rescale per model if that biases the pick
@@ -802,9 +810,17 @@ void SALTEDPredictor::setup_atomic_environment()
 void SALTEDPredictor::read_model_data() {
 	const auto _t_model = std::chrono::steady_clock::now();
 	const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
-	// Kept open for the whole prediction; the matrices are fetched lambda by lambda
-	model_file = std::make_unique<SALTED_BINARY_FILE>(_SALTEDpath);
+	// Kept open for the whole prediction (and the run's later parts); the matrices are fetched lambda by lambda
+	const std::shared_ptr<SALTED_model_store> s = store.lock();
+	if (s) {
+		std::shared_ptr<SALTED_BINARY_FILE>& f = s->files[_SALTEDpath];
+		if (!f) f = std::make_shared<SALTED_BINARY_FILE>(_SALTEDpath);
+		model_file = f;
+	}
+	else model_file = std::make_shared<SALTED_BINARY_FILE>(_SALTEDpath);
 	SALTED_BINARY_FILE &file = *model_file;
+	file.readers = omp_get_max_threads();
+	const size_t dataset_bytes0 = file.dataset_bytes;
 	if (config.field) {
 		err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
 	}
@@ -815,6 +831,8 @@ void SALTEDPredictor::read_model_data() {
 
 	if (config.average) av_coefs = file.read_averages();
 	if (config.sparsify) vfps = file.read_fps();
+	eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_model).count();
+	eager_bytes += file.dataset_bytes - dataset_bytes0;
 
 
 	// Only present species need their model data; absent ones are needed for their
@@ -914,11 +932,12 @@ void SALTEDPredictor::read_model_data() {
 
 // Model matrices are loaded per lambda and dropped after use: nothing rereads them, the weight
 // offsets come from the projector shapes
-// File reads only, touching no member the kernels use, so it can run on another thread
 SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 {
 	lambda_blocks out;
 	if (!model_file) return out;
+	const std::shared_ptr<SALTED_model_store> s = store.lock();
+	const std::filesystem::path path = SALTED_DIR / config.salted_filename;
 	std::vector<std::string> keys;
 	std::vector<SALTED_BINARY_FILE::block_ref> refs;   // projector, features per key
 	for (const std::string &spe : model_species)
@@ -930,13 +949,25 @@ SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 		const auto ft = feat_index.find(key);
 		// G and ENVW carry their projector; an empty ref reads as a 0 x 0 matrix
 		if (g == g_index.end() && (ft == feat_index.end() || (!env_folded && pr == proj_index.end()))) continue;
+		if (s) {
+			const auto held = s->blocks.find({ path, key });
+			if (held != s->blocks.end()) {
+				out.emplace_back(key, held->second.first, held->second.second);
+				if (!s->keep) s->blocks.erase(held);
+				continue;
+			}
+		}
 		keys.push_back(key);
 		refs.push_back(g != g_index.end() || env_folded ? SALTED_BINARY_FILE::block_ref{} : pr->second);
 		refs.push_back(g != g_index.end() ? g->second : ft->second);
 	}
 	std::vector<dMatrix2> blocks = model_file->load_blocks(refs);
 	for (std::size_t k = 0; k < keys.size(); k++)
-		out.emplace_back(keys[k], std::move(blocks[2 * k]), std::move(blocks[2 * k + 1]));
+	{
+		const salted_block V = std::make_shared<const dMatrix2>(std::move(blocks[2 * k])), F = std::make_shared<const dMatrix2>(std::move(blocks[2 * k + 1]));
+		if (s && s->keep) s->blocks[{ path, keys[k] }] = { V, F };
+		out.emplace_back(keys[k], V, F);
+	}
 	return out;
 }
 
@@ -945,16 +976,22 @@ void SALTEDPredictor::install_model_lambda(lambda_blocks blocks, const int lam)
 	for (auto &[key, V, feats] : blocks)
 	{
 		if (power_env_sparse.find(key) != power_env_sparse.end()) continue;
-		Vmat[key] = std::move(V);
+		Vmat[key] = V;
 		// ENVW has V^T F already, G is used as it is (predict)
-		if (config.zeta == 1.0 && Vmat[key].extent(0) != 0)
+		if (config.zeta == 1.0 && V->extent(0) != 0)
 		{
 			if (lam == 0) ref0[key] = feats;   // the kernel itself is never formed at zeta = 1, env_score wants it
-			power_env_sparse[key] = dot(Vmat[key], feats, true, false);
+			power_env_sparse[key] = std::make_shared<const dMatrix2>(dot(*V, *feats, true, false));
 		}
 		else
-			power_env_sparse[key] = std::move(feats);
+			power_env_sparse[key] = feats;
 	}
+}
+
+void SALTEDPredictor::share_model(const std::shared_ptr<SALTED_model_store>& s)
+{
+	store = s;
+	for (auto& sub : sub_models) sub->share_model(s);
 }
 
 void SALTEDPredictor::free_model_lambda(const int lam)
@@ -980,7 +1017,10 @@ vec SALTEDPredictor::predict()
 	const auto _t_predict_start = std::chrono::steady_clock::now();
 	auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
 	{ return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
-	double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_wait = 0.0, _t_model_work = 0.0;
+	double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_wait = 0.0, _t_model_install = 0.0;
+	// the file may be shared with earlier parts: this prediction's reads are what its counters gain
+	const double lazy_s0 = model_file->lazy_s;
+	const size_t lazy_bytes0 = model_file->lazy_bytes, lazy_blocks0 = model_file->lazy_blocks;
 	bool gpu_equicomb = false;
 #ifdef NOSPHERA2_USE_GPU
 	gpu_equicomb = equicomb_gpu_enabled() && salted_gpu_available();
@@ -989,11 +1029,6 @@ vec SALTEDPredictor::predict()
 		sf_gpu_warmup_wait();
 #endif
 	const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
-	// Reading a lambda's blocks takes about as long as its kernels (V6 sucrose: ~180 ms from page
-	// cache on x64, 65-140 MB/s from Android flash), so read lambda + 1 while lambda's kernels run.
-	// Plain file reads, so no OpenMP team of its own (see below). One thread on top of -cpus;
-	// holds two lambdas at once, ~100 MB more at the peak for the V6 model. Output is identical
-	std::future<lambda_blocks> next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, 0);
 	// The (l1, l2) pairs and complex-to-real matrix of every lambda, which the norm wants up front
 	std::vector<ivec2> llvec_all(lmax_max + 1);
 	std::vector<cvec2> c2r_all(lmax_max + 1);
@@ -1075,30 +1110,22 @@ vec SALTEDPredictor::predict()
 				rel_power ? norms[lam].data() : nullptr);
 		}
 		_t_equicomb += _elapsed(_t_eq);
-		// The file reads of lambda ran during lambda - 1's kernels; installing the blocks (the
-		// projector products) stays in line, also with the descriptors on the device: doing that
-		// on a second thread gave that thread its own OpenMP/MKL team, whose spin-wait then cost
-		// the kernels below more than the overlap could ever hide
+		// Read in line by the OpenMP team, not beside the kernels: never more than -cpus threads busy
 		const auto _t_wait = std::chrono::steady_clock::now();
-		install_model_lambda(next_lambda.get(), lam);
-		if (lam < lmax_max && !score_only)
-			next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, lam + 1);
-		const double model_wait = _elapsed(_t_wait);
-		_t_model_wait += model_wait;
-		_t_model_work += model_wait;
+		lambda_blocks blocks = read_model_lambda(lam);
+		_t_model_wait += _elapsed(_t_wait);
+		const auto _t_install = std::chrono::steady_clock::now();
+		install_model_lambda(std::move(blocks), lam);
+		_t_model_install += _elapsed(_t_install);
 		const auto _t_kn = std::chrono::steady_clock::now();
 #if defined(NSA2_OPENBLAS) && !defined(NSA2_ARMPL) && !defined(__ANDROID__)
 		// pch.h keeps a pthreads OpenBLAS serial, as it cannot see an enclosing OpenMP region
 		// (Android's OpenMP OpenBLAS keeps the count pch.h caps to cpu0's cluster, so not there).
-		// This loop is outside one (its parallel for calls no BLAS), so its GEMMs may take every core,
-		// but one while lambda + 1 is read: OpenBLAS splits a GEMM evenly, so a thread the reader
-		// pushes off its core holds back all of them (Pi 4, -cpus 4: kernels 1.9 -> 3.0 s)
-		const int blas_n = lam < lmax_max ? std::max(1, std::min(omp_get_max_threads(), omp_get_num_procs() - 1))
-		                                  : omp_get_max_threads();
+		// This loop is outside one (its parallel for calls no BLAS), so its GEMMs may take every core
 		struct blas_threads_scope {
 			explicit blas_threads_scope(const int n) { openblas_set_num_threads(n); }
 			~blas_threads_scope() { openblas_set_num_threads(1); }
-		} blas_threads(blas_n);
+		} blas_threads(omp_get_max_threads());
 #endif
 		// Species-outer within the group, so a species keeps its sparse matrices hot
 		for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
@@ -1124,7 +1151,7 @@ vec SALTEDPredictor::predict()
 			{
 				// GENV (fold_salted_file): psi W^T[(a,m), n] = sum_f p[(a,m), f] H[a, n ncut + f] with H = k0 G,
 				// no kernel and no k0 scaling over (2l + 1)^2 blocks
-				const dMatrix2 H = dot(kernell0[spe_idx], power_env_sparse[key], false, false);
+				const dMatrix2 H = dot(kernell0[spe_idx], *power_env_sparse[key], false, false);
 				const size_t nm = nmax[key], nc = featsize[lam];
 				err_checkf(H.extent(1) == nm * nc, "The GENV block of " + key + " does not fit the descriptors", std::cout);
 				dMatrix2 psi(pvec_lam.extent(0), nm);
@@ -1145,14 +1172,14 @@ vec SALTEDPredictor::predict()
 			//The regression GEMM stays on the CPU: the device barely wins, because fp64 runs
 			//at a sixty-fourth rate on a consumer part and each call ships its own operands.
 			//It would pay on a datacentre part.
-			dMatrix2 kernel_nm = dot(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true);
+			dMatrix2 kernel_nm = dot(pvec_lam, *power_env_sparse[spe + to_string(lam)], false, true);
 			if (lam == 0)
 			{
 				// Each atom's closest reference environment as a cosine in the sparsified feature space (the stored
 				// norms are those of the full one), so models with different FPS selections compare
-				const dMatrix2 k1 = config.zeta == 1 && ref0.count(key) ? dot(pvec_lam, ref0[key], false, true) : dMatrix2();
+				const dMatrix2 k1 = config.zeta == 1 && ref0.count(key) ? dot(pvec_lam, *ref0[key], false, true) : dMatrix2();
 				const dMatrix2& k = config.zeta == 1 ? k1 : kernel_nm;
-				const dMatrix2& R = config.zeta == 1 ? ref0[key] : power_env_sparse[key];
+				const dMatrix2& R = config.zeta != 1 ? *power_env_sparse[key] : ref0.count(key) ? *ref0[key] : k1;
 				auto norm = [](const dMatrix2& A, const int r) { double s = 0.0; for (int f = 0; f < (int)A.extent(1); f++) s += A(r, f) * A(r, f); return std::sqrt(s); };
 				vec rn(k.extent(1));
 				for (int j = 0; j < (int)k.extent(1); j++) rn[j] = norm(R, j);
@@ -1200,14 +1227,14 @@ vec SALTEDPredictor::predict()
 						}
 					}
 				}
-				psi_nm[spe_idx][lam] = dot(kernel_nm, Vmat[spe + to_string(lam)], false, false);
+				psi_nm[spe_idx][lam] = dot(kernel_nm, *Vmat[spe + to_string(lam)], false, false);
 			}
 		}
 		_t_kernels += _elapsed(_t_kn);
 		free_model_lambda(lam);
 		if (score_only) return {};
 	}
-
+	const auto _t_assemble = std::chrono::steady_clock::now();
 	unordered_map<string, dMatrix1> C{};
 	unordered_map<string, int> ispe{};
 	for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
@@ -1341,15 +1368,16 @@ vec SALTEDPredictor::predict()
 	// npy::write_npy("folder_model.npy", coeffs);
 	if (ProgressBar::report_counts)
 	{
-		const double total = std::chrono::duration<double>(
-			std::chrono::steady_clock::now() - _t_predict_start).count();
-		std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb
-				  << " s (" << (100.0 * _t_equicomb / total) << "%) + kernels "
-				  << _t_kernels << " s (" << (100.0 * _t_kernels / total)
-				  << "%) + model wait " << _t_model_wait << " s ("
-				  << (100.0 * _t_model_wait / total) << "%) + rest "
-				  << (total - _t_equicomb - _t_kernels - _t_model_wait) << " s; model preparation "
-				  << _t_model_work << " s" << std::endl;
+		const double total = _elapsed(_t_predict_start), assemble = _elapsed(_t_assemble);
+		auto part = [total](const char* what, const double s) { std::cout << " + " << what << " " << s << " s (" << 100.0 * s / total << "%)"; };
+		std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb << " s (" << 100.0 * _t_equicomb / total << "%)";
+		part("kernels", _t_kernels);
+		part("model wait", _t_model_wait);
+		part("model install", _t_model_install);
+		part("assemble", assemble);
+		std::cout << " + rest " << total - _t_equicomb - _t_kernels - _t_model_wait - _t_model_install - assemble << " s" << std::endl;
+		std::cout << "[model] payload read " << model_file->lazy_s - lazy_s0 << " s, " << model_file->lazy_bytes - lazy_bytes0
+				  << " bytes in " << model_file->lazy_blocks - lazy_blocks0 << " blocks; eager blocks " << eager_s << " s, " << eager_bytes << " bytes" << std::endl;
 	}
 	return pred_coefs;
 }
@@ -1421,7 +1449,7 @@ void SALTEDPredictor::shrink_intermediate_vectors()
 	v1.shrink_to_fit();
 	v2.shrink_to_fit();
 	weights.shrink_to_fit();
-	std::unordered_map<std::string, dMatrix2> umap;
+	std::unordered_map<std::string, salted_block> umap;
 	std::unordered_map<std::string, int> umap2;
 	std::unordered_map<std::string, dMatrix1> umap3;
 	Vmat.swap(umap);

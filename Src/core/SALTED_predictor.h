@@ -6,6 +6,17 @@
 #include "SALTED_utilities.h"
 #include "wfn_class.h"
 
+using salted_block = std::shared_ptr<const dMatrix2>;
+//The model of one run held for its parts, so a later part reads neither the file nor a block again: open files and
+//(species, lambda) blocks by model file, shared and never copied. keep = false: a block is handed out once and dropped
+// shortcut: keeps every block of the run until the last part, not bounded by -mem; release per lambda if models outgrow desktop memory
+struct SALTED_model_store
+{
+	std::map<std::filesystem::path, std::shared_ptr<SALTED_BINARY_FILE>> files;
+	std::map<std::pair<std::filesystem::path, std::string>, std::pair<salted_block, salted_block>> blocks;
+	bool keep = true;
+};
+
 //The SALTED prediction for a structure as a flat table with its coefficients, so rho and the ESP
 //can be evaluated at points without a wavefunction (xyz input); opt.salted_model_dir names the model
 class SALTEDPredictor
@@ -13,6 +24,8 @@ class SALTEDPredictor
 public:
 	SALTEDPredictor(WFN wavy, options &opt_in);
 	SALTEDPredictor() = default;
+	//The parts of a run share one load of the model; the caller owns the store and frees it after the last part
+	void share_model(const std::shared_ptr<SALTED_model_store>& s);
 
 	const std::string get_dfbasis_name() const;
 	vec gen_SALTED_densities();
@@ -78,7 +91,7 @@ private:
 	void setup_atomic_environment();
 
 	vec weights{};
-	std::unordered_map<std::string, dMatrix2> Vmat{};
+	std::unordered_map<std::string, salted_block> Vmat{};
 	// Projector shapes for every species the model knows, present or not: the flat
 	// weight vector is laid out over all of them, so absent widths shift the offsets
 	std::unordered_map<std::string, std::array<size_t, 2>> proj_dims{};
@@ -91,16 +104,20 @@ private:
 	// VERSION 4, zeta != 1: the (species, l) keys GENV holds G for, in place of features and projector
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> g_index{};
 	// Held open for the whole prediction, indexed by (species, lambda)
-	std::unique_ptr<SALTED_BINARY_FILE> model_file{};
+	std::shared_ptr<SALTED_BINARY_FILE> model_file{};
+	std::weak_ptr<SALTED_model_store> store{};
+	// For -v: time and dataset bytes of the blocks read whole (CONFG, BASIS, WEIGH, WIG, AVERG, FPS)
+	double eager_s = 0.0;
+	size_t eager_bytes = 0;
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> feat_index{};
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> proj_index{};
 	std::unordered_set<std::string> model_species{};
 	std::unordered_map<std::string, int> Mspe{};
 	std::unordered_map<int, std::vector<int64_t>> vfps{};
 	std::unordered_map<int, vec> wigner3j{};
-	std::unordered_map<std::string, dMatrix2> power_env_sparse{};
+	std::unordered_map<std::string, salted_block> power_env_sparse{};
 	// zeta = 1, unfolded: the l = 0 reference features before the projector goes in
-	std::unordered_map<std::string, dMatrix2> ref0{};
+	std::unordered_map<std::string, salted_block> ref0{};
 	std::unordered_map<std::string, vec> av_coefs{};
 	std::unordered_map<int, int> featsize{};
 
@@ -108,8 +125,8 @@ private:
 	void read_model_data();
 	// Drop the model matrices of one lambda; read_model_data() only indexes
 	void free_model_lambda(const int lam);
-	// (species+lambda key, projector, features); read and install split for the prefetch
-	using lambda_blocks = std::vector<std::tuple<std::string, dMatrix2, dMatrix2>>;
+	// (species+lambda key, projector, features)
+	using lambda_blocks = std::vector<std::tuple<std::string, salted_block, salted_block>>;
 	lambda_blocks read_model_lambda(const int lam);
 	void install_model_lambda(lambda_blocks blocks, const int lam);
 

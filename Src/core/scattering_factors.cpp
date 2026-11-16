@@ -3026,7 +3026,8 @@ std::vector<Thakkar> make_spherical_evaluators(const ivec& atom_type_list)
 }
 
 //the file list a spherical fill runs over, and the index into it; nr also selects opt.groups[nr] and the part's cif,
-//so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed
+//so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed;
+//only tempy[nr] is read, the other parts stay empty
 int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>& tempy)
 {
 	if (!opt.wfn.empty())
@@ -3034,8 +3035,11 @@ int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>&
 		tempy.emplace_back(opt.wfn);
 		return 0;
 	}
-	for (const std::filesystem::path& part_file : opt.combined_tsc_calc_files)
-		tempy.emplace_back(part_file);
+	for (int i = 0; i < (int)opt.combined_tsc_calc_files.size(); i++)
+		if (i == nr)
+			tempy.emplace_back(opt.combined_tsc_calc_files[i]);
+		else
+			tempy.emplace_back();
 	return nr;
 }
 
@@ -3742,10 +3746,13 @@ tsc_block_type calculate_scattering_factors(
 		time_descriptions.push_back("Calculation of Charges");
 		if (tshb_only) {
 			//keyed as the table's rows, the core as the table adds it: the model's ECP mode
+			const auto t_rec = std::chrono::steady_clock::now();
 			ScattererLabels keys;
 			append_scatterer_ids(keys, opt, labels, *wavy, asym_atom_list);
 			opt.tshb->append(ml->tshb(labels, keys, asym_atom_list, *wavy, calculator.wavy.get_ECP_mode(), opt.electron_diffraction), file);
 			file << labels.size() << " atom(s) go into the .tshb, no table" << endl;
+			if (ProgressBar::report_counts)
+				std::cout << "[stages] tshb records " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_rec).count() << " s" << endl;
 		}
 
 		if (prep_out != NULL)
@@ -4004,31 +4011,42 @@ tsc_block_type calculate_scattering_factors(
 	{
 		file << "Performing the remaining calculation of spherical atoms..." << std::endl;
 		opt.needs_Thakkar_fill = false;
+		const auto t_fill = std::chrono::steady_clock::now();
 		std::vector<WFN> tempy;
 		const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
+		const auto t_wfn = std::chrono::steady_clock::now();
 		//no_date is not part of spherical_fill_scope: only this caller suppresses the banner
 		const bool no_date_was = opt.no_date;
 		opt.no_date = true;
+		//the atoms of earlier parts too: the table and the .tshb keep the first copy of a key, so a fill of them was discarded
+		svec fill_known(known_atoms);
+		fill_known.insert(fill_known.end(), labels.begin(), labels.end());
 		if (tshb_only)
 		{
 			//the atoms alone: their records need no reflections
 			salted_part_prep spherical;
 			{
 				const spherical_fill_scope fill(opt, hkl);
-				calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr, kpts, &spherical);
+				calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, fill_known, fill_nr, kpts, &spherical);
 			}
 			opt.no_date = no_date_was;
+			const auto t_atoms = std::chrono::steady_clock::now();
 			fill_tshb(spherical, tempy[fill_nr], opt, file);
+			if (ProgressBar::report_counts)
+				std::cout << "[stages] fill: wavefunctions " << std::chrono::duration<double>(t_wfn - t_fill).count()
+						  << " s, atoms " << std::chrono::duration<double>(t_atoms - t_wfn).count()
+						  << " s, records " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_atoms).count() << " s" << endl;
 		}
 		else
 		{
 			tsc_block<int, cdouble> blocky_thakkar;
 			{
 				const spherical_fill_scope fill(opt, hkl);
-				blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
+				blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, fill_known, fill_nr);
 			}
 			opt.no_date = no_date_was;
-			blocky.append(std::move(blocky_thakkar), file);
+			if (!blocky_thakkar.is_empty())
+				blocky.append(std::move(blocky_thakkar), file);
 		}
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Spherical Atoms");
@@ -4069,9 +4087,19 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	//each predictor replaces opt.spherical_fill_charges with its part's EEQ charges; the fill below needs every part's
 	std::vector<std::vector<std::array<double, 4>>> charges(n_parts);
 	svec known;
+	auto mark = std::chrono::steady_clock::now();
+	auto lap = [&mark](const std::string& what) {
+		const auto now = std::chrono::steady_clock::now();
+		if (ProgressBar::report_counts)
+			std::cout << "[stages] " << what << " " << std::chrono::duration<double>(now - mark).count() << " s" << std::endl;
+		mark = now;
+	};
+	std::shared_ptr<SALTED_model_store> model_store = std::make_shared<SALTED_model_store>();
 	for (size_t i = 0; i < n_parts; i++)
 	{
 		auto pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+		pred->share_model(model_store);
+		lap("part " + std::to_string(i + 1) + ": predictor");
 		charges[i] = opt.spherical_fill_charges;
 		if (!pred->basis_set_loaded())
 			load_basis_into_WFN(pred->wavy, BasisSetLibrary::get_basis_set(pred->get_dfbasis_name()));
@@ -4088,7 +4116,9 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		}
 		preds.push_back(pred);
 		preps.push_back(std::move(prep));
+		lap("part " + std::to_string(i + 1) + ": prediction and setup");
 	}
+	model_store.reset();
 
 	//atoms the model cannot predict (unknown species, or nothing inside the descriptor cutoff) become extra rows here
 	//every part must be walked: a part file only yields atoms of the parts it covers, so part 0 alone drops the rest
@@ -4138,6 +4168,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 		}
 		file << "Spherical remainder: " << n_filled
 			 << " atom(s) the model cannot predict" << std::endl;
+		lap("spherical fill");
 	}
 
 	//each spherical remainder straight after its own predicted atoms, as the sequential path appends it per part;
@@ -4185,6 +4216,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			}
 			return combined;
 		});
+	lap("factors and table, streamed");
 	return true;
 }
 

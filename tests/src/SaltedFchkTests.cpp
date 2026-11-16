@@ -16,6 +16,7 @@
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
 #include <random>
+#include <regex>
 #undef I
 
 namespace
@@ -574,6 +575,34 @@ TEST(SaltedFchkIoTests, SyntheticModelIndexAndLoadBlock)
 		EXPECT_EQ(f.load_block(empty).extent(0), 0u);
 	}
 	std::filesystem::remove(p);
+}
+
+// load_blocks reads every block of the shipped model as load_block does, byte for byte, with one reader and with several
+// whose pieces (an odd size, so they cut doubles) cross the blocks, more of them than blocks; a block past the end of the file still stops the run
+TEST(SaltedFchkIoTests, ParallelReadMatchesLoadBlock)
+{
+	const auto p = nos_test_repo_root() / "tests" / "SALTED" / "Model" / "model.salted";
+	SALTED_BINARY_FILE f(p);
+	std::vector<SALTED_BINARY_FILE::block_ref> refs;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key)) refs.push_back(r);
+	refs.insert(refs.begin() + 3, SALTED_BINARY_FILE::block_ref{});
+	for (const std::size_t readers : { 1, 2, 7, 64 })
+		for (const std::size_t piece : { std::size_t(4u << 20), std::size_t(1001) })
+		{
+			f.readers = readers;
+			f.piece = piece;
+			const std::vector<dMatrix2> got = f.load_blocks(refs);
+			ASSERT_EQ(got.size(), refs.size());
+			for (size_t i = 0; i < refs.size(); i++)
+			{
+				const dMatrix2 want = f.load_block(refs[i]);
+				ASSERT_EQ(got[i].size(), want.size()) << i;
+				EXPECT_EQ(std::memcmp(got[i].data(), want.data(), want.size() * sizeof(double)), 0) << i << " readers " << readers << " piece " << piece;
+			}
+		}
+	const SALTED_BINARY_FILE::block_ref past{ static_cast<std::streamoff>(std::filesystem::file_size(p)) - 800, 10, 20 };
+	EXPECT_EXIT({ f.readers = 4; f.piece = 1001; f.load_blocks({ refs[0], past }); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
 // -salted_fold's writer: PROJ becomes PROJW, the blocks behind it move and still read back; a block
@@ -1595,6 +1624,186 @@ TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 	// each H gets 0.460 e against 0.807 e in the reference fit of this geometry (reading_SALTED/coefficients_conf0.npy,
 	// same basis, 10.000 e); the Aug and Sep 2026 builds predict the same coefficients to 1e-16
 	EXPECT_NEAR(e[0] + e[1] + e[2], 9.1937, 1e-3);
+}
+
+// -v accounts for the prediction: the payload line names exactly the bytes of the H and O blocks of the shipped model
+// and the eager line those of the datasets read whole; without -v none of the stage lines is written
+TEST(SaltedFchkPredictorTests, VerboseStagesCountThePayload)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto run = [&root](const bool verbose) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = verbose;
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		SP.gen_SALTED_densities();
+		const std::string out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return out;
+	};
+	SALTED_BINARY_FILE f(root / "SALTED" / "Model" / "model.salted");
+	SALTEDConfig c{};
+	f.populate_config(c);
+	ASSERT_FALSE(f.has_block("FEATL") || f.has_block("ENVW") || f.has_block("GENV"));
+	size_t bytes = 0, blocks = 0;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key))
+		{
+			const std::string spe = k.substr(0, k.size() - 1);
+			if (spe != "H" && spe != "O") continue;
+			bytes += r.rows * r.cols * sizeof(double);
+			blocks += r.rows * r.cols != 0;
+		}
+	f.read_weights();
+	f.read_wigners();
+	if (c.average) f.read_averages();
+	if (c.sparsify) f.read_fps();
+	const std::string out = run(true);
+	for (const char* line : { "[stages] featomic calculator ", "[stages] featomic descriptors ", "[stages] predict ", " + model install ", " + assemble " })
+		EXPECT_NE(out.find(line), std::string::npos) << line << " missing in\n" << out;
+	std::smatch m;
+	ASSERT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s, (\\d+) bytes in (\\d+) blocks; eager blocks \\S+ s, (\\d+) bytes"))) << out;
+	EXPECT_EQ(std::stoull(m[1]), bytes);
+	EXPECT_EQ(std::stoull(m[2]), blocks);
+	EXPECT_EQ(std::stoull(m[3]), f.dataset_bytes);
+	const std::string quiet = run(false);
+	EXPECT_EQ(quiet.find("[stages]"), std::string::npos) << quiet;
+	EXPECT_EQ(quiet.find("[model]"), std::string::npos) << quiet;
+}
+
+// Two parts sharing one model store (as -mtc does): water, then cysteine. The second reads only the blocks of the species
+// water lacks, each block of the run comes from the file once, and both predict what a predictor of their own predicts
+TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const std::filesystem::path xyz[2] = { root / "reading_SALTED" / "water_monomer.xyz", root / "SALTED" / "test_cysteine.xyz" };
+	auto predict = [&root](const std::filesystem::path& p, const std::shared_ptr<SALTED_model_store>& s, std::string& out) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		WFN w(p, false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		SP.share_model(s);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		const vec c = SP.gen_SALTED_densities();
+		out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return c;
+	};
+	auto payload = [](const std::string& out) {
+		std::smatch m;
+		EXPECT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s, (\\d+) bytes in (\\d+) blocks"))) << out;
+		return m.empty() ? std::array<size_t, 2>{} : std::array<size_t, 2>{ std::stoull(m[1]), std::stoull(m[2]) };
+	};
+	SALTED_BINARY_FILE f(root / "SALTED" / "Model" / "model.salted");
+	std::map<std::string, std::array<size_t, 2>> per_species;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key))
+		{
+			auto& b = per_species[k.substr(0, k.size() - 1)];
+			b[0] += r.rows * r.cols * sizeof(double);
+			b[1] += r.rows * r.cols != 0;
+		}
+	ASSERT_TRUE(per_species.count("C") && per_species.count("N"));
+	const std::array<size_t, 2> water = { per_species["H"][0] + per_species["O"][0], per_species["H"][1] + per_species["O"][1] };
+	std::array<size_t, 2> new_in_cys{};
+	for (const std::string spe : { "C", "N", "S" })
+		if (per_species.count(spe)) new_in_cys[0] += per_species[spe][0], new_in_cys[1] += per_species[spe][1];
+	std::string out;
+	const vec alone0 = predict(xyz[0], nullptr, out), alone1 = predict(xyz[1], nullptr, out);
+	auto store = std::make_shared<SALTED_model_store>();
+	const vec shared0 = predict(xyz[0], store, out);
+	EXPECT_EQ(payload(out), water);
+	const vec shared1 = predict(xyz[1], store, out);
+	EXPECT_EQ(payload(out), new_in_cys);
+	EXPECT_EQ(store->files.size(), 1u);
+	EXPECT_EQ(store->files.begin()->second->lazy_blocks, water[1] + new_in_cys[1]);
+	ASSERT_EQ(shared0.size(), alone0.size());
+	ASSERT_EQ(shared1.size(), alone1.size());
+	for (size_t i = 0; i < alone0.size(); i++) ASSERT_EQ(shared0[i], alone0[i]) << i;
+	for (size_t i = 0; i < alone1.size(); i++) ASSERT_EQ(shared1[i], alone1[i]) << i;
+}
+
+// Every lambda's blocks are read by an OpenMP team of at most -cpus threads: reader threads of their own (a team of one
+// each) run while the team's workers still spin, beyond -cpus
+TEST(SaltedFchkPredictorTests, ModelIsReadInLineWithCpusReaders)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const int before = omp_get_max_threads();
+	for (const int n : { 1, 4 })
+	{
+		omp_set_num_threads(n);
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		auto store = std::make_shared<SALTED_model_store>();
+		SALTEDPredictor SP(w, opt);
+		SP.share_model(store);
+		EXPECT_FALSE(SP.gen_SALTED_densities().empty());
+		ASSERT_EQ(store->files.size(), 1u);
+		const SALTED_BINARY_FILE& f = *store->files.begin()->second;
+		EXPECT_GT(f.lazy_blocks, 0u);
+		EXPECT_EQ(f.readers, (size_t)n);
+		if (n == 1) EXPECT_EQ(f.team, 1);
+		else EXPECT_TRUE(f.team > 1 && f.team <= n) << f.team;
+	}
+	omp_set_num_threads(before);
+}
+
+// A merged folder (the model and a copy of it as an alternative in a subfolder): the l = 0 blocks the SOAP score reads
+// are kept for the prediction, so in a run without a store the predictions read no more blocks than in a run whose
+// store holds every block (the score passes print no payload line), and predict the same
+TEST(SaltedFchkPredictorTests, MergedScoreReadsLambda0Once)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("merged");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "alt");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "model.salted");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "alt" / "model.salted");
+	auto predict = [&](const std::shared_ptr<SALTED_model_store>& s, size_t& blocks) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = dir;
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		if (s) SP.share_model(s);
+		const vec c = SP.gen_SALTED_densities();
+		const std::string out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		EXPECT_NE(out.find("Combining 2 SALTED models"), std::string::npos) << out;
+		blocks = 0;
+		const std::regex re("\\[model\\] payload read \\S+ s, \\d+ bytes in (\\d+) blocks");
+		for (std::sregex_iterator m(out.begin(), out.end(), re), e; m != e; ++m) blocks += std::stoull((*m)[1]);
+		return c;
+	};
+	size_t alone_blocks = 0, held_blocks = 0;
+	const vec alone = predict(nullptr, alone_blocks);
+	auto store = std::make_shared<SALTED_model_store>();
+	const vec held = predict(store, held_blocks);
+	EXPECT_EQ(store->files.size(), 2u);
+	EXPECT_GT(alone_blocks, 0u);
+	EXPECT_EQ(alone_blocks, held_blocks);
+	ASSERT_EQ(alone.size(), held.size());
+	for (size_t i = 0; i < alone.size(); i++) ASSERT_EQ(alone[i], held[i]) << i;
+	store.reset();   // the store keeps both files open, and Windows deletes no open file
+	std::filesystem::remove_all(dir);
 }
 
 // rel_power (NORM block): the lambda > 0 features are divided by the lambda = 0 length, so the coefficients of the
