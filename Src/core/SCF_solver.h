@@ -68,6 +68,8 @@ protected:
 	virtual std::string functional_name() const { return "E"; }
 	// The target quantity of the last iteration, E plus the model term: the functional the SCF descends
 	double quant_ = 0;
+	// TRAH steers this run: an iteration's model term must then be exact, not built from the last one
+	bool second_order() const { return trah_active_; }
 
 	// Prefix of the timers and of the log lines that name the procedure, and what the log calls one run
 	std::string label_ = "SCF", step_name_ = "run";
