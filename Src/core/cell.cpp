@@ -599,7 +599,8 @@ ivec cell::choose_kept_operations(const std::vector<asym_atom>& asym_atoms, cons
 	return {};
 }
 
-// Deletes every operation not in kept and enlarges hkl by the kept rotations; applied_symmetry returns the deleted operations
+// Deletes every operation not in kept and enlarges hkl by the kept rotations, the entries the grid integrates; applied_symmetry
+// returns the deleted operations
 void cell::keep_operations(const ivec& kept, ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
 	const int num_sym_ops = static_cast<int>(sym[0][0].size());
 	applied_symmetry.clear();

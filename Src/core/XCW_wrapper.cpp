@@ -267,7 +267,7 @@ static dMatrix2 spin_summed(const occ::Mat& Dw) {
 	return D;
 }
 
-void XCW_wrapper::evaluate_cryst_crit(const dMatrix2& dm_eff) {
+void XCW_wrapper::evaluate_cryst_crit(const dMatrix2& dm_eff, const bool incremental) {
 	//density-following shares refit at this evaluation only when NOSPHERA2_XCW_WEIGHT_UPDATE asks for it
 	sf.XG.refresh = sf.XG.ws && scf_solver.lambda != 0.0 && (weight_every_ > 0 ? weight_count_ % weight_every_ == 0 : weight_every_ == 0 && weight_count_ == 0);
 	weight_count_++;
@@ -285,15 +285,21 @@ void XCW_wrapper::evaluate_cryst_crit(const dMatrix2& dm_eff) {
 		sf.XG.tol = std::min(1e-3, 1e-2 * d);
 	}
 	if (sf.XG.refresh) weight_D_fit_ = dm_eff;
+	sf.XG.track = incremental;
 	sf.calc_F_calc(dm_eff);
+	sf.XG.track = false;
 	sf.XG.refresh = false;
 	sf.XG.tol = 0.0;
 	sf.eval_scale();
 	sf.calc_criteria();
 }
 
-void XCW_wrapper::perturbation_matrix(occ::Mat& perturb, const bool unrestricted) {
-	sf.perturbation(perturb, unrestricted, writer.log);
+//NOSPHERA2_XCW_GRID_PTOL: bound on the entries of lambda P the blocks kept from the last iteration may leave out, 0 (off) by default.
+//WIP, see XG in structure_factors.h
+void XCW_wrapper::perturbation_matrix(occ::Mat& perturb, const bool unrestricted, const double lambda, const bool incremental) {
+	const char* pt = tuning("NOSPHERA2_XCW_GRID_PTOL");
+	const double ptol = pt && incremental && lambda != 0.0 ? std::atof(pt) / std::abs(lambda) : 0.0;
+	sf.perturbation(perturb, unrestricted, writer.log, ptol);
 }
 
 occ::Mat XCW_wrapper::perturbation_matrix_response(const dMatrix2& dD_eff, const double lambda) {

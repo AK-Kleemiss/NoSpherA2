@@ -92,20 +92,58 @@ struct xcw_fb {
 	};
 	std::vector<proto> protos;
 	ivec proto_of; //[atom]
-	bvec off; //[atom] no weight in F (a grown copy): neither transformed nor contracted, its sf column left 0
+	bvec off; //[atom] no weight in F (sym_fact 0): neither transformed nor contracted, its sf column left 0
 	std::vector<std::vector<std::vector<std::pair<int, int>>>> at; //[atom][rule] (point, its place i nsh + slot in W)
-	int ne = 0, no = 0, nn = 0, S = 1; //Y(k^) widths for the largest L, |k| nodes, nodes per entry
+	int L = 0, ne = 0, no = 0, nn = 0, S = 1; //largest L and its Y(k^) widths, |k| nodes, nodes per entry
+	double h = 0; //node step of the Lagrange table
+	vec qn; //|k| of each node without the table
 	ivec n0; //[entry] first node
 	vec wt, Ye, Yo; //[entry] S Lagrange weights, Y(k^) [ne], [no]
 
-	//sf[g nc + c] = f_g(k_c)
-	void forward(const vec2& rho, cvec& sf) const
+	//the entries at the points k: their first node, Lagrange weights and Y(k^); without the table a point takes the node
+	//of its own |k|, which every image of an entry shares with it
+	void place(const vec& kx, const vec& ky, const vec& kz, ivec& n0_, vec& wt_, vec& Ye_, vec& Yo_) const
 	{
-		const int ng = static_cast<int>(proto_of.size()), nc = static_cast<int>(n0.size());
+		const int n = static_cast<int>(kx.size());
+		const fb_ylm Y(L);
+		std::vector<std::pair<double, int>> node(qn.size());
+		for (int i = 0; i < static_cast<int>(qn.size()); i++) node[i] = { qn[i], i };
+		std::sort(node.begin(), node.end());
+		n0_.resize(n); wt_.resize(static_cast<size_t>(n) * S);
+		Ye_.resize(static_cast<size_t>(n) * ne); Yo_.resize(static_cast<size_t>(n) * no);
+		for (int c = 0; c < n; c++) {
+			const double q = std::sqrt(kx[c] * kx[c] + ky[c] * ky[c] + kz[c] * kz[c]), iq = q > 0.0 ? 1.0 / q : 0.0;
+			Y.eval(kx[c] * iq, ky[c] * iq, q > 0.0 ? kz[c] * iq : 1.0, Ye_.data() + static_cast<size_t>(c) * ne, Yo_.data() + static_cast<size_t>(c) * no);
+			double* w = wt_.data() + static_cast<size_t>(c) * S;
+			if (S == 1) {
+				const double tol = 1e-9 * std::max(q, 1.0);
+				const auto it = std::lower_bound(node.begin(), node.end(), std::make_pair(q - tol, -1));
+				err_checkf(it != node.end() && it->first <= q + tol, "XCW grid transform: no node at |k| " + std::to_string(q), std::cout);
+				n0_[c] = it->second;
+				w[0] = 1.0;
+				continue;
+			}
+			n0_[c] = std::clamp(static_cast<int>(q / h) - 1, 0, nn - 4);
+			const double u = q / h - n0_[c];
+			w[0] = -(u - 1) * (u - 2) * (u - 3) / 6.0; w[1] = u * (u - 2) * (u - 3) / 2.0;
+			w[2] = -u * (u - 1) * (u - 3) / 2.0; w[3] = u * (u - 1) * (u - 2) / 6.0;
+		}
+	}
+
+	//sf[g nc + c] = f_g(k_c) of the atoms in todo (all when null), the others left as they are
+	void forward(const vec2& rho, cvec& sf, const std::vector<char>* todo = nullptr) const
+	{
+		sum(radial(rho, todo), n0, wt, Ye, Yo, sf, todo);
+	}
+
+	//T_g,lm(q_n) of every atom in todo
+	vec2 radial(const vec2& rho, const std::vector<char>* todo = nullptr) const
+	{
+		const int ng = static_cast<int>(proto_of.size());
 		vec2 C(ng), T(ng);
 		std::vector<std::pair<int, int>> tp, tr;
 		for (int g = 0; g < ng; g++) {
-			if (off[g]) continue;
+			if (off[g] || (todo && !(*todo)[g])) continue;
 			const proto& P = protos[proto_of[g]];
 			C[g].assign(static_cast<size_t>(P.ns) * P.nl(), 0.0);
 			T[g].assign(static_cast<size_t>(nn) * P.nl(), 0.0);
@@ -142,16 +180,23 @@ struct xcw_fb {
 					0.0, T[g].data() + o, nl);
 			}
 		}
+		return T;
+	}
+
+	//sf[g nc + c] = f_g(k_c) from radial's T at the entries n0_, wt_, Ye_, Yo_
+	void sum(const vec2& T, const ivec& n0_, const vec& wt_, const vec& Ye_, const vec& Yo_, cvec& sf, const std::vector<char>* todo = nullptr) const
+	{
+		const int ng = static_cast<int>(proto_of.size()), nc = static_cast<int>(n0_.size());
 #pragma omp parallel for schedule(static)
 		for (int c = 0; c < nc; c++) {
-			const double* ye = Ye.data() + static_cast<size_t>(c) * ne, * yo = Yo.data() + static_cast<size_t>(c) * no, * w = wt.data() + static_cast<size_t>(c) * S;
+			const double* ye = Ye_.data() + static_cast<size_t>(c) * ne, * yo = Yo_.data() + static_cast<size_t>(c) * no, * w = wt_.data() + static_cast<size_t>(c) * S;
 			for (int g = 0; g < ng; g++) {
-				if (off[g]) continue;
+				if (off[g] || (todo && !(*todo)[g])) continue;
 				const proto& P = protos[proto_of[g]];
 				const int nl = P.nl();
 				double re = 0, im = 0;
 				for (int m = 0; m < S; m++) {
-					const double* t = T[g].data() + static_cast<size_t>(n0[c] + m) * nl;
+					const double* t = T[g].data() + static_cast<size_t>(n0_[c] + m) * nl;
 					double se = 0, so = 0;
 					for (int j = 0; j < P.ne; j++) se += ye[j] * t[j];
 					for (int j = 0; j < P.no; j++) so += yo[j] * t[P.ne + j];
@@ -163,14 +208,14 @@ struct xcw_fb {
 		}
 	}
 
-	//The transpose: V_g(p) = Re Sum_c H[g nc + c] f_g's kernel e^{ik_c.d_p}
-	void adjoint(const cvec& H, vec2& V) const
+	//The transpose: V_g(p) = Re Sum_c H[g nc + c] f_g's kernel e^{ik_c.d_p} of the atoms in todo
+	void adjoint(const cvec& H, vec2& V, const std::vector<char>* todo = nullptr) const
 	{
 		const int ng = static_cast<int>(proto_of.size()), nc = static_cast<int>(n0.size());
 		vec2 gT(ng), gC(ng);
 		std::vector<std::pair<int, int>> tp, tr;
 		for (int g = 0; g < ng; g++) {
-			if (off[g]) continue;
+			if (off[g] || (todo && !(*todo)[g])) continue;
 			const proto& P = protos[proto_of[g]];
 			gC[g].assign(static_cast<size_t>(P.ns) * P.nl(), 0.0);
 			for (int t = 0; t < static_cast<int>(P.rules.size()); t++) tp.emplace_back(g, t);
@@ -182,7 +227,7 @@ struct xcw_fb {
 			vec gCt, gW;
 #pragma omp for schedule(dynamic)
 			for (int g = 0; g < ng; g++) {
-				if (off[g]) continue;
+				if (off[g] || (todo && !(*todo)[g])) continue;
 				const proto& P = protos[proto_of[g]];
 				const int nl = P.nl();
 				gT[g].assign(static_cast<size_t>(nn) * nl, 0.0);
@@ -342,21 +387,16 @@ void structure_factors::plan_grid_fb(const sf_shell_layout& layout)
 	const bool table = nq < nc;
 	F.nn = table ? nq : nc;
 	F.S = table ? 4 : 1;
+	F.L = L; F.h = h;
 	F.ne = fb_n_even(L); F.no = fb_n_odd(L);
-	F.n0.resize(nc); F.wt.resize(static_cast<size_t>(nc) * F.S);
-	F.Ye.resize(static_cast<size_t>(nc) * F.ne); F.Yo.resize(static_cast<size_t>(nc) * F.no);
-	const fb_ylm Y(L);
+	if (!table) F.qn = qk;
+	vec kx(nc), ky(nc), kz(nc);
 	for (int c = 0; c < nc; c++) {
 		const int i = XG.inversion_link[c][0];
-		const double q = qk[c], iq = q > 0.0 ? 1.0 / q : 0.0;
-		Y.eval(k_pt[0][i] * iq, k_pt[1][i] * iq, q > 0.0 ? k_pt[2][i] * iq : 1.0, F.Ye.data() + static_cast<size_t>(c) * F.ne, F.Yo.data() + static_cast<size_t>(c) * F.no);
-		double* w = F.wt.data() + static_cast<size_t>(c) * F.S;
-		if (!table) { F.n0[c] = c; w[0] = 1.0; continue; }
-		F.n0[c] = std::clamp(static_cast<int>(q / h) - 1, 0, nq - 4);
-		const double u = q / h - F.n0[c];
-		w[0] = -(u - 1) * (u - 2) * (u - 3) / 6.0; w[1] = u * (u - 2) * (u - 3) / 2.0;
-		w[2] = -u * (u - 1) * (u - 3) / 2.0; w[3] = u * (u - 1) * (u - 2) / 6.0;
+		kx[c] = k_pt[0][i]; ky[c] = k_pt[1][i]; kz[c] = k_pt[2][i];
 	}
+	F.place(kx, ky, kz, F.n0, F.wt, F.Ye, F.Yo);
+	if (!table) for (int c = 0; c < nc; c++) F.n0[c] = c;
 	for (size_t P = 0; P < F.protos.size(); P++) {
 		xcw_fb::proto& Q = F.protos[P];
 		Q.J.assign(static_cast<size_t>(Q.L + 1) * F.nn * Q.ns, 0.0);
@@ -391,7 +431,7 @@ void structure_factors::grid_F(const dMatrix2& D)
 		const ivec& lk = XG.lookup[r];
 		cdouble sum = scatter_data.anom_correction[r];
 		for (int g = 0; g < ng; g++) {
-			if (asym_atoms[g].sym_fact == 0.0) continue; //a grown copy: partition only
+			if (asym_atoms[g].sym_fact == 0.0) continue; //no weight in F: partition only
 			cdouble t = 0;
 			for (int s = 0; s < static_cast<int>(lk.size()); s++) {
 				const int e = lk[s];
@@ -415,54 +455,87 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 	for (int g = 0; g < ng; g++)
 		for (int b = 0; b < static_cast<int>(XG.blocks[g].size()); b++) list.emplace_back(g, b);
 	const int nb = static_cast<int>(list.size()), nmo = static_cast<int>(D.extent(0));
-	//NOSPHERA2_XCW_GRID_DTOL: per block bound on the |dF| a kept rho may carry; off by default: an SCF moves
-	//every element of D each cycle, so few blocks stay below any useful bound
-	const char* dt = tuning("NOSPHERA2_XCW_GRID_DTOL");
-	const double dtol = dt && !XG.on_device ? std::atof(dt) : 0.0;
-	const bool fresh = static_cast<int>(XG.bound.size()) != nb || XG.D_last.rows() != nmo;
+	//NOSPHERA2_XCW_GRID_DTOL: per atom bound on the |df_g| the blocks keeping their rho may carry in a tracked SCF, 0 (off)
+	//by default; NOSPHERA2_XCW_GRID_FULL: every how many tracked calls every block is integrated. WIP, see XG in structure_factors.h
+	const char* dt = tuning("NOSPHERA2_XCW_GRID_DTOL"), * fe = tuning("NOSPHERA2_XCW_GRID_FULL");
+	const double dtol = dt ? std::atof(dt) : 0.0;
+	const int full = fe ? std::max(1, std::atoi(fe)) : 8;
+	const bool fresh = static_cast<int>(XG.absS.size()) != nb || XG.D_last.rows() != nmo;
 	//rho itself with the integration weights alone when the shares follow it
 	const vec2& wr = XG.ws ? XG.w0 : XG.w;
 	if (fresh) {
-		XG.bound.assign(nb, 0.0);
+		XG.absS.assign(nb, std::vector<float>());
 		XG.drift.assign(nb, 0.0);
 		XG.rho_last.resize(ng);
-		for (int g = 0; g < ng; g++) XG.rho_last[g].assign(XG.w[g].size(), 0.0);
+		XG.m2.resize(ng);
+		for (int g = 0; g < ng; g++) {
+			XG.rho_last[g].assign(XG.w[g].size(), 0.0);
+			XG.m2[g].assign(XG.w[g].size(), 0.0);
+		}
 #pragma omp parallel for schedule(dynamic)
 		for (int i = 0; i < nb; i++) {
 			const GridBlock& b = XG.blocks[list[i].first][list[i].second];
 			const int na = static_cast<int>(b.active_aos.size()), np = b.point_count;
 			const double* w = wr[list[i].first].data() + b.point_start;
-			double s = 0;
+			double* m = XG.m2[list[i].first].data() + b.point_start;
+			vec A(static_cast<size_t>(na) * na, 0.0), x(na);
 			for (int p = 0; p < np; p++) {
-				double a = 0;
-				for (int ii = 0; ii < na; ii++) a += std::abs(b.ao_values[static_cast<size_t>(ii) * np + p]);
-				s += w[p] * a * a;
+				for (int ii = 0; ii < na; ii++) {
+					x[ii] = std::abs(b.ao_values[static_cast<size_t>(ii) * np + p]);
+					m[p] = std::max(m[p], x[ii] * x[ii]);
+				}
+				for (int ii = 0; ii < na; ii++)
+					for (int jj = ii; jj < na; jj++) A[static_cast<size_t>(ii) * na + jj] += w[p] * x[ii] * x[jj];
 			}
-			XG.bound[i] = 2.0 * s;
+			XG.absS[i].assign(A.begin(), A.end());
 		}
 	}
 	vec2& rho = XG.rho_last;
-	std::vector<char> redo(nb, 1);
+	if (XG.track) XG.f_calls++;
+	const bool inc = XG.track && !fresh && dtol > 0 && !XG.on_device && !XR.on && XG.fb && XG.f_calls % full != 0
+		&& XG.sfc_last.size() == static_cast<size_t>(ng) * nc;
+	XG.todo_b.assign(nb, 1);
 	vec dd(nb, 0.0);
-	if (!fresh && dtol > 0) {
+	if (inc) {
+		//Sum_p |w drho| <= 2 Sum_munu |dD_munu| A_munu over the pairs the block integrates
 #pragma omp parallel for schedule(dynamic)
 		for (int i = 0; i < nb; i++) {
 			const GridBlock& b = XG.blocks[list[i].first][list[i].second];
 			const int na = static_cast<int>(b.active_aos.size());
 			const int* a = b.active_aos.data();
-			double m = 0;
-			for (int ii = 0; ii < na; ii++)
-				for (int jj = ii; jj < na; jj++)
-					if (jj == ii || !XG.skip[a[ii]][a[jj]]) m = std::max(m, std::abs(D(a[ii], a[jj]) - XG.D_last(a[ii], a[jj])));
-			const double d = dd[i] = XG.drift[i] + m * XG.bound[i];
-			if (d < dtol) { XG.drift[i] = d; redo[i] = 0; }
+			const float* A = XG.absS[i].data();
+			double s = 0;
+			for (int ii = 0; ii < na; ii++) {
+				s += std::abs(D(a[ii], a[ii]) - XG.D_last(a[ii], a[ii])) * A[static_cast<size_t>(ii) * na + ii];
+				for (int jj = ii + 1; jj < na; jj++)
+					if (!XG.skip[a[ii]][a[jj]]) s += 2.0 * std::abs(D(a[ii], a[jj]) - XG.D_last(a[ii], a[jj])) * A[static_cast<size_t>(ii) * na + jj];
+			}
+			dd[i] = XG.drift[i] + 2.0 * s;
+		}
+		//per atom the smallest bounds kept while their sum stays within dtol
+		ivec first(ng + 1, 0);
+		for (int i = 0; i < nb; i++) first[list[i].first + 1] = i + 1;
+		for (int g = 0; g < ng; g++) {
+			if (first[g + 1] < first[g]) first[g + 1] = first[g];
+			ivec ord;
+			for (int i = first[g]; i < first[g + 1]; i++) ord.push_back(i);
+			std::sort(ord.begin(), ord.end(), [&](const int x, const int y) { return dd[x] < dd[y]; });
+			double s = 0;
+			for (int k = 0; k < static_cast<int>(ord.size()) && s + dd[ord[k]] < dtol; k++) {
+				s += dd[ord[k]];
+				XG.todo_b[ord[k]] = 0;
+			}
 		}
 	}
-	const int kept = nb - static_cast<int>(std::count(redo.begin(), redo.end(), 1));
+	XG.todo.assign(ng, XG.refresh ? 1 : 0);
+	for (int i = 0; i < nb; i++)
+		if (XG.todo_b[i]) XG.todo[list[i].first] = 1;
+	const int kept = nb - static_cast<int>(std::count(XG.todo_b.begin(), XG.todo_b.end(), 1));
 	if (XG.D_last.rows() != nmo) XG.D_last.resize(nmo, nmo);
 	for (int i = 0; i < nmo; i++)
 		for (int j = 0; j < nmo; j++) XG.D_last(i, j) = D(i, j);
 	sc.lap("F change test");
+	bool host = true;
 #ifdef NOSPHERA2_USE_GPU
 	//GPU: rho of every block from D by the device's GEMMs, the same values as the loop below
 	if (XG.on_device) {
@@ -471,7 +544,7 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 			for (int j = 0; j < nmo; j++) Dh[static_cast<size_t>(i) * nmo + j] = D(i, j);
 		err_checkf(xcw_grid_gpu_density(Dh.data(), r.data()), "XCW grid density on the device failed", std::cout);
 		for (int g = 0; g < ng; g++) std::copy(r.begin() + XG.gpu_off[g], r.begin() + XG.gpu_off[g + 1], rho[g].begin());
-		std::fill(redo.begin(), redo.end(), 0);
+		host = false;
 	}
 #endif
 	//w_p rho(p) = 2 w_p Sum_munu D chi_mu chi_nu with D restricted to the block's AOs and the
@@ -483,8 +556,8 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 		std::vector<float> Df, Tf;
 #pragma omp for schedule(dynamic)
 		for (int i = 0; i < nb; i++) {
-			if (!redo[i]) continue;
-			XG.drift[i] = 0;
+			XG.drift[i] = XG.todo_b[i] ? 0.0 : dd[i];
+			if (!host || !XG.todo_b[i]) continue;
 			const int g = list[i].first;
 			const GridBlock& b = XG.blocks[g][list[i].second];
 			const int na = static_cast<int>(b.active_aos.size()), np = b.point_count;
@@ -512,7 +585,8 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 			for (int p = 0; p < np; p++) r[p] *= 2.0 * w[p];
 		}
 	}
-	if (sc.on) std::cout << "XCW grid F kept " << kept << " of " << nb << " blocks, bound " << *std::min_element(dd.begin(), dd.end()) << " .. " << *std::max_element(dd.begin(), dd.end()) << "\n";
+	if (sc.on && inc) std::cout << "XCW grid F kept " << kept << " of " << nb << " blocks, " << ng - std::count(XG.todo.begin(), XG.todo.end(), 1)
+		<< " of " << ng << " atoms, bound " << *std::min_element(dd.begin(), dd.end()) << " .. " << *std::max_element(dd.begin(), dd.end()) << "\n";
 	sc.lap("F density");
 	if (!XG.ws) return rho;
 	if (XG.refresh) {
@@ -536,33 +610,66 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 	const vec2& rho = grid_rho(D);
 	stage_clock sc;
 	//The transform of rho: Fourier-Bessel when planned, else the direct sum over points x cleaned
-	//entries (P * nc sincos), the exact reference
-	cvec sfc(static_cast<size_t>(ng) * nc);
-	if (XG.fb) XG.fb->forward(rho, sfc);
+	//entries (P * nc sincos), the exact reference; the atoms grid_rho kept keep their last transform
+	const bool part = std::count(XG.todo.begin(), XG.todo.end(), 1) < ng;
+	cvec sfc = part ? XG.sfc_last : cvec(static_cast<size_t>(ng) * nc);
+	if (XG.fb) XG.fb->forward(rho, sfc, part ? &XG.todo : nullptr);
 	else {
+		vec2 kc(3, vec(nc));
+		for (int c = 0; c < nc; c++)
+			for (int x = 0; x < 3; x++) kc[x][c] = k_pt[x][XG.inversion_link[c][0]];
+		sfc = grid_sf_at(kc);
+	}
+	XG.sfc_last = sfc;
+	sc.lap("F transform");
+	return sfc;
+}
+
+cvec structure_factors::grid_sf_at(const vec2& k)
+{
+	const int ng = model_data.ncen, n = static_cast<int>(k[0].size());
+	cvec sf(static_cast<size_t>(ng) * n);
+	if (XR.on) {
+		for (int g = 0; g < ng; g++) {
+			std::vector<cvec> F;
+			ri_kernels(k[0], k[1], k[2], F, g);
+			if (F[g].empty()) continue;
+			const int p0 = XR.atom_start[g], np = XR.atom_start[g + 1] - p0;
+#pragma omp parallel for
+			for (int i = 0; i < n; i++) {
+				cdouble s = 0;
+				for (int j = 0; j < np; j++) s += F[g][static_cast<size_t>(j) * n + i] * XR.c[p0 + j];
+				sf[static_cast<size_t>(g) * n + i] = s;
+			}
+		}
+		return sf;
+	}
+	const vec2& rho = XG.ws ? XG.rho_s : XG.rho_last;
+	if (XG.fb) {
+		ivec n0;
+		vec wt, Ye, Yo;
+		XG.fb->place(k[0], k[1], k[2], n0, wt, Ye, Yo);
+		XG.fb->sum(XG.fb->radial(rho), n0, wt, Ye, Yo, sf);
+		return sf;
+	}
 #pragma omp parallel for schedule(dynamic)
-	for (int c = 0; c < nc; c++) {
-		const int idx = XG.inversion_link[c][0];
-		const double kx = k_pt[0][idx], ky = k_pt[1][idx], kz = k_pt[2][idx];
+	for (int i = 0; i < n; i++)
 		for (int g = 0; g < ng; g++) {
 			if (asym_atoms[g].sym_fact == 0.0) continue;
 			const double* x = XG.d1[g].data(), * y = XG.d2[g].data(), * z = XG.d3[g].data(), * r = rho[g].data();
 			double sr = 0, si = 0;
 			for (size_t p = 0; p < rho[g].size(); p++) {
 				if (r[p] == 0.0) continue;
-				const double ang = kx * x[p] + ky * y[p] + kz * z[p];
+				const double ang = k[0][i] * x[p] + k[1][i] * y[p] + k[2][i] * z[p];
 				sr += r[p] * std::cos(ang);
 				si += r[p] * std::sin(ang);
 			}
-			sfc[static_cast<size_t>(g) * nc + c] = cdouble(sr, si);
+			sf[static_cast<size_t>(g) * n + i] = cdouble(sr, si);
 		}
-	}
-	}
-	sc.lap("F transform");
-	return sfc;
+	return sf;
 }
 
-void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
+void structure_factors::grid_contract(occ::Mat& out, const cvec& pre, const double tol)
 {
 	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
 	const bool fp32 = XG.fp32;
@@ -620,7 +727,57 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 		}
 	}
 	sc.lap("P transform");
-	grid_apply_V(V, out);
+	//tol > 0: out = P_last + the blocks' parts of V - V_app, a block whose |dout| <= Sum_p |V_p - V_app,p| m2_p can reach
+	//fits in tol keeping its part; the smallest kept first
+	const char* fe = tuning("NOSPHERA2_XCW_GRID_FULL");
+	const int full = fe ? std::max(1, std::atoi(fe)) : 8;
+	if (tol > 0) XG.p_calls++;
+	const bool inc = tol > 0 && !XG.on_device && XG.P_last.rows() == nmo && static_cast<int>(XG.V_app.size()) == ng
+		&& static_cast<int>(XG.m2.size()) == ng && XG.p_calls % full != 0;
+	if (!inc) {
+		grid_apply_V(V, out);
+		if (tol > 0) {
+			XG.P_last = out;
+			XG.V_app = V;
+		}
+		return;
+	}
+	std::vector<std::pair<int, int>> list;
+	for (int g = 0; g < ng; g++)
+		for (int b = 0; b < static_cast<int>(XG.blocks[g].size()); b++) list.emplace_back(g, b);
+	const int nb = static_cast<int>(list.size());
+	vec dd(nb);
+#pragma omp parallel for schedule(dynamic)
+	for (int i = 0; i < nb; i++) {
+		const GridBlock& b = XG.blocks[list[i].first][list[i].second];
+		const double* v = V[list[i].first].data() + b.point_start, * va = XG.V_app[list[i].first].data() + b.point_start, * m = XG.m2[list[i].first].data() + b.point_start;
+		double s = 0;
+		for (int p = 0; p < b.point_count; p++) s += std::abs(v[p] - va[p]) * m[p];
+		dd[i] = s;
+	}
+	ivec ord(nb);
+	for (int i = 0; i < nb; i++) ord[i] = i;
+	std::sort(ord.begin(), ord.end(), [&](const int x, const int y) { return dd[x] < dd[y]; });
+	std::vector<char> todo(nb, 1);
+	double s = 0;
+	for (int k = 0; k < nb && s + dd[ord[k]] < tol; k++) {
+		s += dd[ord[k]];
+		todo[ord[k]] = 0;
+	}
+	for (int i = 0; i < nb; i++) {
+		const GridBlock& b = XG.blocks[list[i].first][list[i].second];
+		double* v = V[list[i].first].data() + b.point_start, * va = XG.V_app[list[i].first].data() + b.point_start;
+		for (int p = 0; p < b.point_count; p++) {
+			const double d = todo[i] ? v[p] - va[p] : 0.0;
+			if (todo[i]) va[p] = v[p];
+			v[p] = d;
+		}
+	}
+	if (sc.on) std::cout << "XCW grid P kept " << nb - std::count(todo.begin(), todo.end(), 1) << " of " << nb << " blocks, bound "
+		<< dd[ord[0]] << " .. " << dd[ord[nb - 1]] << ", tol " << tol << "\n";
+	grid_apply_V(V, out, &todo);
+	out += XG.P_last;
+	XG.P_last = out;
 }
 
 void structure_factors::check_adjoint()
@@ -648,7 +805,7 @@ void structure_factors::check_adjoint()
 	std::cout << "XCW adjoint check (" << (XR.on ? "ri" : "grid") << "): " << std::scientific << std::setprecision(3) << std::abs(l1 - l2) / std::abs(l1) << std::defaultfloat << std::endl;
 }
 
-void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
+void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out, const std::vector<char>* todo)
 {
 	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size());
 	const bool fp32 = XG.fp32;
@@ -670,8 +827,11 @@ void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
 	//out(mu, nu) = Sum_p chi_mu V chi_nu over the blocks both are active on, screened pairs left out.
 	//Blocks dealt round-robin in fours and the thread partials merged in thread order: the same sum under any load
 	std::vector<std::pair<int, int>> list;
-	for (int g = 0; g < ng; g++)
-		for (int b = 0; b < static_cast<int>(XG.blocks[g].size()); b++) list.emplace_back(g, b);
+	for (int g = 0, nl = 0; g < ng; g++) {
+		for (int b = 0; b < static_cast<int>(XG.blocks[g].size()); b++)
+			if (!todo || (*todo)[nl + b]) list.emplace_back(g, b);
+		nl += static_cast<int>(XG.blocks[g].size());
+	}
 	std::vector<occ::Mat> parts(omp_get_max_threads());
 #pragma omp parallel
 	{
