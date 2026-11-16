@@ -1,0 +1,16 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Bond path 0 (8) - 1 (6): BPL 2.7156 GPL 2.7115 BPL-GPL 0.0041 bohr
+Bond path 0 (8) - 4 (6): BPL 2.7291 GPL 2.7246 BPL-GPL 0.0045 bohr
+Bond path 1 (6) - 2 (1): BPL 1.8886 GPL 1.8865 BPL-GPL 0.0021 bohr, end maxima 0.0000 / 0.0666 bohr off the nuclei
+Bond path 1 (6) - 3 (1): BPL 1.8635 GPL 1.8627 BPL-GPL 0.0008 bohr, end maxima 0.0000 / 0.0686 bohr off the nuclei
+Bond path 1 (6) - 4 (6): BPL 2.7782 GPL 2.7511 BPL-GPL 0.0271 bohr
+Bond path 4 (6) - 5 (1): BPL 1.8078 GPL 1.8038 BPL-GPL 0.0039 bohr, end maxima 0.0000 / 0.0707 bohr off the nuclei
+Bond path 4 (6) - 6 (1): BPL 1.8174 GPL 1.8154 BPL-GPL 0.0021 bohr, end maxima 0.0000 / 0.0700 bohr off the nuclei

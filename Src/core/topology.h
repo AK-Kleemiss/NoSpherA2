@@ -357,6 +357,98 @@ namespace topology
 		return r;
 	}
 
+	struct bond_path
+	{
+		std::vector<d3> points;          //nucleus a ... bond critical point ... nucleus b
+		size_t bcp_index = 0;
+		int a = -1, b = -1;              //nearest nucleus to each end, a <= b
+		double gap_a = 0.0, gap_b = 0.0; //distance of the maximum that end reached from its nucleus, 0 when it arrived
+		double bpl = 0.0;                //bond path length, arc length along points
+		double gpl = 0.0;                //geometric path length, |R_a - R_b|
+	};
+
+	//Off a (3,-1) point both ways along the eigenvector of the positive eigenvalue, then RK4 uphill on
+	//grad rho / |grad rho| with step h.  A half ends within 2h of a nucleus and is snapped onto it, or at a
+	//maximum off it: within nna_distance (an H maximum in a Gaussian basis) that is the nucleus' attractor and
+	//is joined to it, further out (an ECP pseudo-density) the gap is reported, not bridged
+	template <class S>
+	bond_path trace_bond_path(const S& source, const d3& bcp, const std::vector<nucleus>& nuclei, const double h = 0.01, const int max_steps = 4000,
+		const double nna_distance = options{}.nna_distance)
+	{
+		bond_path path;
+		path.points.push_back(bcp);
+		d3 g{ 0.0, 0.0, 0.0 };
+		double H[9]{};
+		const double rho0 = calculate_hessian(source, bcp, g, H);
+		vec A(H, H + 9), W(3);
+		if (nuclei.empty() || !try_make_Eigenvalues(A, W))
+			return path;
+		const d3 e3{ A[2], A[5], A[8] }; //row-major with eigenvectors in columns, eigenvalues ascending
+		auto uphill = [&source](const d3& p, d3& u) {
+			d3 gr{ 0.0, 0.0, 0.0 };
+			double hh[9];
+			const double rho = calculate_hessian(source, p, gr, hh);
+			const double n = array_length(gr);
+			u = n > 0.0 ? d3{ gr[0] / n, gr[1] / n, gr[2] / n } : d3{ 0.0, 0.0, 0.0 };
+			return n > 0.0 ? rho : -1.0;
+		};
+		auto nearest = [&nuclei](const d3& p, int& at, double& d) {
+			d = std::numeric_limits<double>::infinity();
+			for (size_t n = 0; n < nuclei.size(); n++) {
+				const double t = array_length(p, nuclei[n].pos);
+				if (t < d) { d = t; at = (int)n; }
+			}
+		};
+		auto half = [&](const double sign, int& end, double& gap) {
+			std::vector<d3> pts;
+			d3 p{ bcp[0] + sign * h * e3[0], bcp[1] + sign * h * e3[1], bcp[2] + sign * h * e3[2] };
+			double rho = rho0;
+			for (int s = 0; s < max_steps; s++) {
+				nearest(p, end, gap);
+				pts.push_back(p);
+				if (gap < 2.0 * h) {
+					pts.push_back(nuclei[end].pos);
+					gap = 0.0;
+					break;
+				}
+				d3 k1, k2, k3, k4;
+				const double r = uphill(p, k1);
+				if (!(r > rho))
+					break; //a maximum that is not a nucleus
+				rho = r;
+				auto at = [&p, h](const d3& k, const double f) { return d3{ p[0] + f * h * k[0], p[1] + f * h * k[1], p[2] + f * h * k[2] }; };
+				uphill(at(k1, 0.5), k2);
+				uphill(at(k2, 0.5), k3);
+				uphill(at(k3, 1.0), k4);
+				const d3 step{ h / 6.0 * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0]), h / 6.0 * (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]),
+					h / 6.0 * (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]) };
+				//on top of a maximum the stages cancel and the steps shrink
+				if (array_length(step) < 1E-6 * h)
+					break;
+				for (int k = 0; k < 3; k++) p[k] += step[k];
+			}
+			if (gap > 0.0 && gap <= nna_distance)
+				pts.push_back(nuclei[end].pos);
+			return pts;
+		};
+		std::vector<d3> up = half(1.0, path.a, path.gap_a);
+		const std::vector<d3> down = half(-1.0, path.b, path.gap_b);
+		std::reverse(up.begin(), up.end());
+		path.bcp_index = up.size();
+		up.push_back(bcp);
+		up.insert(up.end(), down.begin(), down.end());
+		path.points.swap(up);
+		if (path.a > path.b) {
+			std::reverse(path.points.begin(), path.points.end());
+			path.bcp_index = path.points.size() - 1 - path.bcp_index;
+			std::swap(path.a, path.b);
+			std::swap(path.gap_a, path.gap_b);
+		}
+		for (size_t k = 1; k < path.points.size(); k++) path.bpl += array_length(path.points[k], path.points[k - 1]);
+		path.gpl = array_length(nuclei[path.a].pos, nuclei[path.b].pos);
+		return path;
+	}
+
 	void report_topology(const result& r, const std::vector<nucleus>& nuclei, std::ostream& log, const options& opt = {});
 	//-topology <wfn>: true when the critical point set is complete, so the caller can exit non-zero
 	bool report(const std::filesystem::path& wfn_path, std::ostream& log);

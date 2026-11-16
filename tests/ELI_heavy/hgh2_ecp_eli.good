@@ -50,6 +50,7 @@ Density Critical Points (5 found):
     HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
     DelSqRho  :         0.0176
     Bond Ellipticity:         0.0000
+    Bond Path :   Hg0-H2   BPL :         2.3464   GPL :         3.1180   BPL-GPL :        -0.7716 bohr   end maxima off nuclei by 0.7716 / 0.0000
    V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
 
   CP   5  [bond        ]  converged   H1-Hg0 bond
@@ -59,6 +60,7 @@ Density Critical Points (5 found):
     HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
     DelSqRho  :         0.0176
     Bond Ellipticity:         0.0000
+    Bond Path :   Hg0-H1   BPL :         2.3464   GPL :         3.1180   BPL-GPL :        -0.7716 bohr   end maxima off nuclei by 0.7716 / 0.0000
    V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
 
 QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)

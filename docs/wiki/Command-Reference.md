@@ -251,6 +251,7 @@ is a separate flag and several can be written in one run.
 | `-polarizabilities <7 wfn files>` | 7 | | Polarisability from seven finite-field wavefunctions. |
 | `-e_field <F>` | 1 | `0.005` | Field strength used by the finite-field jobs. |
 | `-laplacian_bonds <wfn>` | 1 | | Laplacian profiles along each bond. One-shot. |
+| `-laplacian_bond_paths <wfn>` | 1 | | rho and Laplacian along the traced QTAIM bond paths (bond critical point uphill to both nuclei), one `<wfn>_bond_path_<a>_<b>.dat` per bond point; logs BPL and GPL. One-shot. |
 | `-fukui_analysis [wfn]` | 0-1 | | Condensed Fukui indices, printed to the console. |
 | `-promol_nci <f1.xyz> <f2.xyz> [f3.xyz ...] [rcut1] [rcut2] [rho_max] [rdg_max] [colour_max]` | 2+ | `0.95 0.75 0.5 1.0 0.015` | Intermolecular NCI from promolecular densities of two or more fragments. |
 | `-promol_nci_single_thread` | 0 | off | Serialise the promolecular NCI loop. |

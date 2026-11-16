@@ -3422,12 +3422,58 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	}
 }
 
-void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
+//rho and its Laplacian along each traced path to <stem>_bond_path_<a>_<b>.dat, a BPL/GPL line per path to log if given
+static void write_bond_path_profiles(const WFN &wavy, const std::vector<topology::bond_path> &paths, const std::string &stem, std::ostream *log)
+{
+	std::map<std::pair<int, int>, int> seen; //a second path between one pair must not overwrite the first
+	for (const topology::bond_path &bp : paths) {
+		if (bp.a < 0) continue;
+		std::string name = stem + "_bond_path_" + std::to_string(bp.a) + "_" + std::to_string(bp.b);
+		if (const int n = seen[{ bp.a, bp.b }]++) name += "_" + std::to_string(n + 1);
+		if (log) {
+			*log << "Bond path " << bp.a << " (" << wavy.get_atom_charge(bp.a) << ") - " << bp.b << " (" << wavy.get_atom_charge(bp.b)
+				<< "): BPL " << std::fixed << std::setprecision(4) << bp.bpl << " GPL " << bp.gpl << " BPL-GPL " << bp.bpl - bp.gpl << " bohr";
+			if (bp.gap_a > 0.0 || bp.gap_b > 0.0)
+				*log << ", end maxima " << bp.gap_a << " / " << bp.gap_b << " bohr off the nuclei";
+			*log << "\n";
+		}
+		std::ofstream result(std::filesystem::current_path() / std::filesystem::path(name + ".dat"), std::ios::out);
+		result << "# s x y z rho laplacian, bohr and a.u.; the bond critical point is point " << bp.bcp_index + 1 << "\n";
+		double s = 0.0;
+		for (size_t k = 0; k < bp.points.size(); k++) {
+			if (k) s += array_length(bp.points[k], bp.points[k - 1]);
+			d3 grad{ 0.0, 0.0, 0.0 };
+			double lap = 0.0;
+			const double rho = calculate_density(wavy, bp.points[k], grad, lap);
+			result << std::scientific << std::setprecision(6) << std::setw(14) << s;
+			for (int c = 0; c < 3; c++) result << std::setw(14) << bp.points[k][c];
+			result << std::setw(14) << rho << std::setw(14) << lap << "\n";
+		}
+	}
+}
+
+void bondwise_laplacian_plots(std::filesystem::path &wfn_name, const bool along_path)
 {
 	WFN wavy(wfn_name);
 	wavy.delete_unoccupied_MOs();
 
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+
+	if (along_path) {
+		topology::options topo_opt;
+		topo_opt.bond_scale = 1.35; //the pairs the straight-line mode plots
+		const std::vector<topology::nucleus> nuclei = topology::nuclei_of(wavy);
+		const topology::result top = topology::analyze_topology(wavy, nuclei, topo_opt);
+		std::vector<d3> bcps;
+		for (const topology::cp &p : top.points)
+			if (p.kind == topology::cp_kind::bond) bcps.push_back(p.position);
+		std::vector<topology::bond_path> paths(bcps.size());
+#pragma omp parallel for schedule(dynamic)
+		for (int k = 0; k < (int)bcps.size(); k++)
+			paths[k] = topology::trace_bond_path(wavy, bcps[k], nuclei);
+		write_bond_path_profiles(wavy, paths, wfn_name.string(), &std::cout);
+		return;
+	}
 
 	int points = 1001;
 
@@ -3646,6 +3692,225 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 	if (!warn.empty()) std::cout << "  WARNING: " << warn << std::endl;
 }
 
+//-eli_basin_cube: ELI-D inside the "A-B bond" basins, zero outside, on a box cropped to them. The voxels climb the
+//gridded field to a terminal (a grid maximum, or a box-face maximum), only the terminals and the voxels on the basin
+//surface walk the analytic field with classify (the integrator's own climb), so the surface is the integrator's.
+//That runs on a coarse box only (a basin touching a face grows that face); the requested spacing is reached by halving.
+static void write_eli_basin_cube(WFN &l_w, const std::vector<d4> &maxima, const svec &labels, const svec &want, const double spacing_ang,
+	const std::function<int(const d3 &)> &classify, std::ostream &log) {
+	auto matches = [](std::string lab, const std::string &w) {
+		if (lab == w) return true;
+		lab.erase(std::remove_if(lab.begin(), lab.end(), [](const char c) { return std::isdigit(static_cast<unsigned char>(c)); }), lab.end());
+		return lab == w;
+	};
+	std::vector<char> target(labels.size() + 2, 0);
+	std::vector<int> hits;
+	for (size_t b = 0; b < labels.size(); b++) {
+		const std::string &l = labels[b];
+		const size_t dash = l.find('-'), sp = l.find(" bond");
+		if (dash == std::string::npos || sp == std::string::npos || sp < dash) continue;
+		const std::string x = l.substr(0, dash), y = l.substr(dash + 1, sp - dash - 1);
+		if ((matches(x, want[0]) && matches(y, want[1])) || (matches(x, want[1]) && matches(y, want[0]))) { target[b + 1] = 1; hits.push_back(static_cast<int>(b)); }
+	}
+	if (hits.empty()) { log << "\n-eli_basin_cube: no " << want[0] << "-" << want[1] << " bond basin, no cube written." << std::endl; return; }
+	log << "\n-eli_basin_cube: " << hits.size() << " basin(s):";
+	for (const int b : hits) log << " " << b + 1 << " (" << labels[b] << ")";
+	log << std::endl;
+
+	d3 lo{ 1e300, 1e300, 1e300 }, hi{ -1e300, -1e300, -1e300 };
+	for (const int b : hits) for (int i = 0; i < 3; i++) { lo[i] = std::min(lo[i], maxima[b][i] - 3.0); hi[i] = std::max(hi[i], maxima[b][i] + 3.0); }
+	std::array<int, 3> n{};
+	vec val, rho;
+	std::vector<char> in;
+	double h = 0.1;
+	auto idx = [&](const int x, const int y, const int z) { return (static_cast<size_t>(x) * n[1] + y) * n[2] + z; };
+	auto pos = [&](const size_t i) { return d3{ lo[0] + (i / (static_cast<size_t>(n[1]) * n[2])) * h, lo[1] + ((i / n[2]) % n[1]) * h, lo[2] + (i % n[2]) * h }; };
+	auto inside = [&](const d3 &p) { const int b = classify(p); return static_cast<char>(b > 0 && b < static_cast<int>(target.size()) && target[b]); };
+	//Labels the box at spacing h; returns which faces (-x,+x,-y,+y,-z,+z) the basin touches
+	//ponytail: a grown box re-evaluates the whole box; keep the old voxels if growth ever dominates
+	auto label_box = [&]() {
+		for (int i = 0; i < 3; i++) n[i] = static_cast<int>(std::ceil((hi[i] - lo[i]) / h)) + 1;
+		const size_t N = static_cast<size_t>(n[0]) * n[1] * n[2];
+		val.assign(N, 0.0); rho.assign(N, 0.0);
+#pragma omp parallel for schedule(dynamic, 1024)
+		for (long long i = 0; i < static_cast<long long>(N); i++) l_w.computeRhoELI(pos(i), rho[i], val[i]);
+		//Steepest ascent on the grid: up = the neighbour with the largest rise per bohr, -1 a terminal, -2 below the density cutoff
+		std::vector<long long> up(N, -2);
+#pragma omp parallel for schedule(static)
+		for (long long i = 0; i < static_cast<long long>(N); i++) {
+			if (rho[i] < basin_density_cutoff) continue;
+			const int x = static_cast<int>(i / (static_cast<long long>(n[1]) * n[2])), y = static_cast<int>((i / n[2]) % n[1]), z = static_cast<int>(i % n[2]);
+			double best = 0.0;
+			long long to = -1;
+			for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
+				const int a = x + dx, b = y + dy, c = z + dz;
+				if ((!dx && !dy && !dz) || a < 0 || b < 0 || c < 0 || a >= n[0] || b >= n[1] || c >= n[2]) continue;
+				const size_t j = idx(a, b, c);
+				if (rho[j] < basin_density_cutoff) continue;
+				const double rise = (val[j] - val[i]) / std::sqrt(static_cast<double>(dx * dx + dy * dy + dz * dz));
+				if (rise > best) { best = rise; to = static_cast<long long>(j); }
+			}
+			up[i] = to;
+		}
+		//Every voxel to its terminal, with path compression
+		std::vector<long long> root(N, -2), path;
+		for (size_t i = 0; i < N; i++) {
+			if (up[i] == -2 || root[i] != -2) continue;
+			long long j = static_cast<long long>(i);
+			path.clear();
+			while (root[j] == -2 && up[j] >= 0) { path.push_back(j); j = up[j]; }
+			const long long r = root[j] != -2 ? root[j] : j;
+			root[j] = r;
+			for (const long long k : path) root[k] = r;
+		}
+		std::vector<long long> terms;
+		for (size_t i = 0; i < N; i++) if (root[i] == static_cast<long long>(i)) terms.push_back(static_cast<long long>(i));
+		std::vector<char> t_in(terms.size(), 0);
+#pragma omp parallel for schedule(dynamic)
+		for (long long t = 0; t < static_cast<long long>(terms.size()); t++) t_in[t] = inside(pos(terms[t]));
+		std::vector<char> term_in(N, 0);
+		for (size_t t = 0; t < terms.size(); t++) term_in[terms[t]] = t_in[t];
+		in.assign(N, 0);
+		for (size_t i = 0; i < N; i++) if (root[i] >= 0) in[i] = term_in[root[i]];
+		//The basin surface walks the analytic field until no voxel flips
+		std::vector<char> done(N, 0);
+		for (int pass = 0; pass < 200; pass++) {
+			std::vector<long long> edge;
+			for (int x = 0; x < n[0]; x++) for (int y = 0; y < n[1]; y++) for (int z = 0; z < n[2]; z++) {
+				const size_t i = idx(x, y, z);
+				if (done[i] || rho[i] < basin_density_cutoff) continue;
+				const bool e = (x > 0 && in[idx(x - 1, y, z)] != in[i]) || (x + 1 < n[0] && in[idx(x + 1, y, z)] != in[i])
+					|| (y > 0 && in[idx(x, y - 1, z)] != in[i]) || (y + 1 < n[1] && in[idx(x, y + 1, z)] != in[i])
+					|| (z > 0 && in[idx(x, y, z - 1)] != in[i]) || (z + 1 < n[2] && in[idx(x, y, z + 1)] != in[i]);
+				if (e) edge.push_back(static_cast<long long>(i));
+			}
+			if (edge.empty()) break;
+			std::vector<char> e_in(edge.size(), 0);
+#pragma omp parallel for schedule(dynamic)
+			for (long long k = 0; k < static_cast<long long>(edge.size()); k++) e_in[k] = inside(pos(edge[k]));
+			size_t flips = 0;
+			for (size_t k = 0; k < edge.size(); k++) { done[edge[k]] = 1; flips += in[edge[k]] != e_in[k]; in[edge[k]] = e_in[k]; }
+			log << "  h " << std::setprecision(4) << h << " bohr, pass " << pass + 1 << ": " << terms.size() << " grid terminals, " << edge.size() << " surface voxels walked, " << flips << " flipped" << std::endl;
+			if (!flips) break;
+		}
+		std::array<bool, 6> face{};
+		for (size_t i = 0; i < N; i++) {
+			if (!in[i]) continue;
+			const int x = static_cast<int>(i / (static_cast<size_t>(n[1]) * n[2])), y = static_cast<int>((i / n[2]) % n[1]), z = static_cast<int>(i % n[2]);
+			face[0] |= x == 0; face[1] |= x == n[0] - 1; face[2] |= y == 0; face[3] |= y == n[1] - 1; face[4] |= z == 0; face[5] |= z == n[2] - 1;
+		}
+		return face;
+	};
+	//The whole box is labelled only at 4 fine spacings. Each halving gives a new point the label of its enclosing
+	//cell when all its corners agree and walks the analytic field otherwise, so only the cells the surface cuts are
+	//climbed, and ELI-D is evaluated only inside.
+	//ponytail: a protrusion thinner than a coarse cell (0.076 bohr at 0.01 A) between agreeing corners is lost
+	const int levels = 2, stride = 1 << levels;
+	const double hf = constants::ang2bohr(spacing_ang);
+	h = hf * stride;
+	for (int grow = 0; grow < 6; grow++) {
+		const std::array<bool, 6> face = label_box();
+		bool any = false;
+		for (int i = 0; i < 3; i++) {
+			if (face[2 * i]) { lo[i] -= 1.0; any = true; }
+			if (face[2 * i + 1]) { hi[i] += 1.0; any = true; }
+		}
+		if (!any) break;
+		log << "  the basin reaches the box face, growing it by 1 bohr" << std::endl;
+	}
+	//The fine grid spans the coarse basin's index box plus one coarse cell, aligned so every coarse voxel is a fine one
+	std::array<int, 3> c0{ n[0], n[1], n[2] }, c1{ -1, -1, -1 };
+	for (int x = 0; x < n[0]; x++) for (int y = 0; y < n[1]; y++) for (int z = 0; z < n[2]; z++)
+		if (in[idx(x, y, z)]) { const int c[3] = { x, y, z }; for (int k = 0; k < 3; k++) { c0[k] = std::min(c0[k], c[k]); c1[k] = std::max(c1[k], c[k]); } }
+	err_checkf(c1[0] >= 0, "-eli_basin_cube: the basin holds no voxel", log);
+	for (int k = 0; k < 3; k++) { c0[k] = std::max(0, c0[k] - 1); c1[k] = std::min(n[k] - 1, c1[k] + 1); }
+	const std::array<int, 3> nc = n;
+	const std::vector<char> coarse = std::move(in);
+	for (int k = 0; k < 3; k++) { lo[k] += c0[k] * h; n[k] = (c1[k] - c0[k]) * stride + 1; }
+	h = hf;
+	const size_t NF = static_cast<size_t>(n[0]) * n[1] * n[2];
+	std::vector<signed char> lab(NF, -1);
+	for (int x = c0[0]; x <= c1[0]; x++) for (int y = c0[1]; y <= c1[1]; y++) for (int z = c0[2]; z <= c1[2]; z++)
+		lab[idx((x - c0[0]) * stride, (y - c0[1]) * stride, (z - c0[2]) * stride)] = coarse[(static_cast<size_t>(x) * nc[1] + y) * nc[2] + z];
+	for (int s = stride / 2; s >= 1; s /= 2) {
+		const int S = 2 * s;
+		std::vector<long long> pend;
+		for (int x = 0; x < n[0]; x += s) for (int y = 0; y < n[1]; y += s) for (int z = 0; z < n[2]; z += s) {
+			const size_t i = idx(x, y, z);
+			if (lab[i] >= 0) continue;
+			const int x0 = x / S * S, y0 = y / S * S, z0 = z / S * S, ex = x % S ? S : 0, ey = y % S ? S : 0, ez = z % S ? S : 0;
+			int ones = 0, tot = 0;
+			for (int dx = 0; dx <= ex; dx += S) for (int dy = 0; dy <= ey; dy += S) for (int dz = 0; dz <= ez; dz += S) { tot++; ones += lab[idx(x0 + dx, y0 + dy, z0 + dz)]; }
+			if (ones == tot) lab[i] = 1;
+			else if (ones == 0) lab[i] = 0;
+			else pend.push_back(static_cast<long long>(i));
+		}
+#pragma omp parallel for schedule(dynamic)
+		for (long long k = 0; k < static_cast<long long>(pend.size()); k++) lab[pend[k]] = inside(pos(pend[k]));
+		log << "  h " << std::setprecision(4) << h * s << " bohr: " << pend.size() << " points in cells cut by the surface walked the field" << std::endl;
+	}
+	val.assign(NF, 0.0); rho.assign(NF, 0.0);
+#pragma omp parallel for schedule(dynamic, 1024)
+	for (long long i = 0; i < static_cast<long long>(NF); i++) if (lab[i] == 1) l_w.computeRhoELI(pos(i), rho[i], val[i]);
+	in.assign(lab.begin(), lab.end());
+	double vol = 0.0, pop = 0.0;
+	const double dv = h * h * h;
+	cube out(n, l_w.get_ncen(), true);
+	out.give_parent_wfn(l_w);
+	for (int i = 0; i < 3; i++) { out.set_origin(i, lo[i]); for (int j = 0; j < 3; j++) out.set_vector(i, j, i == j ? h : 0.0); }
+	out.calc_dv();
+	for (int x = 0; x < n[0]; x++) for (int y = 0; y < n[1]; y++) for (int z = 0; z < n[2]; z++) {
+		const size_t i = idx(x, y, z);
+		out.set_value(x, y, z, in[i] ? val[i] : 0.0);
+		if (in[i]) { vol += dv; pop += rho[i] * dv; }
+	}
+	std::string names;
+	for (const int b : hits) names += (names.empty() ? "" : ", ") + labels[b];
+	out.set_comment1("ELI-D inside the ELI-D basin(s) " + names + ", zero outside");
+	out.set_comment2("NoSpherA2 -eli_basin_cube " + want[0] + " " + want[1] + ", spacing " + std::to_string(spacing_ang) + " Angstrom");
+	std::filesystem::path p = l_w.get_path();
+	p.replace_filename(p.stem().string() + "_eli_" + want[0] + "-" + want[1] + ".cube");
+	out.set_path(p);
+	log << "  " << n[0] << " x " << n[1] << " x " << n[2] << " voxels of " << std::setprecision(4) << spacing_ang << " A: volume " << vol << " bohr^3, "
+		<< pop << " electrons (voxel sums; the quadrature table above is the reference)" << std::endl;
+	log << "Writing " << p.string() << std::endl;
+	err_checkf(out.write_file(true), "-eli_basin_cube: failed to write the cube", log);
+}
+
+//-eli_mask_cube: ELI-D on the nonzero voxels of a given grid, zero elsewhere - a region carried over from another
+//complex where this one has no basin. The region cube's atoms are not read (a parent without atoms takes none).
+static void write_eli_mask_cube(WFN &l_w, const std::filesystem::path &mask_path, std::ostream &log) {
+	WFN none(e_origin::cub);
+	const cube mask(mask_path, true, none, log);
+	const i3 n = mask.get_sizes();
+	cube out(n, l_w.get_ncen(), true);
+	out.give_parent_wfn(l_w);
+	d3 o;
+	std::array<d3, 3> v;
+	for (int i = 0; i < 3; i++) { o[i] = mask.get_origin(i); out.set_origin(i, o[i]); for (int j = 0; j < 3; j++) { v[i][j] = mask.get_vector(i, j); out.set_vector(i, j, v[i][j]); } }
+	out.calc_dv();
+	const double dv = out.get_dv();
+	double vol = 0.0, pop = 0.0;
+#pragma omp parallel for reduction(+:vol, pop) schedule(dynamic)
+	for (int x = 0; x < n[0]; x++) for (int y = 0; y < n[1]; y++) for (int z = 0; z < n[2]; z++) {
+		if (mask.get_value(x, y, z) == 0.0) continue;
+		d3 p;
+		for (int k = 0; k < 3; k++) p[k] = o[k] + x * v[0][k] + y * v[1][k] + z * v[2][k];
+		double rho, eli;
+		l_w.computeRhoELI(p, rho, eli);
+		out.set_value(x, y, z, eli);
+		vol += dv; pop += rho * dv;
+	}
+	out.set_comment1("ELI-D inside the region of " + mask_path.filename().string() + ", zero outside");
+	out.set_comment2("NoSpherA2 -eli_mask_cube");
+	std::filesystem::path p = l_w.get_path();
+	p.replace_filename(p.stem().string() + "_eli_in_" + mask_path.stem().string() + ".cube");
+	out.set_path(p);
+	log << "-eli_mask_cube: " << n[0] << " x " << n[1] << " x " << n[2] << " voxels, region volume " << vol << " bohr^3, " << pop << " electrons" << std::endl;
+	log << "Writing " << p.string() << std::endl;
+	err_checkf(out.write_file(true), "-eli_mask_cube: failed to write the cube", log);
+}
+
 void ELI_analysis(const WFN &wavy, options &opt) {
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
@@ -3662,6 +3927,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	properties_options prop_opt = opt.properties;
 	WFN l_w = wavy;
 	l_w.delete_unoccupied_MOs();
+	if (!opt.eli_mask_cube.empty()) { write_eli_mask_cube(l_w, opt.eli_mask_cube, std::cout); return; }
 	//g = rho tau - |grad rho|^2 / 4 vanishes identically when one orbital carries the density: ELI-D is 0/0 and
 	//its basins are round-off (DGrid shatters the same way). That is the definition, not the integrator, so warn.
 	if (l_w.get_nmo() < 2)
@@ -3674,7 +3940,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//a fitted density (its attractors are not the orbitals' critical points) and a wavefunction without orbitals.
 	const bool stream_qtaim = !opt.basin_cube && !fld && l_w.get_nmo() > 0;
 	const bool stream_eli = !opt.basin_cube;
-	const bool need_cube = !stream_qtaim || !stream_eli;
+	if (!opt.eli_basin_atoms.empty() && !stream_eli) std::cout << "WARNING: -eli_basin_cube needs the analytic ELI-D basins and is ignored with -basin_cube." << std::endl;
+	const bool need_cube = (!stream_qtaim && !opt.eli_only) || !stream_eli;
 	const std::vector<atom> atoms = wavy.get_atoms();
 	cube rho, eli_cube;
 	basin_stage_timer T;
@@ -3760,7 +4027,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//basins follow the fitted density; a SALTED prediction has none, so they are skipped. -topology's Newton
 	//search on the analytic Hessian, checked against Poincare-Hopf: no grid decides which points exist
 	std::vector<critical_point> density_critical_points;
-	if (l_w.get_nmo() > 0) {
+	if (opt.eli_only) std::cout << "-eli_only: density critical points and QTAIM basins skipped." << std::endl;
+	else if (l_w.get_nmo() > 0) {
 		//-topology's default 1.3 x (r_cov + r_cov) bond seeding misses hydrogen bonds and long contacts while
 		//Poincare-Hopf still closes; 2.5 reaches O-H...O and C-H...O, and seeding and fragment count share it
 		topology::options topo_opt;
@@ -3806,7 +4074,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		});
 		density_critical_points.swap(kept);
 	}
-	{
+	if (!opt.eli_only) {
 	const section_log::tee cp_tee("qtaim");
 	std::cout << "Density Critical Points";
 	if (!density_critical_points.empty())
@@ -3817,6 +4085,15 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	}
 	else {
 		constexpr int nw = 15; // numeric field width — wide enough for large core densities
+		std::vector<topology::bond_path> bond_paths(density_critical_points.size());
+		{
+			const std::vector<topology::nucleus> nuclei = topology::nuclei_of(l_w);
+#pragma omp parallel for schedule(dynamic)
+			for (int i = 0; i < (int)density_critical_points.size(); i++)
+				if (density_critical_points[i].type == "bond")
+					bond_paths[i] = topology::trace_bond_path(l_w, density_critical_points[i].position, nuclei);
+		}
+		if (opt.fba) write_bond_path_profiles(l_w, bond_paths, opt.wfn.string(), nullptr); //beside the straight-line profiles
 		for (size_t i = 0; i < density_critical_points.size(); i++) {
 			const critical_point &cp = density_critical_points[i];
 
@@ -3896,6 +4173,15 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
 			if (std::isfinite(cp.ellipticity))
 				std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
+			if (const topology::bond_path &bp = bond_paths[i]; bp.a >= 0) {
+				//the traced path's ends, which for a long contact need not be the two nearest atoms
+				std::cout << "    Bond Path :   " << l_w.get_atom_label(bp.a) << bp.a << "-" << l_w.get_atom_label(bp.b) << bp.b
+					<< "   BPL :" << std::setw(nw) << bp.bpl << "   GPL :" << std::setw(nw) << bp.gpl
+					<< "   BPL-GPL :" << std::setw(nw) << bp.bpl - bp.gpl << " bohr";
+				if (bp.gap_a > 0.0 || bp.gap_b > 0.0)
+					std::cout << "   end maxima off nuclei by " << bp.gap_a << " / " << bp.gap_b;
+				std::cout << "\n";
+			}
 			if (std::isfinite(cp.virial_field) || std::isfinite(cp.kinetic_lagrangian) || std::isfinite(cp.kinetic_hamiltonian) || std::isfinite(cp.lagrangian_density)) {
 				std::cout << "   V         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.virial_field
 					<< "   G         :" << std::fixed << std::setprecision(4) << std::setw(nw) << cp.kinetic_lagrangian
@@ -3920,7 +4206,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//Density attractors come from the critical-point search already run, and the quadrature walks the field.
 	//A fitted density keeps the cube: those critical points are the orbitals', not the fit's attractors.
 	std::pair<cubei, std::vector<d4>> qtaim_results;
-	if (stream_qtaim) {
+	if (opt.eli_only) {}
+	else if (stream_qtaim) {
 		qtaim_results.second = streaming_density_attractors(l_w, density_critical_points, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, opt.debug);
 		std::cout << "QTAIM attractors from the analytic field: " << qtaim_results.second.size() << " (" << l_w.get_ncen() << " nuclei, " << qtaim_results.second.size() - l_w.get_ncen() << " non-nuclear)" << std::endl;
 	}
@@ -3956,7 +4243,15 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			std::cout << "  Delocalization indices skipped: " << l_w.get_nmo() << " orbitals over " << res.second.size()
 				<< " basins on " << omp_get_max_threads() << " threads would need " << aom_bytes / (1024 * 1024) << " MB of overlap matrices.\n";
 		const bool mapped = eli && stream && !eli_core_map.empty();
-		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr, nullptr, nullptr, mapped ? &eli_split : nullptr);
+		//-eli_basin_cube labels its voxels with the integrator's own climb, after the integration has filled the memo
+		const std::function<void(const std::function<int(const d3 &)> &)> probe = [&](const std::function<int(const d3 &)> &classify) {
+			write_eli_basin_cube(l_w, res.second, lab, opt.eli_basin_atoms, grid_spacing, classify, std::cout);
+		};
+		const bool want_probe = eli && stream && opt.eli_basin_atoms.size() == 2;
+		//-eli_only with -eli_basin_cube: the cube alone, the basin populations are not integrated
+		const bool cube_only = want_probe && opt.eli_only;
+		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr, nullptr, nullptr, mapped ? &eli_split : nullptr, want_probe ? &probe : nullptr, cube_only);
+		if (cube_only) { T.lap("ELI-D basin cube"); return; }
 		const section_log::tee basin_tee(eli ? "eli" : "qtaim", eli ? "ELI-D basins: populations, volumes and maxima"
 			: "QTAIM basins: populations, charges, volumes and maxima");
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
@@ -4016,7 +4311,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		}
 	};
 	if (l_w.get_nmo() == 0) {
-		report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
+		if (!opt.eli_only) report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
 		std::cout << "\nNo orbitals: the ELI-D basins are skipped." << std::endl;
 		return;
 	}
@@ -4071,8 +4366,9 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	if (!eli_shell_map.empty())
 		for (size_t b = 1; b < eli_core_map.size(); b++) eli_core_map[b] = eli_shell_map[eli_core_map[b]];
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
-	report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
+	if (!opt.eli_only) report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
 	report("ELI-D Analysis", eli_results, eli_labels, true, stream_eli);
+	if (opt.eli_only && stream_eli && opt.eli_basin_atoms.size() == 2) return;
 	const section_log::tee spin_tee("eli", "Spin-resolved ELI-D");
 	spin_eli_analysis(l_w, opt, atoms, shell_dist, shell_tol);
 }

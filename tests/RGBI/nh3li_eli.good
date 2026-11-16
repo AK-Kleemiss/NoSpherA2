@@ -65,6 +65,7 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -1.1221e+00    -1.0858e+00     8.3089e-01
     DelSqRho  :        -1.3770
     Bond Ellipticity:         0.0334
+    Bond Path :   N0-H1   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
    V         :    -4.4986e-01   G         :         0.0528   K         :     3.9705e-01   L         :     3.4424e-01
 
   CP   7  [bond        ]  converged   H2-N0 bond
@@ -74,6 +75,7 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -1.1220e+00    -1.0858e+00     8.3089e-01
     DelSqRho  :        -1.3769
     Bond Ellipticity:         0.0334
+    Bond Path :   N0-H2   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
    V         :    -4.4985e-01   G         :         0.0528   K         :     3.9704e-01   L         :     3.4423e-01
 
   CP   8  [bond        ]  converged   H3-N0 bond
@@ -83,6 +85,7 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -1.1220e+00    -1.0857e+00     8.3089e-01
     DelSqRho  :        -1.3769
     Bond Ellipticity:         0.0334
+    Bond Path :   N0-H3   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
    V         :    -4.4984e-01   G         :         0.0528   K         :     3.9703e-01   L         :     3.4422e-01
 
   CP   9  [bond        ]  converged   Li4-N0 bond
@@ -92,6 +95,7 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -6.1343e-02    -6.1342e-02     3.4404e-01
     DelSqRho  :         0.2214
     Bond Ellipticity:         0.0000
+    Bond Path :   N0-Li4   BPL :         3.6882   GPL :         3.6882   BPL-GPL :         0.0000 bohr
    V         :    -4.0482e-02   G         :         0.0479   K         :    -7.4285e-03   L         :    -5.5339e-02
 
 QTAIM attractors from the analytic field: 5 (5 nuclei, 0 non-nuclear)

@@ -297,6 +297,12 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-16 (merge of the equicomb branch at `814e9a9c` into `salted-relpower-norm`), the rel_power normalisation and the
+symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index of `plan_norms`. `ctest` on a CUDA
+`release-windows-tests` build (GPU present) reports **1418 passed, 0 failed, 12 skipped** (2 disabled) of 1432; on Linux (AKL006,
+Slurm job 1795253, GCC 11.5 `release-linux-tests`, CPU only, one process per test) **1403 passed, 0 failed, 23 skipped**
+(2 disabled) of 1428. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (merge of `814e9a9c`, branch `salted-load-time`), the SALTED load-time branch carries PR #240's head
 (master with PR #242, the ECP table core) in merge `a6954443`; the shared model store keeps #242's cores (an all-electron
 model takes none from its input, `-coef` takes the input's mode, the table core follows the wavefunction's mode). `ctest -j4`
@@ -331,6 +337,12 @@ As of 2026-11-16 (ECP table core), the table core of an ECP the reader detected 
 (def2 Thakkar), not the option's default mode 0; `TomlIntegrationTests.EcpAutoCore` and
 `EcpCoreTests.StreamedRiTableTakesTheReadersEcpMode` are new. `ctest --preset release-windows` on a CPU-only build reports
 **1403 passed, 0 failed, 12 skipped** (2 disabled) of 1417. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-13 (symmetric-site normalisation, branch `salted-relpower-norm`), the sparse equicomb zeroes lambda
+features that vanish by site symmetry, the empty-environment warning is taken from the density, and a model whose NORM
+block says `rel_power` (VERSION 7) divides every lambda > 0 block by the atom's lambda = 0 length;
+`SaltedFchkPredictorTests.RelPowerIsContinuousAtASymmetricSite` and `SaltedFchkEquicombTests.RelPowerMatchesSalted` (against SALTED's kernels) are new. `ctest -R "SALTED|Salted|salted"` on a CUDA
+`release-windows-tests` build: **59 passed, 0 failed** of 59; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-15 (OpenMP-team model reads, branch `salted-load-time`), the SALTED model reader reads each lambda's blocks with the OpenMP team instead of fresh `std::thread`s, so the model read keeps to the `-cpus` threads; `SaltedFchkPredictorTests.ModelIsReadInLineWithCpusReaders` checks the team. Exclusive A/B (AKL032, n = 10, pinned to `-cpus` cores): 16-40 % faster than the `std::thread` reader and 9-30 % faster than the prefetch `86cd31c9` at `-cpus` 2/4/8; with idle cores beyond `-cpus` (unpinned) it is 17-27 % slower than the prefetch on the small cases (AKL032 and AKL046), which the `-cpus` pool rule gives up; tables byte-identical to `d5a31f3f`. `ctest -j4` on a CUDA `release-windows-tests` build: **1410 passed, 0 failed, 12 skipped** (2 disabled) of 1424; full suite on a CPU-only GCC 11.5 build: **1395 passed, 0 failed, 23 skipped** (2 disabled) of 1420. See `UNIT_TESTS_STATUS.md`.
 
