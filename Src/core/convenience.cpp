@@ -617,6 +617,14 @@ std::string help_message =
  "                                    an attractor that no ascent path can leave.\n"
  "                                    Same basins, many times the time; it is\n"
  "                                    there to check that they are the same.\n"
+ "  -eli_only                          With -eli_analysis: skip the density critical\n"
+ "                                    points and QTAIM basins, ELI-D only. With\n"
+ "                                    -eli_basin_cube: only that cube, no basin integration.\n"
+ "  -eli_basin_cube <A> <B>            With -eli_analysis: a cube of ELI-D inside the\n"
+ "                                    A-B bond basins (element or label, e.g. Pt Zn),\n"
+ "                                    zero outside, at the -eli_analysis resolution.\n"
+ "  -eli_mask_cube <region.cube>       With -eli_analysis: only ELI-D on the grid of that\n"
+ "                                    cube where it is nonzero, zero elsewhere (no basins).\n"
  "  -no_spin_eli                       Skip the spin-resolved ELI-D basins\n"
  "                                    (alpha-alpha, beta-beta, triplet) that\n"
  "                                    -fba and -eli_analysis add for an\n"
@@ -2952,6 +2960,17 @@ bool options::digest_run_options(const std::string &temp, int &i)
 		basin_grid = std::max(1, stoi(arguments[i + 1]));
 	else if (temp == "-basin_cube")
 		basin_cube = true;
+	else if (temp == "-eli_basin_cube") {
+		err_checkf(i + 2 < argc, "-eli_basin_cube needs two atoms, e.g. -eli_basin_cube Pt Zn", std::cout);
+		eli_basin_atoms = { arguments[i + 1], arguments[i + 2] };
+		i += 2;
+	}
+	else if (temp == "-eli_mask_cube") {
+		err_checkf(i + 1 < argc && std::filesystem::exists(arguments[i + 1]), "-eli_mask_cube needs an existing cube", std::cout);
+		eli_mask_cube = arguments[++i];
+	}
+	else if (temp == "-eli_only")
+		eli_only = true;
 	else if (temp == "-no_spin_eli")
 		spin_eli = false;
 	else if (temp == "-basin_analytic")
