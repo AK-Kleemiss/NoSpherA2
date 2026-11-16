@@ -102,6 +102,9 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	}
 
 	wavy = wavy_in;
+	// the input's cores belong to its own basis: only the model's ECP block declares one
+	wavy.set_has_ECPs(false, false, 0);
+	for (int a = 0; a < wavy.get_ncen(); a++) wavy.set_atom_ECP_electrons(a, 0);
 	if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
 	_path = _path / config.salted_filename;
 	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
@@ -302,6 +305,8 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 	}
 
 	wavy = wavy_in;
+	wavy.set_has_ECPs(false, false, 0);
+	for (int a = 0; a < wavy.get_ncen(); a++) wavy.set_atom_ECP_electrons(a, 0);
 	atom_model.assign(wavy_in.get_ncen(), -1);
 	atom_in_model.assign(wavy_in.get_ncen(), -1);
 	for (int a = 0; a < wavy_in.get_ncen(); a++)
