@@ -24,8 +24,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	// v2 identical to conj(v1): read v1 and flip the sign instead of
 	// holding a second copy of the same gigabytes
 	bool v2_is_conj_of_v1 = false,
-	// natoms values from equicomb_norms for this lambda; computed here when absent,
-	// unused on the GPU, which computes its own
+	// natoms values from equicomb_norms for this lambda; computed here when absent
 	const double* norms = nullptr);
 
 //Normal implementation
