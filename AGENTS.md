@@ -297,6 +297,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-16 (SALTED ECP cores, branch `fix-salted-ecp-double-core`), the SALTED predictor takes no ECP core from its input:
+an all-electron model run with `-ECP`, `-mtc_ECP` or an ECP gbw adds none, a model with an ECP block only its own table's;
+`SaltedFchkPredictorTests.OnlyTheModelDeclaresACore` and two `SaltedFchkCliTests` are new. `ctest` on a CUDA `release-windows-tests`
+build (GPU present) reports **1404 passed, 0 failed, 12 skipped** (2 disabled) of 1418. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (ECP fixture HgI2), `tests/ECP_HgI2` (2.4 MB, 230 kB compressed) pins the def2 core for a 60- and a
 28-electron ECP four ways (`TomlIntegrationTests.HgI2Ecp*`, incl. a one-part `-mtc`) and against an all-electron X2C
 wavefunction (`EcpCoreTests.Def2CoreMatchesAllElectronX2c`). `ctest --preset release-windows` on a CPU-only build reports
