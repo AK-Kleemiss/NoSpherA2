@@ -87,7 +87,7 @@ template void computeEri3c<Coulomb3C_SPH>(Int_Params &param1,
 	vec &eri3c);
 
 template <typename Kernel>
-void compute2C(Int_Params &params, vec &ret) {
+void compute2C(Int_Params &params, vec &ret, const int comp) {
 	ivec bas = params.get_bas();
 	ivec atm = params.get_atm();
 	vec env = params.get_env();
@@ -106,13 +106,14 @@ void compute2C(Int_Params &params, vec &ret) {
 
 	// Compute integrals; the 2C drivers mirror the shell triangle, so the result is exactly symmetric
 	// and its fortran order is already the regular ordering
-	ret.assign((size_t)naoi * (size_t)naoj, 0.0);
-	Kernel::drv(ret.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+	ret.assign((size_t)comp * naoi * (size_t)naoj, 0.0);
+	Kernel::drv(ret.data(), comp, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 }
-template void compute2C<Coulomb2C_SPH>(Int_Params &params, vec &ret);
-template void compute2C<Coulomb2C_CRT>(Int_Params &params, vec &ret);
-template void compute2C<Overlap2C_SPH>(Int_Params &params, vec &ret);
-template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret);
+template void compute2C<Coulomb2C_SPH>(Int_Params &params, vec &ret, int comp);
+template void compute2C<Coulomb2C_CRT>(Int_Params &params, vec &ret, int comp);
+template void compute2C<Overlap2C_SPH>(Int_Params &params, vec &ret, int comp);
+template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret, int comp);
+template void compute2C<Dipole2C_SPH>(Int_Params &params, vec &ret, int comp);
 
 
 extern "C" libcint::CINTIntegralFunction int3c1e_sph;

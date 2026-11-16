@@ -119,6 +119,9 @@ struct basin_overlaps {
 	size_t triangle() const { return (size_t)nmo * (nmo + 1) / 2; }
 	double at(const int b, const int i, const int j) const { return S[b][packed(i, j)]; }
 };
+//One basin's share of one quadrature point: where it sits (the half-cell's centre when the cell is split), its
+//electrons w fr rho and the basin (1-based); the shares of a basin sum to its population
+struct basin_point { d3 p; double q; int basin; };
 //delta(A,B) = 2 m sum_{ij, same spin} sqrt(n_i n_j) S^A_ij S^B_ij (Mueller; n_i n_j for 0/1), lambda(A) the same with B = A,
 //over spin-orbital occupations n in [0,1]; m = 2 for a restricted wavefunction, whose single
 //set of MOs stands for both spins, 1 when alpha and beta are listed separately
@@ -207,7 +210,7 @@ private:
 //unify_core_basins reports it); the result then has one entry per basin.
 //eli (with eli_field): the ELI member whose boundaries are followed instead of ELI-D. spin_pop (with eli): per basin
 //{N_alpha, N_beta, int rho_s * ELI-q_s} from the populations' points and weights.
-vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr, const eli_spin_field* eli = nullptr, vec2* spin_pop = nullptr, const std::vector<shell_split>* split = nullptr, const std::function<void(const std::function<int(const d3&)>&)>* probe = nullptr, bool probe_only = false);
+vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr, const eli_spin_field* eli = nullptr, vec2* spin_pop = nullptr, const std::vector<shell_split>* split = nullptr, const std::function<void(const std::function<int(const d3&)>&)>* probe = nullptr, bool probe_only = false, std::vector<basin_point>* points = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);
 std::vector<critical_point> refine_cube_critical_points(const cube* cub, const WFN& wavy, const std::vector<critical_point_seed>& seeds, bool debug, double value_floor = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);
 std::vector<critical_point> analyze_cube_critical_points(const cube* cub, const WFN& wavy, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);

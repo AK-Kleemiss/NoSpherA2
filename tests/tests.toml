@@ -684,6 +684,16 @@ good = "uh6_eli.good"
 [ELI_UH6.args]
 eli_analysis = "uh6.gbw"
 
+# Every column of the contribution table sums to its ELI-D basin population.
+[ELI_contributions_epoxide]
+directory = "epoxide_gbw"
+good = "eli_contributions.good"
+
+[ELI_contributions_epoxide.args]
+no_spin_eli = ""
+eli_contributions = ""
+eli_analysis = "epoxide.gbw"
+
 [RGBI_NH3Li_ANO]
 directory = "RGBI"
 good = "nh3li_ano.good"

@@ -21,9 +21,13 @@ struct IBOResult {
 	vec energy;         //diagonal Fock element, sum_i U(i, k)^2 e_i
 	double functional = 0.0, functional_start = 0.0;
 	int sweeps = 0;
+	bool boys = false;  //localised by the Boys functional sum_k |<k|r|k>|^2 instead
 };
 
-IBOResult intrinsic_bond_orbitals(const WFN &wavy);
+//boys: same IAOs and classification, orbitals rotated by the Boys (dipole spread) functional
+IBOResult intrinsic_bond_orbitals(const WFN &wavy, bool boys = false);
+//"CR C1", "LP O3", "BD C1-C2" or "DL C1-C2" (delocalised, top two atoms)
+std::string ibo_label(const IBOResult &r, const WFN &wavy, int k);
 void print_ibo(const IBOResult &r, const WFN &wavy, std::ostream &file);
 //"6,7" (1-based IBO numbers as printed), "all", "C2:C3" or "2:3" (every bond-like IBO between two atoms), comma-separated
 ivec ibo_selection(const IBOResult &r, const std::string &spec);

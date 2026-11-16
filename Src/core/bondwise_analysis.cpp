@@ -15,6 +15,9 @@
 #include "citations.h"
 #include "nao.h"
 #include "section_log.h"
+#include "ibo.h"
+#include "nbo.h"
+#include "basis_set.h"
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -3911,6 +3914,111 @@ static void write_eli_mask_cube(WFN &l_w, const std::filesystem::path &mask_path
 	err_checkf(out.write_file(true), "-eli_mask_cube: failed to write the cube", log);
 }
 
+namespace {
+//One column of the -eli_contributions table: c[b][k] electrons of ELI-D basin b from contributor k
+struct contrib_column {
+	std::string title, skipped;
+	vec2 c;
+	svec lab;
+};
+}
+
+//p_k(b) = 2 sum_ij d_i d_j S_ij(b) for orbital k = sum_m coef[k][m] MO m of wavy; exact for a closed-shell
+//determinant, so orbitals spanning the occupied space split each basin's population without remainder
+static vec2 orbital_contributions(const WFN &wavy, const basin_overlaps &ovl, const vec2 &coef) {
+	//wavy MO -> l_w MO (delete_unoccupied_MOs drops occ == 0 and keeps the order) -> slot in the overlaps
+	ivec slot(wavy.get_nmo(), -1), occupied;
+	for (int m = 0; m < wavy.get_nmo(); m++)
+		if (wavy.get_MO_occ(m) != 0.0) occupied.push_back(m);
+	for (int i = 0; i < ovl.nmo; i++) slot[occupied[ovl.mo_index[i]]] = i;
+	const int nb = static_cast<int>(ovl.S.size()), nk = static_cast<int>(coef.size());
+	vec2 c(nb, vec(nk, 0.0));
+#pragma omp parallel for schedule(dynamic)
+	for (int k = 0; k < nk; k++) {
+		vec d(ovl.nmo, 0.0);
+		for (int m = 0; m < wavy.get_nmo(); m++)
+			if (slot[m] >= 0) d[slot[m]] = coef[k][m];
+		for (int b = 0; b < nb; b++) {
+			double s = 0.0;
+			for (int i = 0; i < ovl.nmo; i++) {
+				if (d[i] == 0.0) continue;
+				const double *row = ovl.S[b].data() + (size_t)i * (i + 1) / 2;
+				double t = 0.0;
+				for (int j = 0; j < i; j++) t += d[j] * row[j];
+				s += d[i] * (2.0 * t + d[i] * row[i]);
+			}
+			c[b][k] = 2.0 * s;
+		}
+	}
+	return c;
+}
+
+//Per ELI-D basin its population, then each column's contributors of at least 0.05 e, largest first, and what
+//the column leaves unlisted; the column sums are the check against the population
+static void print_eli_contributions(const vec &pop, const svec &eli_labels, const std::vector<contrib_column> &cols, std::ostream &out) {
+	constexpr double show = 0.05;
+	constexpr int w = 22;
+	out << "\nELI-D basin contributions (electrons; contributors >= " << show << " e, largest first)\n"
+		<< "  ELI-D and QTAIM labels number the atoms from 0, IBO and NLMO labels from 1, as in their own tables\n";
+	for (const contrib_column &col : cols)
+		if (!col.skipped.empty()) out << "  " << col.title << " skipped: " << col.skipped << "\n";
+	out << "  " << std::left << std::setw(30) << "ELI-D basin";
+	for (const contrib_column &col : cols)
+		if (col.skipped.empty()) out << " | " << std::setw(w) << col.title;
+	out << std::right << "\n";
+	for (size_t b = 0; b < pop.size(); b++) {
+		std::vector<svec> cells;
+		size_t rows = 0;
+		for (const contrib_column &col : cols) {
+			if (!col.skipped.empty()) continue;
+			//an atom's core orbitals are one entry, "CR U1 x43"; a heavy core would fill the column otherwise
+			std::vector<std::pair<std::string, double>> entry;
+			std::map<std::string, std::pair<size_t, int>> core;
+			double listed = 0.0, sum = 0.0;
+			for (size_t k = 0; k < col.c[b].size(); k++) {
+				sum += col.c[b][k];
+				if (col.lab[k].rfind("CR ", 0) != 0) { entry.emplace_back(col.lab[k], col.c[b][k]); continue; }
+				auto it = core.find(col.lab[k]);
+				if (it == core.end()) { core[col.lab[k]] = { entry.size(), 1 }; entry.emplace_back(col.lab[k], col.c[b][k]); }
+				else { entry[it->second.first].second += col.c[b][k]; it->second.second++; }
+			}
+			for (const auto &[name, at] : core)
+				if (at.second > 1) entry[at.first].first += " x" + std::to_string(at.second);
+			// rank on the printed 3 decimals, label on ties, so goldens do not swap equal rows between platforms
+			std::sort(entry.begin(), entry.end(), [](const auto &x, const auto &y) {
+				const long long a = std::llround(x.second * 1000.0), b = std::llround(y.second * 1000.0);
+				return a != b ? a > b : x.first < y.first;
+				});
+			svec cell;
+			for (const auto &[name, v] : entry) {
+				if (v < show) break;
+				std::ostringstream s;
+				s << std::left << std::setw(w - 8) << name << std::right << std::fixed << std::setprecision(3) << std::setw(8) << v;
+				cell.push_back(s.str());
+				listed += v;
+			}
+			std::ostringstream rest, total;
+			rest << std::left << std::setw(w - 8) << "(rest)" << std::right << std::fixed << std::setprecision(3) << std::setw(8) << sum - listed;
+			total << std::left << std::setw(w - 8) << "(sum)" << std::right << std::fixed << std::setprecision(3) << std::setw(8) << sum;
+			cell.push_back(rest.str());
+			cell.push_back(total.str());
+			rows = std::max(rows, cell.size());
+			cells.push_back(cell);
+		}
+		std::ostringstream head;
+		head << std::setw(4) << b + 1 << " " << std::left << std::setw(16) << eli_labels[b] << std::right << std::fixed << std::setprecision(3) << std::setw(9) << pop[b];
+		for (size_t r = 0; r < rows; r++) {
+			out << "  " << std::left << std::setw(30) << (r == 0 ? head.str() : "");
+			for (const svec &cell : cells) {
+				//the rest and sum rows line up at the bottom of every column
+				const size_t lead = rows - cell.size();
+				out << " | " << std::setw(w) << (r < lead ? "" : cell[r - lead]);
+			}
+			out << std::right << "\n";
+		}
+	}
+}
+
 void ELI_analysis(const WFN &wavy, options &opt) {
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
@@ -4225,6 +4333,11 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	std::vector<d4> eli_maxima_all;
 	ivec eli_core_map;
 	std::vector<shell_split> eli_split;
+	//-eli_contributions: the ELI-D integration also keeps its overlap matrices and every point's share
+	basin_overlaps eli_ovl;
+	std::vector<basin_point> eli_points;
+	vec eli_pop;
+	bool contrib_orbitals = false;
 	auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli, const bool stream) {
 		//The voxel sum needs the basin cube; streaming has none
 		if (!stream) {
@@ -4250,8 +4363,10 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		const bool want_probe = eli && stream && opt.eli_basin_atoms.size() == 2;
 		//-eli_only with -eli_basin_cube: the cube alone, the basin populations are not integrated
 		const bool cube_only = want_probe && opt.eli_only;
-		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr, nullptr, nullptr, mapped ? &eli_split : nullptr, want_probe ? &probe : nullptr, cube_only);
+		const bool contrib = eli && opt.eli_contributions && !cube_only;
+		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : (contrib && contrib_orbitals ? &eli_ovl : nullptr), mapped ? &eli_core_map : nullptr, nullptr, nullptr, mapped ? &eli_split : nullptr, want_probe ? &probe : nullptr, cube_only, contrib ? &eli_points : nullptr);
 		if (cube_only) { T.lap("ELI-D basin cube"); return; }
+		if (eli) eli_pop = pop;
 		const section_log::tee basin_tee(eli ? "eli" : "qtaim", eli ? "ELI-D basins: populations, volumes and maxima"
 			: "QTAIM basins: populations, charges, volumes and maxima");
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
@@ -4366,8 +4481,90 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	if (!eli_shell_map.empty())
 		for (size_t b = 1; b < eli_core_map.size(); b++) eli_core_map[b] = eli_shell_map[eli_core_map[b]];
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
+	//The orbital columns need one closed-shell determinant and the localisers' preconditions; checked here so a
+	//column is skipped with its reason instead of the run exiting inside ibo.cpp
+	std::string orbital_skip;
+	if (opt.eli_contributions) {
+		bool closed = true;
+		for (int m = 0; m < wavy.get_nmo(); m++)
+			if (wavy.get_MO_occ(m) != 0.0 && std::abs(wavy.get_MO_occ(m) - 2.0) > 1e-6) closed = false;
+		const size_t bytes = (size_t)l_w.get_nmo() * (l_w.get_nmo() + 1) / 2 * eli_results.second.size() * omp_get_max_threads() * sizeof(double);
+		if (wavy.get_is_unrestricted() || !closed) orbital_skip = "needs a closed-shell wavefunction (every occupation 0 or 2)";
+		else if (bytes > (size_t)512 * 1024 * 1024) orbital_skip = "the overlap matrices would need " + std::to_string(bytes / (1024 * 1024)) + " MB";
+		contrib_orbitals = orbital_skip.empty();
+	}
 	if (!opt.eli_only) report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
 	report("ELI-D Analysis", eli_results, eli_labels, true, stream_eli);
+	if (opt.eli_contributions && !eli_points.empty()) {
+		std::vector<contrib_column> cols(4);
+		cols[0].title = "QTAIM (Raub-Jansen)";
+		cols[1].title = "PM-IBO";
+		cols[2].title = "Boys-IBO";
+		cols[3].title = "NLMO";
+		const int nb = static_cast<int>(eli_pop.size());
+		//Raub-Jansen: each ELI-D point's electrons go to the QTAIM atom its position climbs to
+		if (opt.eli_only) cols[0].skipped = "-eli_only has no QTAIM basins";
+		else {
+			const int nq = static_cast<int>(qtaim_results.second.size());
+			ivec at(eli_points.size(), 0);
+			const std::function<void(const std::function<int(const d3 &)> &)> classify_points = [&](const std::function<int(const d3 &)> &classify) {
+#pragma omp parallel for schedule(dynamic, 256)
+				for (long long i = 0; i < (long long)eli_points.size(); i++) at[i] = classify(eli_points[i].p);
+			};
+			vec vol;
+			double outside = 0.0;
+			integrate_basins_on_atomic_grids(stream_qtaim ? nullptr : &rho, stream_qtaim ? nullptr : &(qtaim_results.first), qtaim_results.second, l_w, opt.accuracy, false, vol, outside, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, opt.basin_grid, fld, nullptr, nullptr, nullptr, nullptr, nullptr, &classify_points, true);
+			cols[0].c.assign(nb, vec(nq + 1, 0.0));
+			for (size_t i = 0; i < eli_points.size(); i++)
+				cols[0].c[eli_points[i].basin - 1][at[i] > 0 ? at[i] - 1 : nq] += eli_points[i].q;
+			cols[0].lab = labels;
+			cols[0].lab.push_back("unassigned");
+			T.lap("Raub-Jansen classification");
+		}
+		if (!contrib_orbitals)
+			for (int c = 1; c < 4; c++) cols[c].skipped = orbital_skip;
+		else {
+			std::string ibo_skip;
+			if (!origin_has_orca_pure_phases(wavy.get_origin())) ibo_skip = "IBOs need ORCA's pure-function phases (.gbw or ORCA .molden)";
+			const std::shared_ptr<BasisSet> minao = BasisSetLibrary::get_basis_set("minao");
+			for (int a = 0; a < wavy.get_ncen() && ibo_skip.empty(); a++)
+				if (!minao->has_element(wavy.get_atom_charge(a)))
+					ibo_skip = std::string("the MINAO reference basis has no ") + constants::atnr2letter(wavy.get_atom_charge(a));
+			for (const bool boys : { false, true }) {
+				contrib_column &col = cols[boys ? 2 : 1];
+				if (!ibo_skip.empty()) { col.skipped = ibo_skip; continue; }
+				const IBOResult ibo = intrinsic_bond_orbitals(wavy, boys);
+				const int nk = static_cast<int>(ibo.mos.size());
+				vec2 coef(nk, vec(wavy.get_nmo(), 0.0));
+				for (int k = 0; k < nk; k++) {
+					for (int i = 0; i < nk; i++) coef[k][ibo.mos[i]] = ibo.U(i, k);
+					col.lab.push_back(ibo_label(ibo, wavy, k));
+				}
+				col.c = orbital_contributions(wavy, eli_ovl, coef);
+				T.lap(boys ? "Boys IBO contributions" : "PM IBO contributions");
+			}
+			if (wavy.get_nr_basis_set_loaded() != wavy.get_ncen() || wavy.get_d_f_switch())
+				cols[3].skipped = "NBO needs the basis set on every atom and pure d/f functions";
+			else {
+				NboOptions nbo_opt;
+				nbo_opt.threads = std::max(opt.threads, 0);
+				nbo_opt.nrt_parent = opt.properties.nbo_lewis;
+				NboOrbitalSpace space;
+				WFN copy(wavy);
+				std::ostringstream nbo_log;
+				const NboResults r = native_nbo(copy, nbo_opt, nbo_log, &space);
+				std::vector<std::pair<int, std::string>> picked;
+				vec2 coef;
+				nbo_cube_wfn(wavy, r, space, "lewis", true, picked, nbo_log, &coef);
+				for (const auto &p : picked) cols[3].lab.push_back(p.second);
+				cols[3].c = orbital_contributions(wavy, eli_ovl, coef);
+				T.lap("NLMO contributions");
+			}
+		}
+		const section_log::tee contrib_tee("eli", "ELI-D basin contributions");
+		print_eli_contributions(eli_pop, eli_labels, cols, std::cout);
+		if (fill_cores) std::cout << "  ECP core electrons count in the ELI-D core populations but in no column's (sum).\n";
+	}
 	if (opt.eli_only && stream_eli && opt.eli_basin_atoms.size() == 2) return;
 	const section_log::tee spin_tee("eli", "Spin-resolved ELI-D");
 	spin_eli_analysis(l_w, opt, atoms, shell_dist, shell_tol);

@@ -310,6 +310,16 @@ with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
 
+## 2026-11-16 — ELI-D basin contributions (`TomlIntegrationTests.ELI_contributions_epoxide`)
+
+Golden run of `-no_spin_eli -eli_contributions -eli_analysis epoxide.gbw` in `tests/epoxide_gbw`
+(`eli_contributions.good`). It fixes the four columns (QTAIM Raub-Jansen, PM-IBO, Boys-IBO, NLMO) of
+all 12 ELI-D basins, and every column's `(sum)` row equals the basin population printed beside it, which
+is the check that the per-orbital overlaps and the point classification are complete. Rows rank on the
+printed three decimals with the label as tie-break, so equal entries do not swap between platforms. About
+1 s. Checked by hand, not in the suite: open-shell NH3Li prints the QTAIM column only, UH6 skips both IBO
+columns (no U in MINAO) and merges the 43 U core NLMOs into one `CR U1 x43` entry.
+
 ## 2026-10-30 — XCW anharmonic ADPs against cctbx (`XcwAdpTests.DebyeWallerFactorsMatchCctbxGramCharlier`)
 
 `tests/xcw_anharmonic/mixed/` is the epoxide (P21/n) with Gram-Charlier loops as `xcw.py` writes them:

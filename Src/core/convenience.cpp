@@ -620,6 +620,9 @@ std::string help_message =
  "  -eli_only                          With -eli_analysis: skip the density critical\n"
  "                                    points and QTAIM basins, ELI-D only. With\n"
  "                                    -eli_basin_cube: only that cube, no basin integration.\n"
+ "  -eli_contributions                 With -eli_analysis: per ELI-D basin, where its electrons\n"
+ "                                    come from: QTAIM atoms (Raub-Jansen), Pipek-Mezey IBOs,\n"
+ "                                    Boys IBOs and NLMOs. Closed shell, .gbw/.molden.\n"
  "  -eli_basin_cube <A> <B>            With -eli_analysis: a cube of ELI-D inside the\n"
  "                                    A-B bond basins (element or label, e.g. Pt Zn),\n"
  "                                    zero outside, at the -eli_analysis resolution.\n"
@@ -2971,6 +2974,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-eli_only")
 		eli_only = true;
+	else if (temp == "-eli_contributions")
+		eli_contributions = true;
 	else if (temp == "-no_spin_eli")
 		spin_eli = false;
 	else if (temp == "-basin_analytic")
