@@ -3547,6 +3547,33 @@ static std::unique_ptr<Gaussian_Molecule> fitted_source(const WFN &wavy, options
 	return fit;
 }
 
+//IBO and NBO labels number atoms from 1; the table uses the 0-based numbers of the QTAIM and ELI-D labels
+static std::string zero_based(const std::string &l) {
+	std::string s;
+	for (size_t i = 0; i < l.size();) {
+		if (!std::isdigit(static_cast<unsigned char>(l[i])) || i == 0 || !std::isalpha(static_cast<unsigned char>(l[i - 1]))) { s += l[i++]; continue; }
+		size_t j = i;
+		while (j < l.size() && std::isdigit(static_cast<unsigned char>(l[j]))) j++;
+		s += std::to_string(std::stoi(l.substr(i, j - i)) - 1);
+		i = j;
+	}
+	return s;
+}
+
+//repeated labels get (1), (2), ... in their order: after the tag of an orbital (LP(1) O0), after an ELI-D LP or bond (O0 LP(1));
+//cores stay one label, the table sums them
+static void number_repeats(svec &lab, const bool orbital) {
+	std::map<std::string, int> n, seen;
+	for (const std::string &l : lab) n[l]++;
+	const auto ends = [](const std::string &l, const std::string &e) { return l.size() >= e.size() && l.compare(l.size() - e.size(), e.size(), e) == 0; };
+	for (std::string &l : lab) {
+		if (n[l] < 2 || (orbital ? l.rfind("CR ", 0) == 0 : !ends(l, " LP") && !ends(l, " bond"))) continue;
+		const std::string k = "(" + std::to_string(++seen[l]) + ")";
+		const size_t sp = l.find(' ');
+		l = orbital && sp != std::string::npos ? l.substr(0, sp) + k + l.substr(sp) : l + k;
+	}
+}
+
 //Kohout's spin-resolved ELI-D (eli_family.h). For an open shell the spin-summed ELI-D is neither spin's pair
 //function; the alpha-alpha, beta-beta and triplet members are, each with its own maxima and basins.
 //Members come from the orbitals (eli_variants_for), never from the stated multiplicity.
@@ -3612,6 +3639,7 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 		if (unify_boundary_basins(r.maxima, l_w, eval, &edge_map) > 0)
 			for (size_t b = 1; b < core_map.size(); b++) core_map[b] = edge_map[core_map[b]];
 		r.labels = assign_labels_to_basins(r.maxima, atoms, opt.debug, 1);
+		number_repeats(r.labels, false);
 		clock.lap(std::string("ELI-D ") + names[f] + " maxima");
 		r.pop = integrate_basins_on_atomic_grids(nullptr, nullptr, all, l_w, opt.accuracy, true, r.vol, r.outside, nullptr, nullptr, opt.basin_grid, nullptr, nullptr, &core_map, &eval, &r.spin, &split);
 		r.done = true;
@@ -3954,12 +3982,12 @@ static vec2 orbital_contributions(const WFN &wavy, const basin_overlaps &ovl, co
 }
 
 //Per ELI-D basin its population, then each column's contributors of at least 0.05 e, largest first, and what
-//the column leaves unlisted; the column sums are the check against the population
+//the column leaves unlisted; the listed ones and the rest add up to the population
 static void print_eli_contributions(const vec &pop, const svec &eli_labels, const std::vector<contrib_column> &cols, std::ostream &out) {
 	constexpr double show = 0.05;
 	constexpr int w = 22;
 	out << "\nELI-D basin contributions (electrons; contributors >= " << show << " e, largest first)\n"
-		<< "  ELI-D and QTAIM labels number the atoms from 0, IBO and NLMO labels from 1, as in their own tables\n";
+		<< "  atoms numbered from 0 in every column, as in the QTAIM and ELI-D tables; (rest) is what a column leaves unlisted\n";
 	for (const contrib_column &col : cols)
 		if (!col.skipped.empty()) out << "  " << col.title << " skipped: " << col.skipped << "\n";
 	out << "  " << std::left << std::setw(30) << "ELI-D basin";
@@ -3997,11 +4025,9 @@ static void print_eli_contributions(const vec &pop, const svec &eli_labels, cons
 				cell.push_back(s.str());
 				listed += v;
 			}
-			std::ostringstream rest, total;
+			std::ostringstream rest;
 			rest << std::left << std::setw(w - 8) << "(rest)" << std::right << std::fixed << std::setprecision(3) << std::setw(8) << sum - listed;
-			total << std::left << std::setw(w - 8) << "(sum)" << std::right << std::fixed << std::setprecision(3) << std::setw(8) << sum;
 			cell.push_back(rest.str());
-			cell.push_back(total.str());
 			rows = std::max(rows, cell.size());
 			cells.push_back(cell);
 		}
@@ -4010,12 +4036,13 @@ static void print_eli_contributions(const vec &pop, const svec &eli_labels, cons
 		for (size_t r = 0; r < rows; r++) {
 			out << "  " << std::left << std::setw(30) << (r == 0 ? head.str() : "");
 			for (const svec &cell : cells) {
-				//the rest and sum rows line up at the bottom of every column
+				//the rest rows line up at the bottom of every column
 				const size_t lead = rows - cell.size();
 				out << " | " << std::setw(w) << (r < lead ? "" : cell[r - lead]);
 			}
 			out << std::right << "\n";
 		}
+		out << "  " << std::string(30 + cells.size() * (3 + w), '-') << "\n";
 	}
 }
 
@@ -4481,6 +4508,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	if (!eli_shell_map.empty())
 		for (size_t b = 1; b < eli_core_map.size(); b++) eli_core_map[b] = eli_shell_map[eli_core_map[b]];
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
+	number_repeats(eli_labels, false);
 	//The orbital columns need one closed-shell determinant and the localisers' preconditions; checked here so a
 	//column is skipped with its reason instead of the run exiting inside ibo.cpp
 	std::string orbital_skip;
@@ -4538,8 +4566,9 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				vec2 coef(nk, vec(wavy.get_nmo(), 0.0));
 				for (int k = 0; k < nk; k++) {
 					for (int i = 0; i < nk; i++) coef[k][ibo.mos[i]] = ibo.U(i, k);
-					col.lab.push_back(ibo_label(ibo, wavy, k));
+					col.lab.push_back(zero_based(ibo_label(ibo, wavy, k)));
 				}
+				number_repeats(col.lab, true);
 				col.c = orbital_contributions(wavy, eli_ovl, coef);
 				T.lap(boys ? "Boys IBO contributions" : "PM IBO contributions");
 			}
@@ -4558,7 +4587,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				std::vector<std::pair<int, std::string>> picked;
 				vec2 coef;
 				nbo_cube_wfn(wavy, r, space, "lewis", true, picked, nbo_log, &coef);
-				for (const auto &p : picked) cols[3].lab.push_back(p.second);
+				for (const auto &p : picked) cols[3].lab.push_back(zero_based(p.second));
+				number_repeats(cols[3].lab, true);
 				cols[3].c = orbital_contributions(wavy, eli_ovl, coef);
 				T.lap("NLMO contributions");
 			}

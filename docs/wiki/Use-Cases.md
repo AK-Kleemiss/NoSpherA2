@@ -209,21 +209,24 @@ Which atoms, bonds, lone pairs and cores fill each ELI-D basin: `-eli_contributi
 | Boys-IBO | Boys-localised IBOs, the same way. |
 | NLMO | Natural localised MOs of the native NBO run, the same way. |
 
-Every column sums to the basin population, so the `(sum)` rows are the check. Contributors of at least
-0.05 e are listed, largest first; the remainder is `(rest)`. For the epoxide, the C-C bond basin (1.775 e)
+Every column sums to the basin population printed beside the basin label. Contributors of at least
+0.05 e are listed, largest first; the remainder is `(rest)`, and a dashed line closes each basin. For the epoxide, the C-C bond basin (1.775 e)
 is 0.898 e from one carbon and 0.851 e from the other, 1.22 e of it from the C-C bond orbital in all three
 orbital columns. Each of the two O lone-pair basins (2.69 e) takes about 0.9 e from each of the two lone
 pairs in PM-IBO and NLMO, but 1.56 e from one lone pair in Boys-IBO: Boys makes two equivalent
 "rabbit-ear" lone pairs, one per basin, while Pipek-Mezey and NBO keep a sigma-type and a pi-type lone pair
 that both spread over both basins.
 
-* ELI-D and QTAIM labels number atoms from 0 (`O0`), IBO and NLMO labels from 1 (`LP O1`), as in their
-  own tables.
+* Every column numbers atoms from 0 (`O0`, `LP O0`), as the QTAIM and ELI-D tables do; the NBO tables
+  themselves keep NBO's numbering from 1.
+* Repeated labels are numbered in order: `LP(1) O0` and `LP(2) O0` for orbitals, `O0 LP(1)` and
+  `C1-C2 bond(2)` for ELI-D basins. Cores and shells stay unnumbered. A basin holding a proton is named
+  as the bond to its nearest bonded atom, `C1-H2 bond`.
 * The orbital columns need a closed-shell wavefunction with occupations 0 or 2. An open shell prints the
   QTAIM column only, and each skipped column says why.
 * The IBO columns need ORCA orbital phases and every element in the MINAO reference basis (it has no U, for example);
   the NLMO column a spherical basis on every atom. `-eli_only` skips the QTAIM column.
-* With ECPs the core electrons are in the ELI-D core populations but in no column's `(sum)`.
+* With ECPs the core electrons are in the ELI-D core populations but in no column's contributors.
 
 ## 11. Intermolecular NCI between two fragments
 

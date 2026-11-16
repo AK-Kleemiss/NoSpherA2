@@ -3664,7 +3664,7 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 				const bool lone_atom = atom_index2 < 0;
 				const double ratio = lone_atom ? 0.0 : std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
 				//Label a bond basin only for a bonded pair that brackets its maximum.
-				bool between = false;
+				bool between = false, bonded = false;
 				err_checkf(atom_index2 >= 0 || atoms.size() == 1, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
 				if (!lone_atom) {
 					const d3 p1 = atoms[atom_index1].get_pos();
@@ -3674,11 +3674,13 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 					const double r1 = (z1 > 0 && z1 < 114) ? constants::covalent_radii[z1] : 1.5;
 					const double r2 = (z2 > 0 && z2 < 114) ? constants::covalent_radii[z2] : 1.5;
 					const double dAB = std::sqrt((p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1]) + (p1[2] - p2[2]) * (p1[2] - p2[2]));
-					between = dAB <= constants::ang2bohr(1.3 * (r1 + r2)) &&
+					bonded = dAB <= constants::ang2bohr(1.3 * (r1 + r2));
+					between = bonded &&
 						(std::sqrt(min_dist1) + std::sqrt(min_dist2)) <= 1.25 * std::max(1e-5, dAB);
 				}
-				if (atoms[atom_index1].get_charge() == 1 && min_dist1 < 0.36) // The basin holding a proton: its maximum sits within 0.6 bohr of the nucleus
-					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1);
+				if (atoms[atom_index1].get_charge() == 1 && min_dist1 < 0.36) // The basin holding a proton: its maximum sits within 0.6 bohr of the nucleus; the bond to its nearest neighbour
+					result[i] = bonded ? atoms[atom_index2].get_label() + to_string(atom_index2) + "-" + atoms[atom_index1].get_label() + to_string(atom_index1) + " bond"
+						: atoms[atom_index1].get_label() + to_string(atom_index1);
 				else if (lone_atom) // lone atom: core inside the core radius, valence shell outside
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < core_dist ? " core" : " LP");
 				else if (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
