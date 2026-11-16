@@ -112,6 +112,9 @@ public:
 	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table.
 	//The atoms' shares come from the grid weights, or from the RI fit when XR.on
 	cvec grid_sfc(const dMatrix2& D);
+	//the per-atom transform of the partition grid_sfc last evaluated at the points k [3][n], [g * n + i]: the rows of
+	//the table a grown model does not integrate
+	cvec grid_sf_at(const vec2& k);
 	//out = Sum_r Re(pre_r dF_r/dD(mu, nu)) over the fit set, the transpose of grid_F: the walk the perturbation and its
 	//response share; nmo x nmo, symmetric, without any prefactor
 	void grid_contract(occ::Mat& out, const cvec& pre);
@@ -150,6 +153,8 @@ public:
 	//to be the transpose of F_calc, whichever partition runs, with the shares the grid holds
 	void check_adjoint();
 	cvec ri_sfc(const dMatrix2& D);
+	//F_P at the points k of the aux functions on atom only (every atom for -1), [atom][j nk + i]
+	void ri_kernels(const vec& kx, const vec& ky, const vec& kz, std::vector<cvec>& F, const int only) const;
 	void ri_contract(const cvec& H, occ::Mat& out);
 
 	//The entries of a rank-N symmetric tensor stored packed in the order i <= j <= k (<= l): the powers of x, y
@@ -181,6 +186,8 @@ public:
 	std::shared_ptr<BasisSet> orbital_basis;
 	// Store the k points
 	vec2 k_pt;
+	// The k points of hkl_tsc, empty while it is hkl_enlarged
+	vec2 k_pt_tsc;
 	// The refined extinction coefficient, or the six Voigt components X11 X22 X33 X12 X13 X23
 	// of the anisotropic tensor. Empty when no model is active, which is what every extinction
 	// branch tests on.
@@ -309,7 +316,7 @@ public:
 	void calc_F_calc(const itsc_block& tsc);
 	// F_calc from wavefunctions, through the tsc table tsc_table computes for them
 	void calc_F_calc(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
-	// The tsc table of the wavefunctions at every entry of hkl_enlarged; grids keeps the integration grids for the next call
+	// The tsc table of the wavefunctions at every entry of hkl_tsc; grids keeps the integration grids for the next call
 	itsc_block tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
 
 	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block
@@ -330,7 +337,7 @@ public:
 	itsc_block result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log, const bool refit_shares);
 	// What result_table keeps between steps: the integration grids of the tsc route and, on the grid route,
 	// the layout of the first table: its scatterers, hkl rows, the asym atom of each scatterer and the
-	// hkl_enlarged entry of each row
+	// hkl_tsc entry of each row
 	GridManager tsc_grids;
 	ScattererLabels tscb_scat_;
 	ivec2 tscb_hkl_;

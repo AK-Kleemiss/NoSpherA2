@@ -94,14 +94,52 @@ struct xcw_fb {
 	ivec proto_of; //[atom]
 	bvec off; //[atom] no weight in F (sym_fact 0): neither transformed nor contracted, its sf column left 0
 	std::vector<std::vector<std::vector<std::pair<int, int>>>> at; //[atom][rule] (point, its place i nsh + slot in W)
-	int ne = 0, no = 0, nn = 0, S = 1; //Y(k^) widths for the largest L, |k| nodes, nodes per entry
+	int L = 0, ne = 0, no = 0, nn = 0, S = 1; //largest L and its Y(k^) widths, |k| nodes, nodes per entry
+	double h = 0; //node step of the Lagrange table
+	vec qn; //|k| of each node without the table
 	ivec n0; //[entry] first node
 	vec wt, Ye, Yo; //[entry] S Lagrange weights, Y(k^) [ne], [no]
+
+	//the entries at the points k: their first node, Lagrange weights and Y(k^); without the table a point takes the node
+	//of its own |k|, which every image of an entry shares with it
+	void place(const vec& kx, const vec& ky, const vec& kz, ivec& n0_, vec& wt_, vec& Ye_, vec& Yo_) const
+	{
+		const int n = static_cast<int>(kx.size());
+		const fb_ylm Y(L);
+		std::vector<std::pair<double, int>> node(qn.size());
+		for (int i = 0; i < static_cast<int>(qn.size()); i++) node[i] = { qn[i], i };
+		std::sort(node.begin(), node.end());
+		n0_.resize(n); wt_.resize(static_cast<size_t>(n) * S);
+		Ye_.resize(static_cast<size_t>(n) * ne); Yo_.resize(static_cast<size_t>(n) * no);
+		for (int c = 0; c < n; c++) {
+			const double q = std::sqrt(kx[c] * kx[c] + ky[c] * ky[c] + kz[c] * kz[c]), iq = q > 0.0 ? 1.0 / q : 0.0;
+			Y.eval(kx[c] * iq, ky[c] * iq, q > 0.0 ? kz[c] * iq : 1.0, Ye_.data() + static_cast<size_t>(c) * ne, Yo_.data() + static_cast<size_t>(c) * no);
+			double* w = wt_.data() + static_cast<size_t>(c) * S;
+			if (S == 1) {
+				const double tol = 1e-9 * std::max(q, 1.0);
+				const auto it = std::lower_bound(node.begin(), node.end(), std::make_pair(q - tol, -1));
+				err_checkf(it != node.end() && it->first <= q + tol, "XCW grid transform: no node at |k| " + std::to_string(q), std::cout);
+				n0_[c] = it->second;
+				w[0] = 1.0;
+				continue;
+			}
+			n0_[c] = std::clamp(static_cast<int>(q / h) - 1, 0, nn - 4);
+			const double u = q / h - n0_[c];
+			w[0] = -(u - 1) * (u - 2) * (u - 3) / 6.0; w[1] = u * (u - 2) * (u - 3) / 2.0;
+			w[2] = -u * (u - 1) * (u - 3) / 2.0; w[3] = u * (u - 1) * (u - 2) / 6.0;
+		}
+	}
 
 	//sf[g nc + c] = f_g(k_c)
 	void forward(const vec2& rho, cvec& sf) const
 	{
-		const int ng = static_cast<int>(proto_of.size()), nc = static_cast<int>(n0.size());
+		sum(radial(rho), n0, wt, Ye, Yo, sf);
+	}
+
+	//T_g,lm(q_n) of every atom
+	vec2 radial(const vec2& rho) const
+	{
+		const int ng = static_cast<int>(proto_of.size());
 		vec2 C(ng), T(ng);
 		std::vector<std::pair<int, int>> tp, tr;
 		for (int g = 0; g < ng; g++) {
@@ -142,16 +180,23 @@ struct xcw_fb {
 					0.0, T[g].data() + o, nl);
 			}
 		}
+		return T;
+	}
+
+	//sf[g nc + c] = f_g(k_c) from radial's T at the entries n0_, wt_, Ye_, Yo_
+	void sum(const vec2& T, const ivec& n0_, const vec& wt_, const vec& Ye_, const vec& Yo_, cvec& sf) const
+	{
+		const int ng = static_cast<int>(proto_of.size()), nc = static_cast<int>(n0_.size());
 #pragma omp parallel for schedule(static)
 		for (int c = 0; c < nc; c++) {
-			const double* ye = Ye.data() + static_cast<size_t>(c) * ne, * yo = Yo.data() + static_cast<size_t>(c) * no, * w = wt.data() + static_cast<size_t>(c) * S;
+			const double* ye = Ye_.data() + static_cast<size_t>(c) * ne, * yo = Yo_.data() + static_cast<size_t>(c) * no, * w = wt_.data() + static_cast<size_t>(c) * S;
 			for (int g = 0; g < ng; g++) {
 				if (off[g]) continue;
 				const proto& P = protos[proto_of[g]];
 				const int nl = P.nl();
 				double re = 0, im = 0;
 				for (int m = 0; m < S; m++) {
-					const double* t = T[g].data() + static_cast<size_t>(n0[c] + m) * nl;
+					const double* t = T[g].data() + static_cast<size_t>(n0_[c] + m) * nl;
 					double se = 0, so = 0;
 					for (int j = 0; j < P.ne; j++) se += ye[j] * t[j];
 					for (int j = 0; j < P.no; j++) so += yo[j] * t[P.ne + j];
@@ -342,21 +387,16 @@ void structure_factors::plan_grid_fb(const sf_shell_layout& layout)
 	const bool table = nq < nc;
 	F.nn = table ? nq : nc;
 	F.S = table ? 4 : 1;
+	F.L = L; F.h = h;
 	F.ne = fb_n_even(L); F.no = fb_n_odd(L);
-	F.n0.resize(nc); F.wt.resize(static_cast<size_t>(nc) * F.S);
-	F.Ye.resize(static_cast<size_t>(nc) * F.ne); F.Yo.resize(static_cast<size_t>(nc) * F.no);
-	const fb_ylm Y(L);
+	if (!table) F.qn = qk;
+	vec kx(nc), ky(nc), kz(nc);
 	for (int c = 0; c < nc; c++) {
 		const int i = XG.inversion_link[c][0];
-		const double q = qk[c], iq = q > 0.0 ? 1.0 / q : 0.0;
-		Y.eval(k_pt[0][i] * iq, k_pt[1][i] * iq, q > 0.0 ? k_pt[2][i] * iq : 1.0, F.Ye.data() + static_cast<size_t>(c) * F.ne, F.Yo.data() + static_cast<size_t>(c) * F.no);
-		double* w = F.wt.data() + static_cast<size_t>(c) * F.S;
-		if (!table) { F.n0[c] = c; w[0] = 1.0; continue; }
-		F.n0[c] = std::clamp(static_cast<int>(q / h) - 1, 0, nq - 4);
-		const double u = q / h - F.n0[c];
-		w[0] = -(u - 1) * (u - 2) * (u - 3) / 6.0; w[1] = u * (u - 2) * (u - 3) / 2.0;
-		w[2] = -u * (u - 1) * (u - 3) / 2.0; w[3] = u * (u - 1) * (u - 2) / 6.0;
+		kx[c] = k_pt[0][i]; ky[c] = k_pt[1][i]; kz[c] = k_pt[2][i];
 	}
+	F.place(kx, ky, kz, F.n0, F.wt, F.Ye, F.Yo);
+	if (!table) for (int c = 0; c < nc; c++) F.n0[c] = c;
 	for (size_t P = 0; P < F.protos.size(); P++) {
 		xcw_fb::proto& Q = F.protos[P];
 		Q.J.assign(static_cast<size_t>(Q.L + 1) * F.nn * Q.ns, 0.0);
@@ -540,26 +580,57 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 	cvec sfc(static_cast<size_t>(ng) * nc);
 	if (XG.fb) XG.fb->forward(rho, sfc);
 	else {
+		vec2 kc(3, vec(nc));
+		for (int c = 0; c < nc; c++)
+			for (int x = 0; x < 3; x++) kc[x][c] = k_pt[x][XG.inversion_link[c][0]];
+		sfc = grid_sf_at(kc);
+	}
+	sc.lap("F transform");
+	return sfc;
+}
+
+cvec structure_factors::grid_sf_at(const vec2& k)
+{
+	const int ng = model_data.ncen, n = static_cast<int>(k[0].size());
+	cvec sf(static_cast<size_t>(ng) * n);
+	if (XR.on) {
+		for (int g = 0; g < ng; g++) {
+			std::vector<cvec> F;
+			ri_kernels(k[0], k[1], k[2], F, g);
+			if (F[g].empty()) continue;
+			const int p0 = XR.atom_start[g], np = XR.atom_start[g + 1] - p0;
+#pragma omp parallel for
+			for (int i = 0; i < n; i++) {
+				cdouble s = 0;
+				for (int j = 0; j < np; j++) s += F[g][static_cast<size_t>(j) * n + i] * XR.c[p0 + j];
+				sf[static_cast<size_t>(g) * n + i] = s;
+			}
+		}
+		return sf;
+	}
+	const vec2& rho = XG.ws ? XG.rho_s : XG.rho_last;
+	if (XG.fb) {
+		ivec n0;
+		vec wt, Ye, Yo;
+		XG.fb->place(k[0], k[1], k[2], n0, wt, Ye, Yo);
+		XG.fb->sum(XG.fb->radial(rho), n0, wt, Ye, Yo, sf);
+		return sf;
+	}
 #pragma omp parallel for schedule(dynamic)
-	for (int c = 0; c < nc; c++) {
-		const int idx = XG.inversion_link[c][0];
-		const double kx = k_pt[0][idx], ky = k_pt[1][idx], kz = k_pt[2][idx];
+	for (int i = 0; i < n; i++)
 		for (int g = 0; g < ng; g++) {
 			if (asym_atoms[g].sym_fact == 0.0) continue;
 			const double* x = XG.d1[g].data(), * y = XG.d2[g].data(), * z = XG.d3[g].data(), * r = rho[g].data();
 			double sr = 0, si = 0;
 			for (size_t p = 0; p < rho[g].size(); p++) {
 				if (r[p] == 0.0) continue;
-				const double ang = kx * x[p] + ky * y[p] + kz * z[p];
+				const double ang = k[0][i] * x[p] + k[1][i] * y[p] + k[2][i] * z[p];
 				sr += r[p] * std::cos(ang);
 				si += r[p] * std::sin(ang);
 			}
-			sfc[static_cast<size_t>(g) * nc + c] = cdouble(sr, si);
+			sf[static_cast<size_t>(g) * n + i] = cdouble(sr, si);
 		}
-	}
-	}
-	sc.lap("F transform");
-	return sfc;
+	return sf;
 }
 
 void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
