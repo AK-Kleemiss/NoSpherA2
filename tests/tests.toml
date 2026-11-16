@@ -1055,6 +1055,13 @@ directory = "epoxide_gbw"
 [laplacian_bonds.args]
 laplacian_bonds = "epoxide.gbw"
 
+# The same along the traced QTAIM bond paths; the log lists BPL and GPL per bond critical point
+[laplacian_bond_paths]
+directory = "epoxide_gbw"
+
+[laplacian_bond_paths.args]
+laplacian_bond_paths = "epoxide.gbw"
+
 # .47 export, checked against our own output; the first 9948 numbers agree with
 # the ORCA-written NBO/reference.47 to 6e-10 (the reference carries extra sections)
 [convert_to_47]

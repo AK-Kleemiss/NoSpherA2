@@ -157,6 +157,7 @@ set_tests_properties(
     TomlIntegrationTests.density_difference
     TomlIntegrationTests.dipole_moments
     TomlIntegrationTests.laplacian_bonds
+    TomlIntegrationTests.laplacian_bond_paths
     TomlIntegrationTests.tscb_to_tsc
     TomlIntegrationTests.merge_tscs
     TomlIntegrationTests.merge_tscs_nocheck

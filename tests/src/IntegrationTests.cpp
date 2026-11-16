@@ -995,6 +995,12 @@ TEST(TomlIntegrationTests, laplacian_bonds)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, laplacian_bond_paths)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "laplacian_bond_paths");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, convert_to_47)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "convert_to_47");
