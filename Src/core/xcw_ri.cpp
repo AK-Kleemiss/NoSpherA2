@@ -111,26 +111,16 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 		XR.atom_start[bf_atom[P] + 1] = P + 1;
 	}
 	for (int g = 0; g < ng; g++) XR.atom_start[g + 1] = std::max(XR.atom_start[g + 1], XR.atom_start[g]);
-	int lmax_aux = 0;
-	for (const auto& sh : aux.shells()) lmax_aux = std::max(lmax_aux, static_cast<int>(sh.l));
-	//k at every cleaned entry, its direction and Y_lm there
-	vec kx(nc), ky(nc), kz(nc), k;
+	//k at every cleaned entry
+	vec kx(nc), ky(nc), kz(nc);
 	for (int c = 0; c < nc; c++) {
 		const int idx = XG.inversion_link[c][0];
 		kx[c] = k_pt[0][idx]; ky[c] = k_pt[1][idx]; kz[c] = k_pt[2][idx];
 	}
-	const occ::Mat3N kd = unit(kx, ky, kz, k);
-	std::vector<occ::Mat> Yk(lmax_aux + 1);
-	for (int l = 0; l <= lmax_aux; l++) Yk[l] = occ_ylm(l, kd);
-	//F_P(k) = i^l Y_lm(k^) Sum_p c_p pi^(3/2) (k/2)^l e^(-k^2/4a) / a^(l+3/2), the transform of c_p r^l e^(-a r^2) Y_lm
-	XR.F.assign(ng, cvec());
+	ri_kernels(kx, ky, kz, XR.F, -1);
 	if (lmax >= 0) XR.R = occ::Mat::Zero(static_cast<size_t>(ng) * XR.n_mom, na);
 	XR.s2.assign(static_cast<size_t>(ng) * XR.n_mom, 0.0);
-	const cdouble il[4] = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
 	for (int g = 0; g < ng; g++) {
-		const int p0 = XR.atom_start[g], np = XR.atom_start[g + 1] - p0;
-		//an atom with sym_fact 0 has no weight in F and no table
-		if (asym_atoms[g].sym_fact != 0.0) XR.F[g].assign(static_cast<size_t>(nc) * np, cdouble(0, 0));
 		const double r_cov = constants::ang2bohr(constants::covalent_radii[asym_atoms[g].type]);
 		for (int l = 0; l <= lmax; l++)
 			for (int m = 0; m <= 2 * l; m++)
@@ -138,24 +128,13 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 	}
 	for (size_t s = 0; s < aux.size(); s++) {
 		const auto& sh = aux[s];
-		const int l = sh.l, P0 = static_cast<int>(aux.first_bf()[s]), g = bf_atom[P0], j0 = P0 - XR.atom_start[g], np = XR.atom_start[g + 1] - XR.atom_start[g];
+		const int l = sh.l, P0 = static_cast<int>(aux.first_bf()[s]), g = bf_atom[P0];
 		double moment = 0.0;
 		for (int p = 0; p < sh.num_primitives(); p++)
 			moment += sh.contraction_coefficients(p, 0) * std::tgamma(l + 1.5) / (2.0 * std::pow(sh.exponents(p), l + 1.5));
-#pragma omp parallel for
-		for (int c = 0; c < (XR.F[g].empty() ? 0 : nc); c++) {
-			double rad = 0.0;
-			for (int p = 0; p < sh.num_primitives(); p++) {
-				const double a = sh.exponents(p);
-				rad += sh.contraction_coefficients(p, 0) * constants::PI3_2 * std::pow(0.5 * k[c], l) * std::exp(-k[c] * k[c] / (4.0 * a)) / std::pow(a, l + 1.5);
-			}
-			for (int m = 0; m <= 2 * l; m++)
-				XR.F[g][static_cast<size_t>(j0 + m) * nc + c] = il[l % 4] * (rad * Yk[l](m, c));
-		}
 		if (l <= lmax)
 			for (int m = 0; m <= 2 * l; m++)
 				XR.R(static_cast<size_t>(g) * XR.n_mom + static_cast<size_t>(l) * l + m, P0 + m) = moment;
-		(void)np;
 	}
 	//the grid partition's moments about each nucleus, r^l Y_lm at the points of the atom's grid, and per l the map from
 	//constants::spherical_harmonic's real harmonics to occ's, fitted on 64 directions
@@ -209,6 +188,40 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 	const char* names[] = { "TFVC", "Hirshfeld", "MBIS", "EMBIS", "Nuclear", "Mulliken", "Sanderson" };
 	std::cout << "XCW partition: RI fit, " << na << " auxiliary functions, (mu nu|P) " << ((XR.B.size() * sizeof(double)) >> 20) << " MB"
 		<< (lmax >= 0 ? ", moments restrained to " + std::string(names[static_cast<int>(scheme)]) + "'s through l = " + std::to_string(lmax) : std::string()) << std::endl;
+}
+
+//F_P(k) = i^l Y_lm(k^) Sum_p c_p pi^(3/2) (k/2)^l e^(-k^2/4a) / a^(l+3/2), the transform of c_p r^l e^(-a r^2) Y_lm
+void structure_factors::ri_kernels(const vec& kx, const vec& ky, const vec& kz, std::vector<cvec>& F, const int only) const
+{
+	const occ::qm::AOBasis& aux = XR.aux;
+	const ivec& bf_atom = aux.bf_to_atom();
+	const int ng = model_data.ncen, nk = static_cast<int>(kx.size());
+	int lmax_aux = 0;
+	for (const auto& sh : aux.shells()) lmax_aux = std::max(lmax_aux, static_cast<int>(sh.l));
+	vec k;
+	const occ::Mat3N kd = unit(kx, ky, kz, k);
+	std::vector<occ::Mat> Yk(lmax_aux + 1);
+	for (int l = 0; l <= lmax_aux; l++) Yk[l] = occ_ylm(l, kd);
+	F.assign(ng, cvec());
+	//an atom with sym_fact 0 has no weight in F and no table
+	for (int g = 0; g < ng; g++)
+		if ((only < 0 || g == only) && asym_atoms[g].sym_fact != 0.0) F[g].assign(static_cast<size_t>(nk) * (XR.atom_start[g + 1] - XR.atom_start[g]), cdouble(0, 0));
+	const cdouble il[4] = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
+	for (size_t s = 0; s < aux.size(); s++) {
+		const auto& sh = aux[s];
+		const int l = sh.l, P0 = static_cast<int>(aux.first_bf()[s]), g = bf_atom[P0], j0 = P0 - XR.atom_start[g];
+		if (F[g].empty()) continue;
+#pragma omp parallel for
+		for (int c = 0; c < nk; c++) {
+			double rad = 0.0;
+			for (int p = 0; p < sh.num_primitives(); p++) {
+				const double a = sh.exponents(p);
+				rad += sh.contraction_coefficients(p, 0) * constants::PI3_2 * std::pow(0.5 * k[c], l) * std::exp(-k[c] * k[c] / (4.0 * a)) / std::pow(a, l + 1.5);
+			}
+			for (int m = 0; m <= 2 * l; m++)
+				F[g][static_cast<size_t>(j0 + m) * nk + c] = il[l % 4] * (rad * Yk[l](m, c));
+		}
+	}
 }
 
 cvec structure_factors::ri_sfc(const dMatrix2& D)

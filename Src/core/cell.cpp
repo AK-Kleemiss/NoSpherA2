@@ -599,9 +599,9 @@ ivec cell::choose_kept_operations(const std::vector<asym_atom>& asym_atoms, cons
 	return {};
 }
 
-// Deletes every operation not in kept; applied_symmetry returns the deleted operations. hkl_enlarged keeps the images under every
-// CIF operation, since the table Olex2 refines from needs f at h.R for all of them
-void cell::keep_operations(const ivec& kept, ivec& applied_symmetry) {
+// Deletes every operation not in kept and enlarges hkl by the kept rotations, the entries the grid integrates; applied_symmetry
+// returns the deleted operations
+void cell::keep_operations(const ivec& kept, ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
 	const int num_sym_ops = static_cast<int>(sym[0][0].size());
 	applied_symmetry.clear();
 	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++)
@@ -618,6 +618,34 @@ void cell::keep_operations(const ivec& kept, ivec& applied_symmetry) {
 			inner.erase(inner.begin() + sym_op);
 		}
 	}
+
+	vec3 rotations;
+	for (int sym_op = 0; sym_op < sym[0][0].size(); ++sym_op) {
+		rotations.push_back({ {
+				static_cast<double>(sym[0][0][sym_op]),
+				static_cast<double>(sym[0][1][sym_op]),
+				static_cast<double>(sym[0][2][sym_op])},{
+				static_cast<double>(sym[1][0][sym_op]),
+				static_cast<double>(sym[1][1][sym_op]),
+				static_cast<double>(sym[1][2][sym_op])},{
+				static_cast<double>(sym[2][0][sym_op]),
+				static_cast<double>(sym[2][1][sym_op]),
+				static_cast<double>(sym[2][2][sym_op])} });
+	}
+
+	const int nr = hkl.size();
+	std::vector<i3> hkl_vec(hkl.begin(), hkl.end());
+	hkl_list new_enlarged;
+	for (const auto& h : hkl) {
+		vec hkl_temp = { static_cast<double>(h[0]), static_cast<double>(h[1]), static_cast<double>(h[2]) };
+		for (const vec2& rot : rotations) {
+			vec new_hkl = self_dot(rot, hkl_temp, false);
+			i3 new_hkl_int = { (int)std::round(new_hkl[0]), (int)std::round(new_hkl[1]), (int)std::round(new_hkl[2]) };
+			new_enlarged.insert(new_hkl_int);
+		}
+	}
+	hkl_enlarged = new_enlarged;
+	//closing function
 }
 
 void cell::grow_ADPs(std::vector<asym_atom>& asym_atoms, vec3& ADPs) {
@@ -846,11 +874,11 @@ ivec2 cell::generate_asym_lookup(const hkl_list& hkl, const hkl_list& hkl_enlarg
 	return lookup;
 }
 
-ivec cell::apply_grown(std::vector<asym_atom>& asym_atoms) {
+ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms) {
 	// Check which symmetry operations are fully applied to the asymmetric unit, ONLY those can be deleted
 	ivec applied_symmetry = confirm_applied_symmetry(asym_atoms);
 	const int operations_before_deletion = static_cast<int>(sym[0][0].size());
-	keep_operations(choose_kept_operations(asym_atoms, applied_symmetry), applied_symmetry);
+	keep_operations(choose_kept_operations(asym_atoms, applied_symmetry), applied_symmetry, hkl_enlarged, hkl);
 	set_sym_fact_from_position_counts(asym_atoms, operations_before_deletion);
 	return applied_symmetry;
 	// closing function

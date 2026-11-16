@@ -19,6 +19,7 @@
 #include <limits>
 #include <map>
 #include <random>
+#include <set>
 
 //tshb_block (Src/core/tshb_block.h): the per-scatterer densities a .tshb carries, keyed and merged as tsc_block keys and
 //merges rows, and the joint file of a -mtc run against the table the same run makes without -tshb
@@ -703,6 +704,69 @@ TEST(XcwPartitionTests, RiTshbIsTheRiTable)
 	EXPECT_LT(own, 1e-10);
 	EXPECT_GT(worst({ "-tune", "NOSPHERA2_XCW_TSHB_FIT" }), 1e-12);
 	EXPECT_GT(worst({ "-tune", "NOSPHERA2_XCW_TSCB_BY_F" }), 1e-3);
+}
+
+//A grown NH3 in P212121 integrates the images under its two kept operations only, but each step's table holds f at h.R for all
+//four CIF operations, as Olex2 refines from them: the RI partition's f there is its .tshb's, the grid's the tsc route's to what
+//the first step's layout check measures, 1.6e-5 on the Fourier-Bessel grid and 1.1e-3 by the direct sum, which is 6.3e-4 off
+//the tsc route on the ungrown model too
+TEST(XcwPartitionTests, GrownTablesCoverEveryCifOperation)
+{
+	const std::string dir = fs::absolute(fixture("xcw_matrix")).string() + "/", cif = dir + "nh3.cif", hkl = dir + "nh3.hkl";
+	app_dir run("xcw_grown_table");
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf grown start 0 step_size 0.01 end 0.01";
+	const cell uc(cif, std::cout, false);
+	std::vector<i3> measured;
+	std::ifstream in(hkl);
+	for (std::string line; std::getline(in, line) && line.size() >= 12;) {
+		const i3 h{ std::stoi(line.substr(0, 4)), std::stoi(line.substr(4, 4)), std::stoi(line.substr(8, 4)) };
+		if (h == i3{ 0, 0, 0 }) break;
+		measured.push_back(h);
+	}
+	ASSERT_GT(measured.size(), 10u);
+	auto tables = [&](std::vector<std::string> extra) {
+		std::vector<std::string> a{ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-xyz", dir + "nh3_grown.xyz", "-XCW_settings", "settings.txt", "-no_date" };
+		a.insert(a.end(), extra.begin(), extra.end());
+		std::stringstream out;
+		std::streambuf* old = std::cout.rdbuf(out.rdbuf());
+		const int rc = run.run(a);
+		std::cout.rdbuf(old);
+		EXPECT_EQ(rc, 0);
+		std::stringstream scf;
+		scf << std::ifstream(run.dir / "SCF.log").rdbuf();
+		const std::string log = out.str() + scf.str();
+		EXPECT_NE(log.find("Operations F_calc sums over (2)"), std::string::npos);
+		for (const std::string step : { "NA2_0000000", "NA2_0010000" }) {
+			const itsc_block t(run.dir / (step + ".tscb"));
+			std::set<i3> rows;
+			for (size_t r = 0; r < t.reflection_size(); r++) rows.insert({ (int)t.get_index(0, r), (int)t.get_index(1, r), (int)t.get_index(2, r) });
+			int missing = 0;
+			for (const i3& h : measured)
+				for (int s = 0; s < static_cast<int>(uc.get_num_syms()); s++) {
+					i3 g{ 0, 0, 0 };
+					for (int j = 0; j < 3; j++)
+						for (int k = 0; k < 3; k++) g[j] += h[k] * static_cast<int>(uc.get_sym(j, k, s));
+					missing += rows.count(g) == 0;
+				}
+			EXPECT_EQ(missing, 0) << step << ".tscb";
+		}
+		return log;
+	};
+	for (const bool direct : { false, true }) {
+		const std::string log = tables(direct ? std::vector<std::string>{ "-tune", "NOSPHERA2_XCW_GRID_DIRECT" } : std::vector<std::string>{});
+		const std::string key = "XCW grid tscb: max |f_grid - f_tsc| / max |f| ";
+		const size_t at = log.find(key);
+		ASSERT_NE(at, std::string::npos) << log;
+		EXPECT_LT(std::stod(log.substr(at + key.size())), direct ? 5e-3 : 1e-4) << log.substr(at, 120);
+		EXPECT_NE(log.find("later steps write the tscb from the grid"), std::string::npos);
+	}
+	tables({ "-xcw_partition", "ri", "-tshb", "-tune", "NOSPHERA2_XCW_TSHB_TABLE" });
+	for (const std::string step : { "NA2_0000000", "NA2_0010000" }) {
+		double f_max = 0.0;
+		const double d = compare_with_table(tshb_block::read(run.dir / (step + ".tshb")), itsc_block(run.dir / (step + ".tscb")), uc, f_max);
+		EXPECT_GT(f_max, 0.0);
+		EXPECT_LT(d / f_max, 1e-10) << step;
+	}
 }
 
 //XCW's RI partition (-xcw_partition ri, AutoAux): the perturbation is the exact transpose of F_calc (NOSPHERA2_XCW_ADJOINT_CHECK,
