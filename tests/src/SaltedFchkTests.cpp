@@ -11,6 +11,7 @@
 #include "core/cube.h"
 #include "core/npy.h"
 #include "core/nos_math.h"
+#include "core/NoSpherA2.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
@@ -1755,6 +1756,179 @@ TEST(SaltedFchkPredictorTests, BasisNotFittingWeightsExits)
 	}
 	EXPECT_EXIT(fold_salted_file(extra, tmp_path("extra_weight_folded.salted")), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	std::filesystem::remove(extra);
+}
+
+// the input's cores (-ECP, -mtc_ECP, an ECP gbw) belong to its basis: an all-electron model declares none, a model
+// with an ECP block its own mode's table and nothing of the input's, a merged folder the cores of the models it uses
+TEST(SaltedFchkPredictorTests, OnlyTheModelDeclaresACore)
+{
+	const auto root = nos_test_repo_root() / "tests" / "SALTED";
+	const auto model = root / "Model" / "model.salted", dir = tmp_path("ecp_core");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	write_salted_ecp(model, dir / "def2.salted", 1);
+	write_salted_ecp(model, dir / "xtb.salted", 2);
+	WFN plain(root / "test_cysteine.xyz", false);
+	WFN flagged = plain;
+	flagged.set_has_ECPs(true, true, 2);
+	auto cores = [](const WFN& w, const pathvec& models) {
+		options opt;
+		opt.salted_model_dir = models[0];
+		if (models.size() > 1) opt.salted_model_dirs = models;
+		SALTEDPredictor SP(w, opt);
+		ivec c(SP.wavy.get_ncen());
+		for (int a = 0; a < SP.wavy.get_ncen(); a++) c[a] = SP.wavy.get_atom_ECP_electrons(a);
+		return std::make_pair(SP.wavy.get_has_ECPs() ? SP.wavy.get_ECP_mode() : 0, c);
+	};
+	const ivec none(plain.get_ncen(), 0);
+	ivec xtb(plain.get_ncen());
+	for (int a = 0; a < plain.get_ncen(); a++) xtb[a] = constants::ECP_core_electrons(constants::ECP_electrons_xTB, plain.get_atom_charge(a));
+	ASSERT_EQ(vec_sum(xtb), 22);
+	EXPECT_EQ(cores(flagged, { model }), std::make_pair(0, none));
+	EXPECT_EQ(cores(flagged, { dir / "def2.salted" }), std::make_pair(1, none));
+	EXPECT_EQ(cores(plain, { dir / "xtb.salted" }), std::make_pair(2, xtb));
+	EXPECT_EQ(cores(flagged, { model, dir / "def2.salted" }), std::make_pair(0, none));
+	EXPECT_EQ(cores(plain, { dir / "xtb.salted", model }), std::make_pair(2, xtb));
+	std::filesystem::remove_all(dir);
+}
+
+namespace
+{
+	// run_app() in a directory of its own, so these runs share no log with the toml cases
+	std::filesystem::path run_salted_cli(const std::string& name, svec args)
+	{
+		const auto dir = tmp_path(name), previous = std::filesystem::current_path();
+		std::filesystem::remove_all(dir);
+		std::filesystem::create_directories(dir);
+		std::filesystem::current_path(dir);
+		for (const char* d : { "-all_charges", "-no_date", "-no_gpu_grid", "-no_gpu_salted" }) args.push_back(d);
+		args.insert(args.begin(), "NoSpherA2");
+		std::vector<char*> argv;
+		for (std::string& a : args) argv.push_back(a.data());
+		EXPECT_EQ(run_app(static_cast<int>(argv.size()), argv.data()), 0) << name;
+		std::filesystem::current_path(previous);
+		return dir;
+	}
+
+	// the numbers of a log's charge tables and electron totals
+	vec charge_numbers(const std::filesystem::path& log)
+	{
+		std::ifstream f(log);
+		vec v;
+		bool in = false;
+		for (std::string l; std::getline(f, l);)
+		{
+			if (l.rfind("Table of Charges", 0) == 0) in = true;
+			if (!in) continue;
+			std::istringstream s(l);
+			for (std::string t; s >> t;)
+				if (std::isdigit(static_cast<unsigned char>(t.back())) && (std::isdigit(static_cast<unsigned char>(t[0])) || t[0] == '-'))
+					v.push_back(std::stod(t));
+			if (l.rfind("Total number of analytical Electrons", 0) == 0) in = false;
+		}
+		return v;
+	}
+
+	void expect_charges_of(const std::filesystem::path& good, const std::filesystem::path& log)
+	{
+		const vec g = charge_numbers(good), r = charge_numbers(log);
+		ASSERT_FALSE(g.empty());
+		ASSERT_EQ(g.size(), r.size()) << log;
+		for (size_t i = 0; i < g.size(); i++) EXPECT_NEAR(r[i], g[i], 0.01) << log << " number " << i;
+	}
+
+	// a text .tsc's rows: h, k, l and the real and imaginary part of every scatterer
+	vec2 tsc_rows(const std::filesystem::path& p)
+	{
+		std::ifstream f(p);
+		vec2 rows;
+		bool data = false;
+		for (std::string l; std::getline(f, l);)
+		{
+			if (data)
+			{
+				std::replace(l.begin(), l.end(), ',', ' ');
+				std::istringstream s(l);
+				rows.emplace_back();
+				for (double x; s >> x;) rows.back().push_back(x);
+			}
+			data = data || l.rfind("DATA:", 0) == 0;
+		}
+		return rows;
+	}
+}
+
+// the toml cases SALTED_ECP2 and SALTED_ECP1: the all-electron model with -ECP gives the golden and the table of the
+// run without it; the same model flagged as xTB valence adds the 22 core electrons of cysteine
+TEST(SaltedFchkCliTests, EcpFlagAddsNoCoreToAnAllElectronModel)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests" / "SALTED";
+	const svec base = { "-SALTED", (root / "Model").string(), "-cif", (root / "test_cysteine.cif").string(),
+		"-wfn", (root / "test_cysteine.xyz").string(), "-dmin", "0.73", "-old_tsc" };
+	auto with = [&base](const svec& extra) { svec a = base; a.insert(a.end(), extra.begin(), extra.end()); return a; };
+	const auto none = run_salted_cli("cli_none", base), ecp2 = run_salted_cli("cli_ecp2", with({ "-ECP", "2" })),
+		ecp1 = run_salted_cli("cli_ecp1", with({ "-ECP", "1" }));
+	const auto xtb_model = tmp_path("cli_xtb_model");
+	std::filesystem::remove_all(xtb_model);
+	std::filesystem::create_directories(xtb_model);
+	write_salted_ecp(root / "Model" / "model.salted", xtb_model / "model.salted", 2);
+	svec xa = base;
+	xa[1] = xtb_model.string();
+	const auto xtb = run_salted_cli("cli_xtb", xa);
+	const vec2 t0 = tsc_rows(none / "experimental.tsc"), tx = tsc_rows(xtb / "experimental.tsc");
+	ASSERT_FALSE(t0.empty());
+	for (const auto& d : { ecp2, ecp1 })
+	{
+		expect_charges_of(root / "SALTED.good", d / "NoSpherA2.log");
+		const vec2 t = tsc_rows(d / "experimental.tsc");
+		ASSERT_EQ(t.size(), t0.size()) << d;
+		for (size_t r = 0; r < t.size(); r++)
+		{
+			ASSERT_EQ(t[r].size(), t0[r].size()) << d;
+			for (size_t i = 0; i < t[r].size(); i++) EXPECT_NEAR(t[r][i], t0[r][i], 1e-8 * (1.0 + std::abs(t0[r][i]))) << d << " row " << r;
+		}
+	}
+	const vec c0 = charge_numbers(none / "NoSpherA2.log"), cx = charge_numbers(xtb / "NoSpherA2.log");
+	ASSERT_EQ(c0.size(), cx.size());
+	EXPECT_NEAR(cx.back() - c0.back(), 22.0, 1e-3);
+	// at the lowest reflection the core adds to the real part of every scatterer, nearly its electron count
+	ASSERT_EQ(tx.size(), t0.size());
+	auto hsum = [&t0](const size_t r) { return std::abs(t0[r][0]) + std::abs(t0[r][1]) + std::abs(t0[r][2]); };
+	size_t low = 0;
+	for (size_t r = 0; r < t0.size(); r++)
+		if (hsum(r) < hsum(low)) low = r;
+	double core = 0.0;
+	for (size_t i = 3; i + 1 < t0[low].size(); i += 2)
+	{
+		EXPECT_GT(tx[low][i] - t0[low][i], -1e-8) << "scatterer " << (i - 3) / 2;
+		EXPECT_NEAR(tx[low][i + 1], t0[low][i + 1], 1e-8);
+		core += tx[low][i] - t0[low][i];
+	}
+	EXPECT_GT(core, 0.95 * 22.0);
+	EXPECT_LT(core, 22.0 + 1e-6);
+	for (const auto& d : { none, ecp2, ecp1, xtb, xtb_model }) std::filesystem::remove_all(d);
+}
+
+// the toml case SALTED_disorder_tshb_ECP2: -mtc_ECP 2 2 with the all-electron model gives the golden of -mtc_ECP 0 0
+// and the same .tshb
+TEST(SaltedFchkCliTests, MtcEcpAddsNoCoreToAnAllElectronModel)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto args = [&root](const std::string& ecp) {
+		return svec{ "-SALTED", (root / "SALTED" / "Model").string(), "-cif", (root / "Hybrid" / "ZP2.cif").string(),
+			"-dmin", "0.9", "-tshb", "-mtc", (root / "Hybrid" / "ZP2_part1.gbw").string(), "0.1",
+			(root / "Hybrid" / "ZP2_part2.gbw").string(), "0.2", "-mtc_mult", "1", "1", "-mtc_charge", "0", "0",
+			"-mtc_ECP", ecp, ecp };
+	};
+	const auto zero = run_salted_cli("cli_mtc0", args("0")), two = run_salted_cli("cli_mtc2", args("2"));
+	expect_charges_of(root / "Hybrid" / "SALTED_disorder_tshb.good", two / "NoSpherA2.log");
+	auto bytes = [](const std::filesystem::path& p) { std::stringstream s; s << std::ifstream(p, std::ios::binary).rdbuf(); return s.str(); };
+	const std::string a = bytes(zero / "experimental.tshb");
+	EXPECT_FALSE(a.empty());
+	EXPECT_TRUE(a == bytes(two / "experimental.tshb"));
+	for (const auto& d : { zero, two }) std::filesystem::remove_all(d);
 }
 
 // ------------------------------------------------------------------ fchk

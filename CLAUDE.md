@@ -239,6 +239,34 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-16 (pTB cores), a pTB file (`.xtb`, `.stda`) declares its cores in mode 3 without `-ECP 3`;
+`WfnCoverageIoTests.PtbDeclaresItsCoresInModeThree` and `TomlIntegrationTests.SucrosePtbNoEcp` are new. `ctest` on a CUDA
+`release-windows-tests` build (GPU present) reports **1414 passed, 0 failed, 12 skipped** (2 disabled) of 1428. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (`-coef` with `-ECP`), the table of a coefficient file adds the `-ECP` core as its charge table and `.tshb`
+do, in the same mode; `EcpCoreTests.CoefficientFileTakesTheEcpCoreEverywhere` is new. `ctest` on a CUDA `release-windows-tests`
+build (GPU present) reports **1412 passed, 0 failed, 12 skipped** (2 disabled) of 1426. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (ECP fixes combined: the table core, the HgI2 fixture and the SALTED cores on `fix-ecp-auto-detected-core`),
+`ctest --preset release-windows` on a CPU-only build reports **1411 passed, 0 failed, 12 skipped** (2 disabled) of 1425.
+See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (SALTED ECP cores, branch `fix-salted-ecp-double-core`), the SALTED predictor takes no ECP core from its input:
+an all-electron model run with `-ECP`, `-mtc_ECP` or an ECP gbw adds none, a model with an ECP block only its own table's;
+`SaltedFchkPredictorTests.OnlyTheModelDeclaresACore` and two `SaltedFchkCliTests` are new. `ctest` on a CUDA `release-windows-tests`
+build (GPU present) reports **1404 passed, 0 failed, 12 skipped** (2 disabled) of 1418. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (ECP fixture HgI2), `tests/ECP_HgI2` (2.4 MB, 230 kB compressed) pins the def2 core for a 60- and a
+28-electron ECP four ways (`TomlIntegrationTests.HgI2Ecp*`, incl. a one-part `-mtc`) and against an all-electron X2C
+wavefunction (`EcpCoreTests.Def2CoreMatchesAllElectronX2c`). `ctest --preset release-windows` on a CPU-only build reports
+**1408 passed, 0 failed, 12 skipped** (2 disabled) of 1422. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (ECP table core), the table core of an ECP the reader detected without `-ECP` is the wavefunction's mode
+(def2 Thakkar), not the option's default mode 0; `TomlIntegrationTests.EcpAutoCore` and
+`EcpCoreTests.StreamedRiTableTakesTheReadersEcpMode` are new. `ctest --preset release-windows` on a CPU-only build reports
+**1403 passed, 0 failed, 12 skipped** (2 disabled) of 1417. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-13 (symmetric-site normalisation, branch `salted-relpower-norm`), the sparse equicomb zeroes lambda
 features that vanish by site symmetry, the empty-environment warning is taken from the density, and a model whose NORM
 block says `rel_power` (VERSION 7) divides every lambda > 0 block by the atom's lambda = 0 length;

@@ -290,13 +290,13 @@ static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const
 			for (int l = 0; l <= lmax1; ++l)
 			{
 				tr1[l] = 0.0;
-				for (int a = 0; a <= 2 * l; ++a) tr1[l] += m1[dm_offset(l) + a * (2 * l + 1) + a];
+				for (int a = 0; a <= 2 * l; ++a) tr1[l] += m1[dm_offset(l) + (size_t)a * (2 * l + 1) + a];
 				tot1 += tr1[l];
 			}
 			for (int l = 0; l <= lmax2; ++l)
 			{
 				tr2[l] = 0.0;
-				for (int a = 0; a <= 2 * l; ++a) tr2[l] += M2[dm_offset(l) + a * (2 * l + 1) + a];
+				for (int a = 0; a <= 2 * l; ++a) tr2[l] += M2[dm_offset(l) + (size_t)a * (2 * l + 1) + a];
 				tot2 += tr2[l];
 			}
 			for (size_t k = 0; k < nplans; ++k)
