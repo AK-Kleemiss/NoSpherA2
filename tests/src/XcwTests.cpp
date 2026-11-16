@@ -1033,6 +1033,19 @@ namespace
 		EXPECT_DOUBLE_EQ(v.RMSP_diff, 7e-6);
 	}
 
+	// the SCF ladder: every method on and eight DIIS vectors by default, `DIIS_size` and the three switches
+	TEST(XcwSettingsTests, DiisSizeAndMethodSwitches)
+	{
+		const options::XCW_settings d = parsed("basis_set sto-3g");
+		EXPECT_EQ(d.diis_size, 8);
+		EXPECT_TRUE(d.use_diis && d.use_soscf && d.use_trah);
+		const options::XCW_settings s = parsed("basis_set sto-3g DIIS_size 5 nodiis NoSOSCF notrah soscf");
+		EXPECT_EQ(s.diis_size, 5);
+		EXPECT_FALSE(s.use_diis || s.use_soscf || s.use_trah);
+		EXPECT_EQ(parse_error("basis_set sto-3g DIIS_size 0"), "Expected a positive integer after 'DIIS_size'");
+		EXPECT_EQ(parse_error("basis_set sto-3g diis_size x"), "Expected a positive integer after 'DIIS_size'");
+	}
+
 	// the switches and the keywords that carry a path, a model or a number
 	TEST(XcwSettingsTests, SwitchesPathsAndModels)
 	{

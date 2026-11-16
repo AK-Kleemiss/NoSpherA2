@@ -297,6 +297,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-16 (SCF ladder), XCW's SCF runs Roothaan < DIIS < SOSCF < TRAH with `nodiis`/`nososcf`/`notrah` and `DIIS_size`,
+SOSCF and TRAH start from semicanonical natural orbitals of the best density, and the TRAH Hessian product carries the exact extinction
+response; `XcwSettingsTests.DiisSizeAndMethodSwitches` and `XcwScfTests.MethodSwitchesReachTheSameSteps` are new. `ctest --preset
+release-windows -j 8` on a CPU-only build reports **1400 passed, 0 failed, 23 skipped** (2 disabled) of 1427. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (grown XCW, two hkl lists), a grown XCW model integrates only the images under its kept operations again
 (`hkl_enlarged`) while its tables hold every CIF operation's (`hkl_tsc`, later steps through `structure_factors::grid_sf_at`);
 `XcwPartitionTests.GrownTablesCoverEveryCifOperation` is new. `ctest --preset release-windows-tests -j 6` on a CPU-only build

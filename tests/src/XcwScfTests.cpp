@@ -766,20 +766,49 @@ TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
 	std::filesystem::remove_all(dir);
 }
 
+//The ladder Roothaan < DIIS < SOSCF < TRAH: by default the cold lambda 0 hands DIIS's orbitals to SOSCF and the warm
+//step goes to TRAH; `notrah` takes the warm step with SOSCF, `nososcf` the cold one from DIIS to TRAH, and with
+//`notrah nososcf` DIIS (Roothaan under `nodiis`) finishes both. Every route reaches the same two steps
+TEST(XcwScfTests, MethodSwitchesReachTheSameSteps)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const std::string scan = "f rhf start 0 step_size 0.01 end 0.01";
+	std::vector<lambda_row> ref;
+	for (const std::string sw : { "", " notrah", " nososcf", " notrah nososcf", " nodiis", " DIIS_size 4" }) {
+		const auto dir = scratch_dir();
+		const p1_run run = run_on_p1(dir, common + scan + sw + read_shared_eri(dir));
+		const auto rows = lambda_rows(run.out);
+		ASSERT_EQ(rows.size(), 2u) << sw << run.out;
+		EXPECT_EQ(occurrences(run.log, "***SCF converged in "), 2u) << sw;
+		const bool soscf = run.log.find("SOSCF: |g|") != std::string::npos, trah = run.log.find("TRAH: ") != std::string::npos;
+		EXPECT_EQ(soscf, sw.find("nososcf") == std::string::npos) << sw;
+		EXPECT_EQ(trah, sw.find("notrah") == std::string::npos) << sw;
+		if (ref.empty()) ref = rows;
+		for (size_t i = 0; i < 2; i++)
+			EXPECT_NEAR(rows[i].d(rows[i].quant), ref[i].d(ref[i].quant), 2e-6) << sw << " lambda " << rows[i].lambda;
+		std::filesystem::remove_all(dir);
+	}
+}
+
 //The exact Hessian-vector product behind the second-order steps (Fock response plus the
 //response of the perturbation with the scale moving) against a central finite difference of
 //the gradient, at a lambda where the perturbation is on, for both spin treatments; the
-//grid in double so the difference quotient is not limited by fp32 noise in the gradient
+//grid in double so the difference quotient is not limited by fp32 noise in the gradient.
+//With extinction the shape y(t) moves with |Fc| and the refined coefficients with the scale:
+//a strong fixed coefficient is exact to the difference quotient (the frozen shape gave 3e-4),
+//refined ones to how stationary eval_scale leaves them (frozen: 9e-5)
 TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
-	for (const std::string kind : { "f rhf", "f2 uhf" }) {
+	const std::pair<std::string, double> kinds[] = { { "f rhf", 1e-4 }, { "f2 uhf", 1e-4 },
+		{ "f rhf extinction bc_lorentzian fixed 0.05", 1e-8 }, { "f2 uhf extinction bc_gaussian 0.01", 1e-5 } };
+	for (const auto& [kind, tol] : kinds) {
 		const auto dir = scratch_dir();
 		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double check_hessian" + read_shared_eri(dir));
 		const size_t at = run.log.find("Hessian check: |Hv - FD| / |FD| = ");
 		ASSERT_NE(at, std::string::npos) << run.log;
 		const double rel = std::stod(run.log.substr(at + std::string("Hessian check: |Hv - FD| / |FD| = ").size()));
-		EXPECT_LT(rel, 1e-4) << kind << ": " << run.log.substr(at, 160);
+		EXPECT_LT(rel, tol) << kind << ": " << run.log.substr(at, 160);
 		std::cout << kind << ": " << run.log.substr(at, 130) << std::endl;
 		std::filesystem::remove_all(dir);
 	}

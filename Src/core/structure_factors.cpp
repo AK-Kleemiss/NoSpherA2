@@ -250,6 +250,8 @@ void structure_factors::setup_extinction(const std::filesystem::path& cif) {
 	ext_g_.assign(model_data.nr, 1.0);
 	ext_m_.assign(model_data.nr, 1.0);
 	ext_dyc_.assign(model_data.nr, 0.0);
+	ext_dy_.assign(model_data.nr, 0.0);
+	ext_d2y_.assign(model_data.nr, 0.0);
 	std::ostringstream banner;
 	banner << "XCW extinction: " << extinction::name(extinction_settings.extinction_model)
 		<< (extinction_settings.aniso ? ", anisotropic (azimuth-averaged, 6 parameters)" : ", isotropic (1 parameter)")
@@ -477,8 +479,10 @@ void structure_factors::update_extinction() {
 	for (int r = 0; r < model_data.nr; r++) {
 		const double u = std::norm(scatter_data.F_calc[r]);
 		const double t = ext_c_[r] * ext_x(r) * u;
-		double dydt = 0.0;
-		const double y = extinction::correction(m, ext_cos2t_[r], t, &dydt);
+		double dydt = 0.0, d2ydt2 = 0.0;
+		const double y = extinction::correction(m, ext_cos2t_[r], t, &dydt, &d2ydt2);
+		ext_dy_[r] = dydt;
+		ext_d2y_[r] = d2ydt2;
 		ext_y_[r] = y;
 		ext_sqrt_y_[r] = std::sqrt(y);
 		//I = y u, so dI/du = y + t dy/dt, and the amplitude's slope is that over sqrt(y)
@@ -1561,62 +1565,99 @@ occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const 
 	const cvec dFr = scatter_data.F_calc;
 	scatter_data.F_calc = F0;
 	scatter_data.anom_correction = fixed;
-	//the scale's response from the weighted least-squares scale of eval_scale
+	//Residual e(z, theta) of reflection r, z = |Fc|^2 (F^2) or |Fc| (F), theta = (s = k^2 or k, the refined extinction
+	//coefficients), which eval_scale holds stationary, so dtheta = -M^-1 b from their stationarity. The extinction shape
+	//moves with z and theta: y(t), t = c x(P) |Fc|^2
 	const bool against_F2 = opt->xcw_settings.refine_against == 2, weighted = opt->xcw_settings.XWR_type == 2;
 	const double k = scatter_data.scale, s = k * k;
-	const int chunk = 128, nchunk = (model_data.nr + chunk - 1) / chunk;
-	vec dnum(nchunk), dden(nchunk), den(nchunk);
+	const int np = ext_p_.empty() ? 0 : static_cast<int>(ext_p_.size()), nt = 1 + (extinction_settings.refine ? np : 0);
+	struct terms { double wi = 0, e = 0, e0 = 0, ez = 0, ezz = 0, dz = 0; cdouble cF, dcF; vec J, Jz, E2; };
+	auto at = [&](const int r, terms& T) {
+		const double w = weighted ? inv_H2_[r] : 1.0, f = std::abs(F0[r]), u = f * f;
+		if (!against_F2 && f == 0) return false;
+		const double c = np ? ext_c_[r] : 0.0, x = np ? ext_x(r) : 0.0, t = c * x * u, y = ext_y(r);
+		const double y1 = np ? ext_dy_[r] : 0.0, y2 = np ? ext_d2y_[r] : 0.0, re = std::real(std::conj(F0[r]) * dFr[r]);
+		T.J.assign(nt, 0.0); T.Jz.assign(nt, 0.0); T.E2.assign(static_cast<size_t>(nt) * nt, 0.0);
+		if (against_F2) {
+			const double g = y + t * y1;
+			T.wi = w / (sig_I_[r] * sig_I_[r]);
+			T.e = T.e0 = s * y * u - scatter_data.F_obs2[r];
+			T.ez = s * g;
+			T.ezz = s * c * x * (2.0 * y1 + t * y2);
+			T.J[0] = y * u;
+			T.Jz[0] = g;
+			for (int p = 1; p < nt; p++) {
+				const double a = ext_a(r, p - 1);
+				T.J[p] = s * c * u * u * y1 * a;
+				T.Jz[p] = s * c * a * u * (2.0 * y1 + t * y2);
+				T.E2[p] = T.E2[static_cast<size_t>(p) * nt] = c * u * u * y1 * a;
+				for (int q = 1; q < nt; q++) T.E2[static_cast<size_t>(p) * nt + q] = s * c * c * u * u * u * y2 * a * ext_a(r, q - 1);
+			}
+			T.dz = 2.0 * re;
+			T.cF = std::conj(F0[r]);
+			T.dcF = std::conj(dFr[r]);
+			return true;
+		}
+		const double h = std::sqrt(y), h1 = y1 / (2.0 * h), h2 = y2 / (2.0 * h) - y1 * y1 / (4.0 * h * y), m = h + 2.0 * t * h1;
+		T.wi = w / (sig_F_[r] * sig_F_[r]);
+		T.e = k * h * f - scatter_data.abs_F_obs[r];
+		T.e0 = k * h * f - scatter_data.F_obs[r];
+		T.ez = k * m;
+		T.ezz = k * (3.0 * h1 + 2.0 * t * h2) * 2.0 * c * x * f;
+		T.J[0] = h * f;
+		T.Jz[0] = m;
+		for (int p = 1; p < nt; p++) {
+			const double a = ext_a(r, p - 1);
+			T.J[p] = k * c * f * f * f * h1 * a;
+			T.Jz[p] = k * c * a * f * f * (3.0 * h1 + 2.0 * t * h2);
+			T.E2[p] = T.E2[static_cast<size_t>(p) * nt] = c * f * f * f * h1 * a;
+			for (int q = 1; q < nt; q++) T.E2[static_cast<size_t>(p) * nt + q] = k * c * c * u * u * f * h2 * a * ext_a(r, q - 1);
+		}
+		T.dz = re / f;
+		T.cF = std::conj(F0[r]) / f;
+		T.dcF = std::conj(dFr[r]) / f - std::conj(F0[r]) * T.dz / u;
+		return true;
+	};
+	//M_ij = Sum w (J_i J_j + e_i d^2e/dtheta_i dtheta_j), b_i = Sum w (J_i e_z + e_i dJ_i/dz) dz; the scale's row takes the
+	//residual solve_scale uses, the coefficients' rows refine_extinction_step's
+	const int chunk = 128, nchunk = (model_data.nr + chunk - 1) / chunk, nm = nt * nt + nt;
+	vec part(static_cast<size_t>(nchunk) * nm, 0.0);
 #pragma omp parallel for schedule(static)
 	for (int ch = 0; ch < nchunk; ch++) {
+		terms T;
+		double* P = part.data() + static_cast<size_t>(ch) * nm;
 		for (int r = ch * chunk; r < std::min((ch + 1) * chunk, model_data.nr); r++) {
-			if (!scatter_data.hkl_mask[r]) continue;
-			//ponytail: the extinction shape is frozen over the step (dy/d|Fc| dropped), so
-			//sqrt(y)|Fc| and m d|Fc| reproduce I and dI exactly but their own curvature is
-			//neglected. Only the Hessian's step proposal degrades - TRAH accepts on the
-			//exact energy rebuild_at returns, and perturbation's gradient stays exact.
-			const double w = weighted ? inv_H2_[r] : 1.0, Fa = ext_sqrt_y(r) * std::abs(F0[r]);
-			const double dFa = std::abs(F0[r]) > 0 ? ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / std::abs(F0[r]) : 0.0;
-			if (against_F2) {
-				const double wi = w / (sig_I_[r] * sig_I_[r]);
-				dnum[ch] += wi * 2.0 * Fa * dFa * scatter_data.F_obs2[r];
-				dden[ch] += wi * 4.0 * Fa * Fa * Fa * dFa;
-				den[ch] += wi * Fa * Fa * Fa * Fa;
-			}
-			else {
-				const double wi = w / (sig_F_[r] * sig_F_[r]);
-				dnum[ch] += wi * dFa * scatter_data.F_obs[r];
-				dden[ch] += wi * 2.0 * Fa * dFa;
-				den[ch] += wi * Fa * Fa;
+			if (!scatter_data.hkl_mask[r] || !at(r, T)) continue;
+			for (int i = 0; i < nt; i++) {
+				const double ei = i == 0 ? T.e0 : T.e;
+				for (int j = 0; j < nt; j++) P[i * nt + j] += T.wi * (T.J[i] * T.J[j] + ei * T.E2[static_cast<size_t>(i) * nt + j]);
+				P[nt * nt + i] += T.wi * (T.J[i] * T.ez + ei * T.Jz[i]) * T.dz;
 			}
 		}
 	}
-	double dnum_sum = 0, dden_sum = 0, den_sum = 0;
-	for (int ch = 0; ch < nchunk; ch++) { dnum_sum += dnum[ch]; dden_sum += dden[ch]; den_sum += den[ch]; }
-	//F: dk = (dN - k dD) / D; F^2: ds = (dN - s dD) / D for s = k^2
-	const double dscale = den_sum != 0 ? (dnum_sum - (against_F2 ? s : k) * dden_sum) / den_sum : 0.0;
-	//d(q_r) for q_r = prefactor's scale power times perturbation's scalar, both moving:
-	//F: q = w conj(F) (k^2 - k Fo / |F|) / sigma^2; F^2: q = w conj(F) (s^2 |F|^2 - s Fo^2) / sigma_I^2
+	occ::Mat M = occ::Mat::Zero(nt, nt);
+	occ::Vec b = occ::Vec::Zero(nt);
+	for (int ch = 0; ch < nchunk; ch++)
+		for (int i = 0; i < nt; i++) {
+			for (int j = 0; j < nt; j++) M(i, j) += part[static_cast<size_t>(ch) * nm + i * nt + j];
+			b(i) += part[static_cast<size_t>(ch) * nm + nt * nt + i];
+		}
+	occ::Vec dth = occ::Vec::Zero(nt);
+	if (M.allFinite() && M.norm() > 0) dth = -M.fullPivLu().solve(b);
+	if (!dth.allFinite()) dth.setZero();
+	//dq_r of q_r = w e e_z c_F, the scalar perturbation contracts with prefactor's scale power folded in:
+	//d(q) = w (de e_z c_F + e de_z c_F + e e_z dc_F), de = e_z dz + J.dtheta, de_z = e_zz dz + Jz.dtheta
 	cvec dq(model_data.nr);
 #pragma omp parallel for
 	for (int r = 0; r < model_data.nr; r++) {
-		if (!scatter_data.hkl_mask[r]) continue;
-		const double w = weighted ? inv_H2_[r] : 1.0, Fm = std::abs(F0[r]);
-		if (Fm == 0) continue;
-		//as above: the model amplitude is sqrt(y)|Fc| and its response m d|Fc|, with the
-		//shape frozen. The carrier conj(F) keeps perturbation's chain factor.
-		const double Fa = ext_sqrt_y(r) * Fm, dFa = ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / Fm;
-		const cdouble carrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(F0[r]);
-		const cdouble dcarrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(dFr[r]);
-		if (against_F2) {
-			const double wi = w / (sig_I_[r] * sig_I_[r]), Fo2 = scatter_data.F_obs2[r];
-			dq[r] = wi * (dcarrier * (s * s * Fa * Fa - s * Fo2)
-				+ carrier * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
+		terms T;
+		if (!scatter_data.hkl_mask[r] || !at(r, T)) continue;
+		double de = T.ez * T.dz, dez = T.ezz * T.dz;
+		for (int i = 0; i < nt; i++) {
+			de += T.J[i] * dth(i);
+			dez += T.Jz[i] * dth(i);
 		}
-		else {
-			const double wi = w / (sig_F_[r] * sig_F_[r]), Fo = scatter_data.abs_F_obs[r];
-			dq[r] = wi * (dcarrier * (k * k * ext_sqrt_y(r) - k * Fo / Fm)
-				+ carrier * (dscale * (2.0 * k * ext_sqrt_y(r) - Fo / Fm) + k * Fo * std::real(std::conj(F0[r]) * dFr[r]) / (Fm * Fm * Fm)));
-		}
+		dq[r] = T.wi * ((de * T.ez + T.e * dez) * T.cF + T.e * T.ez * T.dcF);
 	}
 	occ::Mat dP;
 	grid_contract(dP, dq);

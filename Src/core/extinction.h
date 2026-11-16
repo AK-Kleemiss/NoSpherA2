@@ -32,12 +32,14 @@ namespace extinction {
 	//Becker & Coppens (1974): y = (1 + 2t + A t^2/(1 + B t))^(-1/2), Gaussian and Lorentzian mosaic A and B
 	//as in GSAS-II's GSASIIstrMath.SCExtinction.
 	//D <= 0 (only for a negative coefficient) is left uncorrected rather than NaN; a backstop, as x >= 0 is kept.
-	inline double correction(const model m, const double cos2t, const double t, double* dydt = nullptr) {
+	//d2ydt2, when given, gets d^2y/dt^2 = 3/4 D^(-5/2) D'^2 - 1/2 D^(-3/2) D'', with D'' = 2A/(1 + Bt)^3 (0 for SHELX)
+	inline double correction(const model m, const double cos2t, const double t, double* dydt = nullptr, double* d2ydt2 = nullptr) {
+		if (d2ydt2) *d2ydt2 = 0.0;
 		if (m == model::none) {
 			if (dydt) *dydt = 0.0;
 			return 1.0;
 		}
-		double D = 0.0, dD = 0.0;
+		double D = 0.0, dD = 0.0, d2D = 0.0;
 		if (m == model::shelx) {
 			D = 1.0 + t;
 			dD = 1.0;
@@ -55,6 +57,7 @@ namespace extinction {
 			}
 			D = 1.0 + 2.0 * t + A * t * t / q;
 			dD = 2.0 + 2.0 * A * t / q - A * t * t * B / (q * q);
+			d2D = 2.0 * A / (q * q * q);
 		}
 		if (D <= 0.0) {
 			if (dydt) *dydt = 0.0;
@@ -62,6 +65,7 @@ namespace extinction {
 		}
 		const double y = 1.0 / std::sqrt(D);
 		if (dydt) *dydt = -0.5 * y * dD / D;
+		if (d2ydt2) *d2ydt2 = y * (0.75 * dD * dD / (D * D) - 0.5 * d2D / D);
 		return y;
 	}
 

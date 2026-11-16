@@ -4658,7 +4658,8 @@ void options::loadXCWsettings() {
 		};
 
 	std::string conv_preset = "normal";
-	bool check_hessian = false;
+	bool check_hessian = false, use_diis = true, use_soscf = true, use_trah = true;
+	int diis_size = 8;
 	std::string speed_preset = "normal_conv";
 
 	/* 1: Classical Jayatilaka XWR
@@ -4892,9 +4893,15 @@ void options::loadXCWsettings() {
 			speed_preset = "normal_conv";
 			};
 
-		//`soscf` is accepted and ignored: cold DIIS + warm TRAH is fixed (ccb566ce), and the key
-		//turned the cold start second-order, which costs Fock builds (P1 lambda 0: 14 -> 26)
+		//`soscf` is accepted and ignored: SOSCF is on unless `nososcf`
 		handlers["soscf"] = [&](std::istream&) {};
+		handlers["nodiis"] = [&](std::istream&) { use_diis = false; };
+		handlers["nososcf"] = [&](std::istream&) { use_soscf = false; };
+		handlers["notrah"] = [&](std::istream&) { use_trah = false; };
+		handlers["diis_size"] = [&](std::istream& is) {
+			if (!(is >> diis_size) || diis_size < 1)
+				throw std::runtime_error("Expected a positive integer after 'DIIS_size'");
+			};
 
 		handlers["check_hessian"] = [&](std::istream&) {
 			check_hessian = true;
@@ -5052,6 +5059,10 @@ void options::loadXCWsettings() {
 	xcw_settings.hessian_df_basis_name = hessian_df_basis_name;
 	xcw_settings.guess_basis_name = guess_basis_name;
 	xcw_settings.check_hessian = check_hessian;
+	xcw_settings.diis_size = diis_size;
+	xcw_settings.use_diis = use_diis;
+	xcw_settings.use_soscf = use_soscf;
+	xcw_settings.use_trah = use_trah;
 	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
 	xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
 }

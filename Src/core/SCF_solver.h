@@ -104,11 +104,31 @@ private:
 	// The Roothaan step and the DIIS of OCC's SCF with their matrix products on MKL
 	void solve_orbitals(scf_t& scf, const occ::Mat& F) const;
 	occ::Mat diis_update(scf_t& scf);
-	// CDIIS over the last diis_subspace_ Fock matrices and their commutators, see cdiis_extrapolate
+	// CDIIS over the last settings.diis_size Fock matrices and their commutators, see cdiis_extrapolate
 	occ::Mat cdiis_extrapolate(const occ::Mat& F, const occ::Mat& E);
 	std::deque<occ::Mat> diis_F_, diis_E_;
-	static constexpr size_t diis_subspace_ = 8;
 	occ::qm::ADIIS adiis_;
+
+	// SOSCF: quasi-Newton steps on the orbital rotations of a cold start once the DIIS error is below soscf_start_
+	// (NOSPHERA2_SOSCF_START): kappa = -B^-1 g with B^-1 from L-BFGS over the last soscf_memory_ steps, seeded with
+	// orbital_rotation_gradient's diagonal, |kappa| at most trah_.trust_first, one Fock build per step. A step that
+	// raises the functional is halved once from the orbitals it left; a second rise, or a gradient not halved in
+	// trah_.patience steps, hands the orbitals to TRAH (or, under `notrah`, back to DIIS). At most three entries per run
+	bool soscf_active_ = false, soscf_fresh_ = false, soscf_left_ = false;
+	int soscf_entries_ = 0, soscf_rises_ = 0, soscf_patience_iter_ = 0;
+	double soscf_start_ = 3.3e-3, soscf_quant_ = 0, soscf_patience_grad_ = 0;
+	static constexpr int soscf_memory_ = 10;
+	std::deque<occ::Vec> soscf_s_, soscf_y_;
+	occ::Vec soscf_g_, soscf_kappa_;
+	occ::Mat soscf_C_;
+	// true: a step was taken; false: SOSCF gave up and is off
+	bool soscf_step(scf_t& scf, const double quant, const int iter);
+	// The orbitals become the natural orbitals of D, in decreasing occupation per spin block: the idempotent density
+	// closest to a damped D. True when they reproduce the density the current Fock matrix was built from
+	bool natural_orbitals(scf_t& scf, const occ::Mat& D, const bool built_from_D);
+	// NOSPHERA2_TRAH_FIRST_TRUST / NOSPHERA2_TRAH_FIRST_TOL: the trust radius and a factor on the micro-iteration
+	// tolerance of the first TRAH step of a run
+	double trah_tol_scale_ = 1.0;
 
 	// The best orbitals of this run and their functional value. A step that climbs more than
 	// rescue_rise_ above that best has lost the SCF: rescue_scf restarts it from these orbitals with
@@ -125,7 +145,8 @@ private:
 	// the stabilisers as the settings gave them, restored at the start of every run
 	struct { double stop_shift, stop_damping, level_shift; } base_{ -1, -1, -1 };
 	static constexpr double rescue_rise_ = 1.0;
-	bool rescue_scf(scf_t& scf, const double quant, double& alpha_damp);
+	// allow false: only records the best orbitals
+	bool rescue_scf(scf_t& scf, const double quant, double& alpha_damp, const bool allow = true);
 
 	// Second-order steps (TRAH, trust-region augmented Hessian) for SCFs that DIIS leaves on a
 	// plateau, where the energy stays flat and the orbital gradient stops falling. They rotate the

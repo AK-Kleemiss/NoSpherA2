@@ -1,0 +1,1 @@
+normal normal_conv params 1 basis_set jorge-dzp-dkh df_basis def2-universal-jkfit max_iter 100 F charge 0 mult 2 uhf grown extinction bc_lorentzian start 0 step_size 0.01 end 0.02

@@ -531,7 +531,11 @@ them override single values.
 | `shift <x>` | 1 | preset | Level shift. |
 | `diis_damping <x>` | 1 | preset | DIIS error below which damping is switched off. |
 | `diis_shift <x>` | 1 | preset | DIIS error below which the level shift is switched off. |
-| `soscf` | 0 | | Accepted and ignored. A cold start runs DIIS, a warm start (the previous lambda step or a `.fchk` restart) TRAH from its first iteration. |
+| `DIIS_size <n>` | 1 | `8` | Fock matrices CDIIS and ADIIS extrapolate over. |
+| `nodiis` | 0 | off | Roothaan steps (with damping and level shift) where DIIS would extrapolate; the DIIS error is still measured for the convergence check. |
+| `nososcf` | 0 | off | No SOSCF: a cold start goes from DIIS to TRAH at the DIIS error SOSCF would start at (`3.3e-3`). |
+| `notrah` | 0 | off | No TRAH: warm starts and steps that are lost or stuck take SOSCF instead; with `nososcf` as well, DIIS (or Roothaan) finishes every step. |
+| `soscf` | 0 | | Accepted and ignored; SOSCF is on unless `nososcf`. The ladder is Roothaan < DIIS < SOSCF < TRAH: a cold start runs DIIS until the DIIS error is below `3.3e-3`, then SOSCF (quasi-Newton steps on the orbital rotations, L-BFGS); TRAH takes over when SOSCF stalls or raises the target twice, and runs warm starts (the previous lambda step or a `.fchk` restart) from their first iteration. SOSCF and TRAH start from the natural orbitals of the best density of the step, semicanonical in the Fock matrix. |
 | `check_hessian` | 0 | off | Finite-difference check of the Hessian-vector product on the first second-order step, reported in `SCF.log`; enters TRAH once the DIIS error is below `1e-2`. |
 | `df_basis <name>` | 1 | | Density-fit the Fock build with this auxiliary basis, e.g. `def2-universal-jkfit`. |
 | `hessian_df_basis <name>` | 1 | automatic | Density-fit only the TRAH Hessian products; iterations keep exact Fock builds. Unset, `def2-universal-jkfit` is used when the ERIs do not fit in memory; `none` keeps the products exact. |

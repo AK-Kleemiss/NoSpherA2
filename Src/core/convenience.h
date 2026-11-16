@@ -1114,6 +1114,11 @@ struct options
 		//second-order step, reported in SCF.log; it enters TRAH once the DIIS error is below
 		//trah_.start_threshold, so a cold start has a step to check
 		bool check_hessian = false;
+		//`DIIS_size n`: the Fock matrices CDIIS and ADIIS extrapolate over
+		int diis_size = 8;
+		//`nodiis`, `nososcf`, `notrah`: the method never steers, the next lower one (Roothaan < DIIS < SOSCF < TRAH)
+		//takes its place; the DIIS error is still measured for the convergence check
+		bool use_diis = true, use_soscf = true, use_trah = true;
 		bool apply_shift = true;
 		bool method_apply_shift = true;
 		double diis_stop_shift = 0;
