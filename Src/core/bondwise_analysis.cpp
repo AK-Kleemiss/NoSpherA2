@@ -4549,6 +4549,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				NboOptions nbo_opt;
 				nbo_opt.threads = std::max(opt.threads, 0);
 				nbo_opt.nrt_parent = opt.properties.nbo_lewis;
+				//Under -fba the NBO thread holds the cores the search barriers would wait for
+				if (opt.fba) nbo_opt.search_threads = 1;
 				NboOrbitalSpace space;
 				WFN copy(wavy);
 				std::ostringstream nbo_log;
