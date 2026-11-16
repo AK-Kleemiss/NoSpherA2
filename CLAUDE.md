@@ -239,6 +239,10 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-16 (ECP fixes combined: the table core, the HgI2 fixture and the SALTED cores on `fix-ecp-auto-detected-core`),
+`ctest --preset release-windows` on a CPU-only build reports **1411 passed, 0 failed, 12 skipped** (2 disabled) of 1425.
+See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (SALTED ECP cores, branch `fix-salted-ecp-double-core`), the SALTED predictor takes no ECP core from its input:
 an all-electron model run with `-ECP`, `-mtc_ECP` or an ECP gbw adds none, a model with an ECP block only its own table's;
 `SaltedFchkPredictorTests.OnlyTheModelDeclaresACore` and two `SaltedFchkCliTests` are new. `ctest` on a CUDA `release-windows-tests`
