@@ -13,6 +13,9 @@
 #include "core/GridManager.h"
 #include "core/AtomGrid.h"
 #include "core/wfn_class.h"
+#include "core/basis_set.h"
+#include "core/SALTED_utilities.h"
+#include "core/npy.h"
 
 #include <complex>
 #include <fstream>
@@ -492,9 +495,18 @@ TEST(EcpCoreTests, Def2CoreMatchesAllElectronX2c)
 }
 
 //-coef with -ECP 2: the coefficients fit the valence density, so the table, the charge table and the .tshb all add
-//cysteine's 22 xTB core electrons, in mode 2; the table without -ECP is the one without core
+//cysteine's 22 xTB core electrons, in mode 2; the table without -ECP is the one without core. Below Rb modes 1 and 2
+//add the same core, so an iodine atom with zero coefficients, whose table is its core alone, tells them apart
 TEST(EcpCoreTests, CoefficientFileTakesTheEcpCoreEverywhere)
 {
+	//the core add_ECP_contribution adds in mode m for the xTB core counts -ECP 2 puts on the atoms
+	auto core = [](const int Z, const int m, const double stl) {
+		const int n = constants::ECP_core_electrons(constants::ECP_electrons_xTB, Z);
+		const double k = constants::FOUR_PI * constants::bohr2ang(stl);
+		if (n == 0) return 0.0;
+		if (m == 0) return n * std::exp(-stl / 4.0);
+		return Thakkar(Z, m).get_core_form_factor(k, n) + Spherical_Gaussian_Density(Z, m).get_form_factor(k);
+	};
 	const std::string cif = fixture("SALTED/test_cysteine.cif");
 	const std::vector<std::string> base = { "-wfn", fixture("SALTED/test_cysteine.xyz"), "-cif", cif, "-dmin", "0.73",
 		"-coef", fixture("SALTED/test_cysteine.npy"), "cc-pvqz-jkfit", "-no_gpu_salted", "-no_date" };
@@ -520,22 +532,56 @@ TEST(EcpCoreTests, CoefficientFileTakesTheEcpCoreEverywhere)
 	const cell unit_cell(cif, std::cout, false);
 	ASSERT_EQ(table.get_scatterers_string(), none.get_scatterers_string());
 	ASSERT_EQ(table.reflection_size(), none.reflection_size());
-	size_t low = 0;
+	//every reflection, so also the highest s, where the mode-0 core lies 3.7 e above the mode-2 one
+	size_t high = 0;
+	double worst = 0.0, sum[4] = { 0, 0, 0, 0 };
 	for (size_t r = 0; r < table.reflection_size(); r++)
-		if (unit_cell.get_stl_of_hkl(table.get_indices(r)) < unit_cell.get_stl_of_hkl(table.get_indices(low))) low = r;
-	double core = 0.0;
+		if (unit_cell.get_stl_of_hkl(table.get_indices(r)) > unit_cell.get_stl_of_hkl(table.get_indices(high))) high = r;
 	for (size_t a = 0; a < table.scatterer_size(); a++)
-	{
-		const cdouble d = table.get_sf_for_scatterer(a)[low] - none.get_sf_for_scatterer(a)[low];
-		EXPECT_GT(d.real(), -1e-8) << table.get_scatterers_string()[a];
-		EXPECT_NEAR(d.imag(), 0.0, 1e-8) << table.get_scatterers_string()[a];
-		core += d.real();
-	}
-	EXPECT_GT(core, 0.95 * (n2 - n0));
-	EXPECT_LT(core, n2 - n0 + 1e-6);
+		for (size_t r = 0; r < table.reflection_size(); r++)
+		{
+			const double s = unit_cell.get_stl_of_hkl(table.get_indices(r));
+			const cdouble d = table.get_sf_for_scatterer(a)[r] - none.get_sf_for_scatterer(a)[r];
+			worst = std::max(worst, std::abs(d - core(std::get<atomID>(table.get_scatterer(a)).Z(), 2, s)));
+			if (r != high) continue;
+			sum[3] += d.real();
+			for (int m = 0; m < 3; m++) sum[m] += core(std::get<atomID>(table.get_scatterer(a)).Z(), m, s);
+		}
+	std::cout << "core at s = " << unit_cell.get_stl_of_hkl(table.get_indices(high)) << ": table " << sum[3] << ", mode 0 "
+		<< sum[0] << ", mode 1 " << sum[1] << ", mode 2 " << sum[2] << ", max |df| against mode 2 " << worst << std::endl;
+	EXPECT_LT(worst, 1e-6) << "max |df| of the table's core against the mode-2 core";
 	double f_max = 0.0;
 	EXPECT_LT(compare_with_table(tshb, table, unit_cell, f_max), 1e-8);
 	EXPECT_GT(f_max, 1.0);
+	npy::npy_data<double> zero;
+	WFN iodine(e_origin::NOT_YET_DEFINED);
+	iodine.push_back_atom("I", 0.0, 0.0, 0.0, 53);
+	std::vector<std::shared_ptr<BasisSet>> aux{ BasisSetLibrary::get_basis_set("def2-universal-jkfit") };
+	zero.data.assign(aux_density_table(generate_aux_wfn(iodine, aux).get_atoms()).n_coef, 0.0);
+	zero.shape = { static_cast<unsigned long>(zero.data.size()) };
+	npy::write_npy<double>("I.npy", zero);
+	std::ofstream("I.xyz") << "1\n\nI 0.0 0.0 0.0\n";
+	std::ofstream("I.cif") << "data_I\nloop_\n _space_group_symop_id\n _space_group_symop_operation_xyz\n 1 +X,+Y,+Z\n"
+		"_cell_length_a 10.0\n_cell_length_b 10.0\n_cell_length_c 10.0\n_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n"
+		"_cell_volume 1000.0\nloop_\n _atom_site_label\n _atom_site_type_symbol\n _atom_site_fract_x\n _atom_site_fract_y\n"
+		" _atom_site_fract_z\n _atom_site_U_iso_or_equiv\nI1 I 0.0 0.0 0.0 0.02\n";
+	ASSERT_EQ(run.run({ "-wfn", "I.xyz", "-cif", "I.cif", "-dmin", "0.73", "-coef", "I.npy", "def2-universal-jkfit", "-ECP", "2",
+		"-no_gpu_salted", "-no_date" }), 0);
+	const itsc_block i_table(run.dir / "experimental.tscb");
+	const cell i_cell(run.dir / "I.cif", std::cout, false);
+	ASSERT_EQ(i_table.scatterer_size(), 1u);
+	high = 0;
+	worst = 0.0;
+	for (size_t r = 0; r < i_table.reflection_size(); r++)
+	{
+		const double s = i_cell.get_stl_of_hkl(i_table.get_indices(r));
+		worst = std::max(worst, std::abs(i_table.get_sf_for_scatterer(0)[r] - core(53, 2, s)));
+		if (s > i_cell.get_stl_of_hkl(i_table.get_indices(high))) high = r;
+	}
+	const double s = i_cell.get_stl_of_hkl(i_table.get_indices(high));
+	std::cout << "iodine at s = " << s << ": table " << i_table.get_sf_for_scatterer(0)[high].real() << ", mode 0 " << core(53, 0, s)
+		<< ", mode 1 " << core(53, 1, s) << ", mode 2 " << core(53, 2, s) << ", max |df| against mode 2 " << worst << std::endl;
+	EXPECT_LT(worst, 1e-6) << "max |df| of iodine's table against its mode-2 core";
 }
 
 //-cmtc: four fragments with their own CIFs; C_3, N_3 and O_3 are the same PART 0 atoms in fragments 2 and 3
