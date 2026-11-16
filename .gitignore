@@ -112,6 +112,7 @@ tests/intermolecular_nci/unit_surrounding_plot.py
 tests/epoxide_gbw/experimental.tsc
 tests/epoxide_gbw/combined.tsc
 tests/epoxide_gbw/epoxide.gbw_bondwise_laplacian_*.dat
+tests/epoxide_gbw/epoxide.gbw_bond_path_*.dat
 tests/epoxide_gbw/*.mtl
 tests/epoxide_gbw/NBO/epoxide.inp
 tests/isosurface/Hirshfeld_surface.dat

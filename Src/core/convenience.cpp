@@ -530,6 +530,11 @@ std::string help_message =
  "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n"
  "                                    Correlated (natural-orbital) input: see\n"
  "                                    -wfn and wiki Correlated-Wavefunctions.\n"
+ "  -laplacian_bond_paths <wfn>        rho and its Laplacian along the QTAIM\n"
+ "                                    bond paths, traced uphill from each bond\n"
+ "                                    critical point to both nuclei; prints\n"
+ "                                    bond path (BPL) and geometric (GPL)\n"
+ "                                    lengths.\n"
  "  -fba <wfn>                         Full bonding analysis in one run: RGBI,\n"
  "                                    the Laplacian along every bond\n"
  "                                    (-laplacian_bonds), the QTAIM and ELI-D\n"
@@ -3509,6 +3514,12 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	{
 		wfn = arguments[i + 1];
 		bondwise_laplacian_plots(wfn);
+		finished = true; return true;
+	}
+	else if (temp == "-laplacian_bond_paths")
+	{
+		wfn = arguments[i + 1];
+		bondwise_laplacian_plots(wfn, true);
 		finished = true; return true;
 	}
 	else if (temp == "-atom_dens")

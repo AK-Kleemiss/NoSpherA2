@@ -3422,12 +3422,50 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	}
 }
 
-void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
+void bondwise_laplacian_plots(std::filesystem::path &wfn_name, const bool along_path)
 {
 	WFN wavy(wfn_name);
 	wavy.delete_unoccupied_MOs();
 
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+
+	if (along_path) {
+		topology::options topo_opt;
+		topo_opt.bond_scale = 1.35; //the pairs the straight-line mode plots
+		const std::vector<topology::nucleus> nuclei = topology::nuclei_of(wavy);
+		const topology::result top = topology::analyze_topology(wavy, nuclei, topo_opt);
+		std::vector<d3> bcps;
+		for (const topology::cp &p : top.points)
+			if (p.kind == topology::cp_kind::bond) bcps.push_back(p.position);
+		std::vector<topology::bond_path> paths(bcps.size());
+#pragma omp parallel for schedule(dynamic)
+		for (int k = 0; k < (int)bcps.size(); k++)
+			paths[k] = topology::trace_bond_path(wavy, bcps[k], nuclei);
+		std::map<std::pair<int, int>, int> seen; //a second path between one pair must not overwrite the first
+		for (const topology::bond_path &bp : paths) {
+			if (bp.a < 0) continue;
+			std::string name = wfn_name.string() + "_bond_path_" + std::to_string(bp.a) + "_" + std::to_string(bp.b);
+			if (const int n = seen[{ bp.a, bp.b }]++) name += "_" + std::to_string(n + 1);
+			std::cout << "Bond path " << bp.a << " (" << wavy.get_atom_charge(bp.a) << ") - " << bp.b << " (" << wavy.get_atom_charge(bp.b)
+				<< "): BPL " << std::fixed << std::setprecision(4) << bp.bpl << " GPL " << bp.gpl << " BPL-GPL " << bp.bpl - bp.gpl << " bohr";
+			if (bp.gap_a > 0.0 || bp.gap_b > 0.0)
+				std::cout << ", end maxima " << bp.gap_a << " / " << bp.gap_b << " bohr off the nuclei";
+			std::cout << "\n";
+			std::ofstream result(std::filesystem::current_path() / std::filesystem::path(name + ".dat"), std::ios::out);
+			result << "# s x y z rho laplacian, bohr and a.u.; the bond critical point is point " << bp.bcp_index + 1 << "\n";
+			double s = 0.0;
+			for (size_t k = 0; k < bp.points.size(); k++) {
+				if (k) s += array_length(bp.points[k], bp.points[k - 1]);
+				d3 grad{ 0.0, 0.0, 0.0 };
+				double lap = 0.0;
+				const double rho = calculate_density(wavy, bp.points[k], grad, lap);
+				result << std::scientific << std::setprecision(6) << std::setw(14) << s;
+				for (int c = 0; c < 3; c++) result << std::setw(14) << bp.points[k][c];
+				result << std::setw(14) << rho << std::setw(14) << lap << "\n";
+			}
+		}
+		return;
+	}
 
 	int points = 1001;
 
@@ -3817,6 +3855,14 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	}
 	else {
 		constexpr int nw = 15; // numeric field width — wide enough for large core densities
+		std::vector<topology::bond_path> bond_paths(density_critical_points.size());
+		{
+			const std::vector<topology::nucleus> nuclei = topology::nuclei_of(l_w);
+#pragma omp parallel for schedule(dynamic)
+			for (int i = 0; i < (int)density_critical_points.size(); i++)
+				if (density_critical_points[i].type == "bond")
+					bond_paths[i] = topology::trace_bond_path(l_w, density_critical_points[i].position, nuclei);
+		}
 		for (size_t i = 0; i < density_critical_points.size(); i++) {
 			const critical_point &cp = density_critical_points[i];
 
@@ -3896,6 +3942,15 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			std::cout << "    DelSqRho  :" << std::setw(nw) << cp.laplacian << "\n";
 			if (std::isfinite(cp.ellipticity))
 				std::cout << "    Bond Ellipticity:" << std::setw(nw) << cp.ellipticity << "\n";
+			if (const topology::bond_path &bp = bond_paths[i]; bp.a >= 0) {
+				//the traced path's ends, which for a long contact need not be the two nearest atoms
+				std::cout << "    Bond Path :   " << l_w.get_atom_label(bp.a) << bp.a << "-" << l_w.get_atom_label(bp.b) << bp.b
+					<< "   BPL :" << std::setw(nw) << bp.bpl << "   GPL :" << std::setw(nw) << bp.gpl
+					<< "   BPL-GPL :" << std::setw(nw) << bp.bpl - bp.gpl << " bohr";
+				if (bp.gap_a > 0.0 || bp.gap_b > 0.0)
+					std::cout << "   end maxima off nuclei by " << bp.gap_a << " / " << bp.gap_b;
+				std::cout << "\n";
+			}
 			if (std::isfinite(cp.virial_field) || std::isfinite(cp.kinetic_lagrangian) || std::isfinite(cp.kinetic_hamiltonian) || std::isfinite(cp.lagrangian_density)) {
 				std::cout << "   V         :" << std::scientific << std::setprecision(4) << std::setw(nw) << cp.virial_field
 					<< "   G         :" << std::fixed << std::setprecision(4) << std::setw(nw) << cp.kinetic_lagrangian
