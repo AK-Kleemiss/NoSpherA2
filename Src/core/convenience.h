@@ -1287,6 +1287,13 @@ struct options
 	int basin_grid = 1;
 	//-basin_cube: QTAIM and ELI-D basins on the cube instead of from the analytic critical points and field
 	bool basin_cube = false;
+	//-eli_basin_cube <A> <B>: with -eli_analysis, a cube of ELI-D inside the bond basins between atoms A and B (an element
+	//like Zn or a label like Zn1) and zero outside, cropped to them, at the -eli_analysis resolution
+	svec eli_basin_atoms;
+	//-eli_only: -eli_analysis without the density critical points and QTAIM basins
+	bool eli_only = false;
+	//-eli_mask_cube: ELI-D on the nonzero voxels of this cube's grid, nothing else
+	std::filesystem::path eli_mask_cube;
 	//-no_spin_eli: skip the spin-resolved ELI-D basins of a spin-polarised wavefunction
 	bool spin_eli = true;
 	int threads = -1;

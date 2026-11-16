@@ -2468,7 +2468,7 @@ int basin_memo::settled(const d3 &p) const
 	return static_cast<int>(label);
 }
 
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop, const std::vector<shell_split> *split)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop, const std::vector<shell_split> *split, const std::function<void(const std::function<int(const d3&)>&)> *probe, const bool probe_only)
 {
 	if (!eli_field) eli = nullptr;
 	if (!eli) spin_pop = nullptr;
@@ -3075,6 +3075,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		return b;
 	};
 	auto climb = [&](const d3 &p, long long &lb, long long &ll, const int kind) { return settle(climb_walk(p, lb, ll, kind), p); };
+	//Only the caller's points, no quadrature: the memo then fills from the caller's own climbs
+	if (probe && probe_only) {
+		(*probe)([&](const d3 &p) { long long lb = 0, ll = 0; return climb(p, lb, ll, climb_outer); });
+		return pop;
+	}
 	//Bisect a radial cell only when its edge trajectories reach different basins.
 	constexpr int bisections = 6;
 	long long boundary_points = 0, lost = 0;
@@ -3381,6 +3386,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			<< ", exp cutoff " << constants::exp_cutoff << std::endl;
 	}
 	std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
+	//The caller's own points walk the same trajectories to the same basins, after the memo is filled
+	if (probe) (*probe)([&](const d3 &p) { long long lb = 0, ll = 0; return climb(p, lb, ll, climb_outer); });
 	return pop;
 }
 
