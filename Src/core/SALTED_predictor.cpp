@@ -52,6 +52,8 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	if (opt_in.salted_model_dir.empty() && opt_in.coef_file != "") {
 		std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
 		wavy = generate_aux_wfn(wavy_in, opt_in.aux_basis);
+		// the coefficients fit the input's valence density: its cores (counts on the atoms) go back on in its mode
+		wavy.set_has_ECPs(wavy_in.get_has_ECPs(), false, wavy_in.get_ECP_mode());
 		bbasis_set_loaded = true;
 		config.dfbasis = opt_in.aux_basis[0]->get_name();
 		config.salted_filename = "coefficient file";

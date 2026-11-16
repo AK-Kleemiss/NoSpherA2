@@ -491,6 +491,53 @@ TEST(EcpCoreTests, Def2CoreMatchesAllElectronX2c)
 	}
 }
 
+//-coef with -ECP 2: the coefficients fit the valence density, so the table, the charge table and the .tshb all add
+//cysteine's 22 xTB core electrons, in mode 2; the table without -ECP is the one without core
+TEST(EcpCoreTests, CoefficientFileTakesTheEcpCoreEverywhere)
+{
+	const std::string cif = fixture("SALTED/test_cysteine.cif");
+	const std::vector<std::string> base = { "-wfn", fixture("SALTED/test_cysteine.xyz"), "-cif", cif, "-dmin", "0.73",
+		"-coef", fixture("SALTED/test_cysteine.npy"), "cc-pvqz-jkfit", "-no_gpu_salted", "-no_date" };
+	auto electrons = [](const std::string& log) {
+		const size_t p = log.rfind("Total number of analytical Electrons: ");
+		EXPECT_NE(p, std::string::npos) << log;
+		return p == std::string::npos ? 0.0 : std::stod(log.substr(p + 38));
+	};
+	app_dir run("coef_ecp");
+	ASSERT_EQ(run.run(base), 0);
+	const double n0 = electrons(run.log());
+	const itsc_block none(run.dir / "experimental.tscb");
+	ASSERT_TRUE(fs::remove(run.dir / "experimental.tscb"));
+	std::vector<std::string> ecp = base;
+	ecp.insert(ecp.end(), { "-ECP", "2" });
+	ASSERT_EQ(run.run(ecp), 0);
+	const double n2 = electrons(run.log());
+	const itsc_block table(run.dir / "experimental.tscb");
+	ecp.push_back("-tshb");
+	ASSERT_EQ(run.run(ecp), 0);
+	const tshb_block tshb(run.dir / "experimental.tshb");
+	EXPECT_NEAR(n2 - n0, 22.0, 1e-3);
+	const cell unit_cell(cif, std::cout, false);
+	ASSERT_EQ(table.get_scatterers_string(), none.get_scatterers_string());
+	ASSERT_EQ(table.reflection_size(), none.reflection_size());
+	size_t low = 0;
+	for (size_t r = 0; r < table.reflection_size(); r++)
+		if (unit_cell.get_stl_of_hkl(table.get_indices(r)) < unit_cell.get_stl_of_hkl(table.get_indices(low))) low = r;
+	double core = 0.0;
+	for (size_t a = 0; a < table.scatterer_size(); a++)
+	{
+		const cdouble d = table.get_sf_for_scatterer(a)[low] - none.get_sf_for_scatterer(a)[low];
+		EXPECT_GT(d.real(), -1e-8) << table.get_scatterers_string()[a];
+		EXPECT_NEAR(d.imag(), 0.0, 1e-8) << table.get_scatterers_string()[a];
+		core += d.real();
+	}
+	EXPECT_GT(core, 0.95 * (n2 - n0));
+	EXPECT_LT(core, n2 - n0 + 1e-6);
+	double f_max = 0.0;
+	EXPECT_LT(compare_with_table(tshb, table, unit_cell, f_max), 1e-8);
+	EXPECT_GT(f_max, 1.0);
+}
+
 //-cmtc: four fragments with their own CIFs; C_3, N_3 and O_3 are the same PART 0 atoms in fragments 2 and 3
 static std::vector<std::string> rubredoxin_fragment(const int f, const std::string& groups)
 {

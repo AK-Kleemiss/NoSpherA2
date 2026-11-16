@@ -297,6 +297,10 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-16 (`-coef` with `-ECP`), the table of a coefficient file adds the `-ECP` core as its charge table and `.tshb`
+do, in the same mode; `EcpCoreTests.CoefficientFileTakesTheEcpCoreEverywhere` is new. `ctest` on a CUDA `release-windows-tests`
+build (GPU present) reports **1412 passed, 0 failed, 12 skipped** (2 disabled) of 1426. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (ECP fixes combined: the table core, the HgI2 fixture and the SALTED cores on `fix-ecp-auto-detected-core`),
 `ctest --preset release-windows` on a CPU-only build reports **1411 passed, 0 failed, 12 skipped** (2 disabled) of 1425.
 See `UNIT_TESTS_STATUS.md`.

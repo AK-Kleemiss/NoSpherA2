@@ -52,7 +52,7 @@ need the virtuals).
 | `-hkl <file>` | 1 | Reflection list to compute form factors for. |
 | `-b <basis>` | 1 | Basis set name, needed when the input file does not carry one (`.ffn`, some `.fchk` paths). |
 | `-d <dir>` | 1 | Directory the basis-set files are looked up in. |
-| `-coef <file>` | 1 | Pre-computed density-fitting coefficient file. |
+| `-coef <file> <aux basis...>` | 2+ | Pre-computed density-fitting coefficient file (`.npy`) and the auxiliary basis set(s) it was fitted in, read as `-ri_fit` reads them. With `-ECP N`, or a wavefunction whose reader found ECPs, the coefficients are taken as the fit of the valence density: the table, the charge table and the `.tshb` add the mode-N core alike. |
 | `-fchk <file>` | 1 | Write a Gaussian-format checkpoint file. |
 | `-wfn_cif <file>` | 1 | Write the wavefunction geometry and basis into a CIF. |
 | `-gbw2wfn <file>` | 1 | Convert an ORCA `.gbw` into a `.wfn`. |
