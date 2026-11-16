@@ -492,7 +492,7 @@ void bonding_menu(options& opt, std::vector<WFN>& wavy, int active) {
 	std::cout << rule('-') << '\n' << boxed("BONDING ANALYSIS") << '\n' << rule('-') << '\n'
 		<< boxed("  1  cubes in a bond plane (rho / RDG / ELI-D / Laplacian around 2-3 atoms)") << '\n'
 		<< boxed("  2  the same for every bond listed in a definition file (-bonds format)") << '\n'
-		<< boxed("  3  Laplacian profile along every bond (bond_<i>_<j>_lap.dat)") << '\n'
+		<< boxed("  3  Laplacian profile along every bond (straight line or QTAIM bond path)") << '\n'
 		<< boxed("  4  ELI-D basins in QTAIM basins of chosen atoms (masked cube)") << '\n'
 		<< boxed("  5  Roby-Gould bond indices (RGBI)      6  ELI-D / QTAIM basin integration") << '\n'
 		<< boxed("  7  promolecular NCI between fragments (.xyz files)") << '\n'
@@ -531,8 +531,11 @@ void bonding_menu(options& opt, std::vector<WFN>& wavy, int active) {
 		return;
 	}
 	case 3: {
+		std::string m;
+		if (!ask_line("Along 1 = the straight line (geometric)  2 = the QTAIM bond path (gradient) [1]", m)) return;
+		if (!m.empty() && m != "1" && m != "2") return notice("Choose 1 or 2.");
 		std::filesystem::path p = wavy[active].get_path();
-		bondwise_laplacian_plots(p);
+		bondwise_laplacian_plots(p, m == "2");
 		notice("Laplacian profiles written next to " + p.string());
 		return;
 	}
