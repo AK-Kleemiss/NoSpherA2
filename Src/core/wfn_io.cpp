@@ -3389,6 +3389,8 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
 		elcount -= core;
 		atoms[i].set_ECP_electrons(core);
 	}
+	if (get_nr_ECP_electrons() > 0)
+		set_has_ECPs(true, false, 3);
 	if (debug)
 		file << "elcount after: " << elcount << std::endl;
 	if (multi == 0)

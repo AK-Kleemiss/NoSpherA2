@@ -95,7 +95,7 @@ you are memory-constrained.
 | `-all_charges` | 0 | off | Print every atomic charge, not just a summary. |
 | `-Anion <"Z Z ...">` | 1+ | | Elements to treat as anions when picking spherical references. |
 | `-Cation <"Z Z ...">` | 1+ | | Elements to treat as cations. |
-| `-ECP <0..3>` | 1 | `0` | ECP treatment. `1` = ORCA-style def2-ECP, `3` = pTB. Also spelled `-ecp`, `-Ecp`. |
+| `-ECP <0..3>` | 1 | `0` | ECP treatment. `1` = ORCA-style def2-ECP, `3` = pTB. Also spelled `-ecp`, `-Ecp`. A pTB file (`.xtb`, `.stda`) declares its mode-3 cores without it. |
 | `-method <name>` | 1 | | Record the QM method used (goes into the table header). |
 | `-refine [acc]` | 0-1 | `0.1` | Numerical integral accuracy for the refinement path. |
 | `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "mp2"`, `"mp3"`, `"mp4(sdq)"`, `"mp4"`, `"ccsd"` or `"ccsd(t)"` the density is the correlated one (relaxed MP2, unrelaxed MP3 / MP4 / CCSD / CCSD(T)), not the SCF one; see [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt) for methods, backends and keys. |
