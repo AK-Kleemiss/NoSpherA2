@@ -239,6 +239,13 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-16 (merge of `814e9a9c`, branch `salted-load-time`), the SALTED load-time branch carries PR #240's head
+(master with PR #242, the ECP table core) in merge `a6954443`; the shared model store keeps #242's cores (an all-electron
+model takes none from its input, `-coef` takes the input's mode, the table core follows the wavefunction's mode). `ctest -j4`
+on a CUDA `release-windows-tests` build: **1423 passed, 0 failed, 12 skipped** (2 disabled) of 1437; full suite on a CPU-only
+GCC 11.5 build: **1408 passed, 0 failed, 23 skipped** (2 disabled) of 1433. `.tshb`, `.tscb` and `.tsc` of DBA, 2011412 and
+2230007 at `-cpus` 1 and 8 are byte-identical to `814e9a9c`. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (pTB cores), a pTB file (`.xtb`, `.stda`) declares its cores in mode 3 without `-ECP 3`;
 `WfnCoverageIoTests.PtbDeclaresItsCoresInModeThree` and `TomlIntegrationTests.SucrosePtbNoEcp` are new. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1414 passed, 0 failed, 12 skipped** (2 disabled) of 1428. See
