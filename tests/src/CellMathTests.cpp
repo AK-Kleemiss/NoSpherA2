@@ -395,8 +395,7 @@ namespace NoSpherA2UnitTests
 			cl.asym_unit_cryst_mult(asym);
 			cl.grow_asym_atoms(asym, xyz);
 			cl.resolve_internal_symmetry(asym);
-			hkl_list hkl = { { 1, 0, 0 } }, enlarged;
-			return cl.apply_grown(hkl, enlarged, asym);
+			return cl.apply_grown(asym);
 		}
 
 		cell p1bar_cell()

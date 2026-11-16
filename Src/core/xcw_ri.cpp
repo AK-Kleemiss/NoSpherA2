@@ -129,7 +129,7 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 	const cdouble il[4] = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
 	for (int g = 0; g < ng; g++) {
 		const int p0 = XR.atom_start[g], np = XR.atom_start[g + 1] - p0;
-		//a grown copy has no weight in F and no table
+		//an atom with sym_fact 0 has no weight in F and no table
 		if (asym_atoms[g].sym_fact != 0.0) XR.F[g].assign(static_cast<size_t>(nc) * np, cdouble(0, 0));
 		const double r_cov = constants::ang2bohr(constants::covalent_radii[asym_atoms[g].type]);
 		for (int l = 0; l <= lmax; l++)

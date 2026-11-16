@@ -50,7 +50,7 @@ private:
 
 	// Kept operations of a grown model: no applied operation if possible, weights counting every position once, fewest k-points
 	ivec choose_kept_operations(const std::vector<asym_atom>& asym_atoms, const ivec& applied_symmetry);
-	void keep_operations(const ivec& kept, ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
+	void keep_operations(const ivec& kept, ivec& applied_symmetry);
 	int equal_to_concatenation(const int op_a, const int op_b);
 	
 
@@ -60,7 +60,7 @@ public:
 	void asym_unit_cryst_mult(std::vector<asym_atom>& asym_atoms);
 	// Subgroup projection for grown structures
 	//void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
-	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms);
+	ivec apply_grown(std::vector<asym_atom>& asym_atoms);
 	// U_iso, dispersion and ADPs of the grown atoms from their parents, the ADPs rotated onto the image
 	void grow_ADPs(std::vector<asym_atom>& asym_atoms, vec3& ADPs);
 	// Rotates one atom's U (as read from the CIF), C and D by the rotation of sym_op

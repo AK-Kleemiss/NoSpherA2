@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-16 (grown XCW copy-sum), grown XCW models are copy-sum again (3f316b01's sym_fact 0 for grown atoms and
+`NOSPHERA2_XCW_GROWN_COPYSUM` are gone) with `hkl_enlarged` kept over every CIF operation, so the written `.tscb` holds f at h.R
+for all of them; the grown rows of `tests/xcw_matrix/matrix.good` were regenerated. `ctest --preset release-windows-tests -j 6`
+on a CPU-only build reports **1386 passed, 0 failed, 23 skipped** (2 disabled) of 1411. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (pTB cores), a pTB file (`.xtb`, `.stda`) declares its cores in mode 3 without `-ECP 3`;
 `WfnCoverageIoTests.PtbDeclaresItsCoresInModeThree` and `TomlIntegrationTests.SucrosePtbNoEcp` are new. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1414 passed, 0 failed, 12 skipped** (2 disabled) of 1428. See

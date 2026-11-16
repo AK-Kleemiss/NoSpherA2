@@ -143,17 +143,12 @@ structure_factors::structure_factors(options& opt_in) {
 		if (opt_in.xcw_settings.grown) {
 			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
-		}
-		if (opt_in.xcw_settings.grown && tuning("NOSPHERA2_XCW_GROWN_COPYSUM")) {
-			// Old route: delete the fully applied operations and sum every grown copy's own f over the kept ones. A site's copies
-			// are then not averaged over the operations, which is not the F Olex2 refines from the tscb (R1 0.777 vs 0.748 % on PPh4UF6)
-			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl_table, scatter_data.hkl_enlarged, asym_atoms);
+			// Fifth step of the symmetry resolution: Delete the fully applied operations and solve the symmetry factors for the operations that are kept
+			applied_symmetry = unit_cell.apply_grown(asym_atoms);
 		}
 		else {
-			// Symmetry factors of an ungrown model, also for an atom on a special position. A grown cluster only shapes the
-			// density and its partition: F is the asymmetric unit's f over all operations, as Olex2 computes it from the tscb
+			// Symmetry factors of an ungrown model, also for an atom on a special position
 			unit_cell.set_sym_fact_from_mult(asym_atoms);
-			for (asym_atom& at : asym_atoms) if (at.grown) at.sym_fact = 0.0;
 		}
 		summary << "Operations F_calc sums over (" << unit_cell.get_num_syms() << "):";
 		for (int op = 0; op < unit_cell.get_num_syms(); op++) summary << "  " << unit_cell.symop_string(op);

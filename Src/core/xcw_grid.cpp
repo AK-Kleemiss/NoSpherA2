@@ -92,7 +92,7 @@ struct xcw_fb {
 	};
 	std::vector<proto> protos;
 	ivec proto_of; //[atom]
-	bvec off; //[atom] no weight in F (a grown copy): neither transformed nor contracted, its sf column left 0
+	bvec off; //[atom] no weight in F (sym_fact 0): neither transformed nor contracted, its sf column left 0
 	std::vector<std::vector<std::vector<std::pair<int, int>>>> at; //[atom][rule] (point, its place i nsh + slot in W)
 	int ne = 0, no = 0, nn = 0, S = 1; //Y(k^) widths for the largest L, |k| nodes, nodes per entry
 	ivec n0; //[entry] first node
@@ -391,7 +391,7 @@ void structure_factors::grid_F(const dMatrix2& D)
 		const ivec& lk = XG.lookup[r];
 		cdouble sum = scatter_data.anom_correction[r];
 		for (int g = 0; g < ng; g++) {
-			if (asym_atoms[g].sym_fact == 0.0) continue; //a grown copy: partition only
+			if (asym_atoms[g].sym_fact == 0.0) continue; //no weight in F: partition only
 			cdouble t = 0;
 			for (int s = 0; s < static_cast<int>(lk.size()); s++) {
 				const int e = lk[s];
