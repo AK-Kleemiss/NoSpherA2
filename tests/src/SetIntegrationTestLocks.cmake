@@ -22,6 +22,7 @@ set_tests_properties(
 set_tests_properties(
     TomlIntegrationTests.SucroseIAM
     TomlIntegrationTests.SucrosePtb
+    TomlIntegrationTests.SucrosePtbNoEcp
     PROPERTIES
         RESOURCE_LOCK integration_sucrose_IAM_SF
 )

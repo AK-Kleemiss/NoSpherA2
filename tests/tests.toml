@@ -468,6 +468,19 @@ charge = 0
 acc = 1
 ECP = 3
 
+# the pTB file declares its cores itself: without -ECP the log is sucrose_ptb's
+[sucrose_ptb_no_ECP]
+directory = "sucrose_IAM_SF"
+good = "sucrose_ptb.good"
+
+[sucrose_ptb_no_ECP.args]
+cif = "sucrose.cif"
+dmin = 0.8
+wfn = "wfn.xtb"
+mult = 0
+charge = 0
+acc = 1
+
 [sucrose_SF]
 directory = "sucrose_fchk_SF"
 

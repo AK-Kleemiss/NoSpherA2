@@ -822,6 +822,12 @@ TEST(TomlIntegrationTests, SucrosePtb)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, SucrosePtbNoEcp)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_ptb_no_ECP");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, SucroseSF)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF");
