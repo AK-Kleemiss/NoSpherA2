@@ -503,6 +503,69 @@ hkl = "Rh_ECP_subset.hkl"
 acc = 1
 old_tsc = true
 
+# Linear HgI2 in a 12 A P1 box, PBE/def2-SVP: def2 ECPs with a 60-electron (Hg) and a 28-electron
+# (I) core. HgI2_def2.inp/HgI2_x2c.inp are the ORCA 6.1.1 inputs of the two gbw files.
+# All four ways to ask for the def2 core must give the same table, HgI2_ECP.good (made with
+# -ECP 1): -ECP 1, no -ECP (the gbw reader finds the ECPs), and a one-part -mtc with
+# mtc_ECP 1 or 0. Before the table took the wavefunction's mode, the last three got the
+# mode-0 core: f(Hg) up to 11 e (29 %) too large at s = 0.6-0.71 A^-1. HgI2_subset.hkl is
+# every 120th reflection to d = 0.7 A (89 of 10623). EcpCoreTests checks the same table
+# against the all-electron X2C gbw.
+[HgI2_ECP]
+directory = "ECP_HgI2"
+good = "HgI2_ECP.good"
+actual = "experimental.tsc"
+
+[HgI2_ECP.args]
+wfn = "HgI2_def2.gbw"
+cif = "HgI2.cif"
+hkl = "HgI2_subset.hkl"
+acc = 1
+old_tsc = true
+ECP = 1
+
+[HgI2_ECP_auto]
+directory = "ECP_HgI2"
+good = "HgI2_ECP.good"
+actual = "experimental.tsc"
+
+[HgI2_ECP_auto.args]
+wfn = "HgI2_def2.gbw"
+cif = "HgI2.cif"
+hkl = "HgI2_subset.hkl"
+acc = 1
+old_tsc = true
+
+[HgI2_ECP_mtc]
+directory = "ECP_HgI2"
+good = "HgI2_ECP.good"
+actual = "experimental.tsc"
+
+[HgI2_ECP_mtc.args]
+cif = "HgI2.cif"
+hkl = "HgI2_subset.hkl"
+acc = 1
+old_tsc = true
+mtc = ["HgI2_def2.gbw", "0"]
+mtc_mult = [1]
+mtc_charge = [0]
+mtc_ECP = [1]
+
+[HgI2_ECP_mtc_auto]
+directory = "ECP_HgI2"
+good = "HgI2_ECP.good"
+actual = "experimental.tsc"
+
+[HgI2_ECP_mtc_auto.args]
+cif = "HgI2.cif"
+hkl = "HgI2_subset.hkl"
+acc = 1
+old_tsc = true
+mtc = ["HgI2_def2.gbw", "0"]
+mtc_mult = [1]
+mtc_charge = [0]
+mtc_ECP = [0]
+
 [RGBI_Groups_NH3BH3_sym]
 directory = "RGBI_groups"
 good = "NH3BH3_sym.good"

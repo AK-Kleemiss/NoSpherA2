@@ -864,6 +864,30 @@ TEST(TomlIntegrationTests, EcpAutoCore)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, HgI2Ecp)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, HgI2EcpAuto)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP_auto");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, HgI2EcpMtc)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP_mtc");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, HgI2EcpMtcAuto)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "HgI2_ECP_mtc_auto");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym");

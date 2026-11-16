@@ -438,6 +438,7 @@ TEST(EcpCoreTests, StreamedRiTableTakesTheReadersEcpMode)
 	EXPECT_NE(run.log().find("ECP block removes 28 core electrons"), std::string::npos) << run.log();
 	EXPECT_NE(run.log().find("Streaming tsc in blocks of 30 reflections"), std::string::npos) << run.log();
 	const itsc_block detected(run.dir / "experimental.tscb");
+	ASSERT_TRUE(fs::remove(run.dir / "experimental.tscb"));
 	std::vector<std::string> explicit_mode = args;
 	explicit_mode.insert(explicit_mode.end(), { "-ECP", "1" });
 	ASSERT_EQ(run.run(explicit_mode), 0);
@@ -453,6 +454,41 @@ TEST(EcpCoreTests, StreamedRiTableTakesTheReadersEcpMode)
 		}
 	EXPECT_GT(f_max, 10.0);
 	EXPECT_LT(worst, 1e-8) << "max |df| between the detected and the explicit ECP mode";
+}
+
+//The def2 ECP valence density plus the def2 core against an all-electron X2C wavefunction of the same HgI2 (Hg 60, I 28
+//core electrons), Hirshfeld, s = 0.18-0.71 A^-1: they agree to 0.062 e. The mode-0 core was 11 e off on Hg, 1.2 e on I
+TEST(EcpCoreTests, Def2CoreMatchesAllElectronX2c)
+{
+	const std::vector<std::string> common = { "-cif", fixture("ECP_HgI2/HgI2.cif"), "-hkl", fixture("ECP_HgI2/HgI2_subset.hkl"),
+		"-acc", "1", "-no_date" };
+	const std::string x2c = fixture("ECP_HgI2/HgI2_x2c.gbw"), def2_gbw = fixture("ECP_HgI2/HgI2_def2.gbw");
+	app_dir run("ecp_x2c");
+	std::vector<std::string> args = common;
+	args.insert(args.end(), { "-wfn", x2c });
+	ASSERT_EQ(run.run(args), 0);
+	EXPECT_EQ(run.log().find("ECP block removes"), std::string::npos) << run.log();
+	const itsc_block all_electron(run.dir / "experimental.tscb");
+	ASSERT_TRUE(fs::remove(run.dir / "experimental.tscb"));
+	args = common;
+	args.insert(args.end(), { "-wfn", def2_gbw });
+	ASSERT_EQ(run.run(args), 0);
+	EXPECT_NE(run.log().find("ECP block removes 116 core electrons"), std::string::npos) << run.log();
+	const itsc_block def2(run.dir / "experimental.tscb");
+	ASSERT_EQ(def2.get_scatterers_string(), all_electron.get_scatterers_string());
+	ASSERT_EQ(def2.reflection_size(), all_electron.reflection_size());
+	ASSERT_EQ(def2.scatterer_size(), 3u);
+	for (size_t a = 0; a < def2.scatterer_size(); a++)
+	{
+		double f_max = 0.0, worst = 0.0;
+		for (size_t r = 0; r < def2.reflection_size(); r++)
+		{
+			f_max = std::max(f_max, std::abs(all_electron.get_sf_for_scatterer(a)[r]));
+			worst = std::max(worst, std::abs(def2.get_sf_for_scatterer(a)[r] - all_electron.get_sf_for_scatterer(a)[r]));
+		}
+		EXPECT_GT(f_max, 30.0) << def2.get_scatterers_string()[a];
+		EXPECT_LT(worst, 0.15) << def2.get_scatterers_string()[a] << ": max |df| def2 + core against all-electron";
+	}
 }
 
 //-cmtc: four fragments with their own CIFs; C_3, N_3 and O_3 are the same PART 0 atoms in fragments 2 and 3

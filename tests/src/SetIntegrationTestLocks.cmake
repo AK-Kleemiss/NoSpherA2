@@ -48,6 +48,16 @@ set_tests_properties(
         RESOURCE_LOCK integration_TFVC
 )
 
+# Tests using tests/ECP_HgI2
+set_tests_properties(
+    TomlIntegrationTests.HgI2Ecp
+    TomlIntegrationTests.HgI2EcpAuto
+    TomlIntegrationTests.HgI2EcpMtc
+    TomlIntegrationTests.HgI2EcpMtcAuto
+    PROPERTIES
+        RESOURCE_LOCK integration_ECP_HgI2
+)
+
 # Tests using tests/RGBI_groups (RGBI_NH3Li/RGBI_NH3Li_ANO read nh3li.gbw from there too)
 set_tests_properties(
     TomlIntegrationTests.RGBI_Groups_NH3BH3_sym

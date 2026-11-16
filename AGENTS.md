@@ -297,6 +297,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-16 (ECP fixture HgI2), `tests/ECP_HgI2` (2.4 MB, 230 kB compressed) pins the def2 core for a 60- and a
+28-electron ECP four ways (`TomlIntegrationTests.HgI2Ecp*`, incl. a one-part `-mtc`) and against an all-electron X2C
+wavefunction (`EcpCoreTests.Def2CoreMatchesAllElectronX2c`). `ctest --preset release-windows` on a CPU-only build reports
+**1408 passed, 0 failed, 12 skipped** (2 disabled) of 1422. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (ECP table core), the table core of an ECP the reader detected without `-ECP` is the wavefunction's mode
 (def2 Thakkar), not the option's default mode 0; `TomlIntegrationTests.EcpAutoCore` and
 `EcpCoreTests.StreamedRiTableTakesTheReadersEcpMode` are new. `ctest --preset release-windows` on a CPU-only build reports
