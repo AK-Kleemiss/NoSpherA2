@@ -13,12 +13,14 @@ class SCF_coupling {
 public:
 
 	virtual ~SCF_coupling() = default;
-	// F_calc, scale and the crystallographic refinement criteria of the effective density
-	virtual void evaluate_cryst_crit(const dMatrix2& dm_eff) = 0;
+	// F_calc, scale and the crystallographic refinement criteria of the effective density; incremental: from the
+	// last incremental call, the atoms that cannot have moved by more than the grid's tolerance kept
+	virtual void evaluate_cryst_crit(const dMatrix2& dm_eff, const bool incremental) = 0;
 	// The criteria evaluate_cryst_crit found
 	virtual fit_quality cryst_crit() const = 0;
-	// The perturbation matrix, the derivative of the criterion at the last evaluate_cryst_crit, nmo rows per spin block
-	virtual void perturbation_matrix(occ::Mat& perturb, const bool unrestricted) = 0;
+	// The perturbation matrix, the derivative of the criterion at the last evaluate_cryst_crit, nmo rows per spin block;
+	// incremental as evaluate_cryst_crit, against lambda times it
+	virtual void perturbation_matrix(occ::Mat& perturb, const bool unrestricted, const double lambda, const bool incremental) = 0;
 	// lambda times the change of the perturbation matrix for a change of the effective density,
 	// the scale moving along; leaves F_calc and the scale as they were
 	virtual occ::Mat perturbation_matrix_response(const dMatrix2& dD_eff, const double lambda) = 0;

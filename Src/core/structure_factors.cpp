@@ -1507,7 +1507,7 @@ void structure_factors::calc_F_calc(std::vector<WFN>& wavefunctions, GridManager
 	calc_F_calc(tsc_table(wavefunctions, grids, log));
 }
 
-void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log) {
+void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log, const double tol) {
 	ensure_inv_H2_weights();
 	ensure_cryst_weights();
 
@@ -1542,7 +1542,7 @@ void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted,
 		if (weighted) precompute *= inv_H2_[r];
 		pre[r] = precompute;
 	}
-	grid_contract(perturb, pre);
+	grid_contract(perturb, pre, tol > 0.0 && prefactor != 0.0 ? tol / std::abs(prefactor) : 0.0);
 	perturb *= prefactor;
 	if (unrestricted) {
 		perturb.conservativeResize(2 * model_data.nmo, Eigen::NoChange);

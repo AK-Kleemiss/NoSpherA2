@@ -81,12 +81,20 @@ public:
 		ivec clean_of;
 		bvec is_inverse;
 		std::shared_ptr<struct xcw_fb> fb; //the planned Fourier-Bessel transform of every atom grid, null: the direct sum
-		//grid_F's change-only update: a block whose rho can have moved by less than NOSPHERA2_XCW_GRID_DTOL
-		//since it was last integrated keeps its rho. bound = Sum_p w_p (Sum_mu |chi_mu|)^2 per block, so
-		//max|dD| bound bounds Sum_p |w drho| and with it |dF|; drift sums that over the calls it was kept
-		occ::Mat D_last;
-		vec2 rho_last;
-		vec bound, drift;
+		//Incremental evaluation along an SCF (track). A block keeps its rho while 2 Sum_munu |dD| A_munu, A = Sum_p w_p
+		//|chi_mu chi_nu| (absS, upper triangle), summed with drift over the calls it was kept, fits in its atom's share of
+		//NOSPHERA2_XCW_GRID_DTOL, a bound on |df_g|; an atom with no block integrated keeps f_g. The perturbation keeps a
+		//block's part of P_last while Sum_p |V_p - V_app,p| m2_p, m2 = max_mu chi_mu^2, fits in its tolerance, V_app being
+		//the potential that part was built from. Every NOSPHERA2_XCW_GRID_FULL calls both are built in full.
+		//WIP, off by default: no significant speed-up yet (the grid is ~5% of a P1 def2-TZVP scan, ~0.1% of a UF6 iteration)
+		occ::Mat D_last, P_last;
+		vec2 rho_last, V_app, m2;
+		vec drift;
+		std::vector<std::vector<float>> absS;
+		cvec sfc_last;
+		std::vector<char> todo, todo_b;
+		bool track = false;
+		int f_calls = 0, p_calls = 0;
 		//the block stages run on the device (xcw_grid_gpu.h), atom grid g's points from gpu_off[g] there
 		bool on_device = false;
 		ivec gpu_off;
@@ -117,11 +125,12 @@ public:
 	cvec grid_sf_at(const vec2& k);
 	//out = Sum_r Re(pre_r dF_r/dD(mu, nu)) over the fit set, the transpose of grid_F: the walk the perturbation and its
 	//response share; nmo x nmo, symmetric, without any prefactor
-	void grid_contract(occ::Mat& out, const cvec& pre);
+	//tol > 0: incremental against the last such call, an atom's part left out while it can move out by less than tol
+	void grid_contract(occ::Mat& out, const cvec& pre, const double tol = 0.0);
 	//the weighted density 2 w_p rho(p) of every atom grid, grid_sfc's first half
 	vec2& grid_rho(const dMatrix2& D);
-	//out += Sum_p chi_mu V_p chi_nu over the blocks, the transpose of grid_rho for V_p = w_p v_p
-	void grid_apply_V(const vec2& V, occ::Mat& out);
+	//out += Sum_p chi_mu V_p chi_nu over the blocks in todo (indexed as grid_rho lists them, all when null), the transpose of grid_rho for V_p = w_p v_p
+	void grid_apply_V(const vec2& V, occ::Mat& out, const std::vector<char>* todo = nullptr);
 
 	//The atoms' shares of rho as an RI fit (-xcw_partition ri) instead of the grid weights: c = H^-1 (2 B D + R^T S^2 T(D)),
 	//B = (mu nu|P) from occ's density-fitting engine, H = J + R^T S^2 R, R the analytic multipoles of the aux functions about
@@ -319,8 +328,9 @@ public:
 	// The tsc table of the wavefunctions at every entry of hkl_tsc; grids keeps the integration grids for the next call
 	itsc_block tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
 
-	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block
-	void perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log);
+	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block;
+	// tol > 0 builds it incrementally, each atom's part kept while its entries can move by less than tol
+	void perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log, const double tol = 0.0);
 	// lambda times the change of the perturbation matrix for a change dD_eff of the density, the scale
 	// moving along; leaves F_calc and the scale as they were
 	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda);
