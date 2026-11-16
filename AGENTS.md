@@ -297,6 +297,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-16 (grown XCW copy-sum), grown XCW models are copy-sum again (3f316b01's sym_fact 0 for grown atoms and
+`NOSPHERA2_XCW_GROWN_COPYSUM` are gone) with `hkl_enlarged` kept over every CIF operation, so the written `.tscb` holds f at h.R
+for all of them; the grown rows of `tests/xcw_matrix/matrix.good` were regenerated. `ctest --preset release-windows-tests -j 6`
+on a CPU-only build reports **1386 passed, 0 failed, 23 skipped** (2 disabled) of 1411. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-28 (RI .tshb), XCW's RI `.tshb` is the RI partition's own fit and the first step matches the table's scatterers
 to atoms by id; `XcwPartitionTests.RiTshbIsTheRiTable` is new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM
 reports **1328 passed, 0 failed, 23 skipped** (2 disabled) of 1353. See `UNIT_TESTS_STATUS.md`.

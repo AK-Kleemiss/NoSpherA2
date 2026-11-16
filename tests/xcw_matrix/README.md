@@ -289,8 +289,9 @@ All values are at the final lambda 0.02. The grown rows depend on the 3f316b01 R
 | H² | grown | F² | CD | off | 0.05026 | 0.05452 | 0.09806 | 2.192 | 6.210 | 9.725 | – |
 | H² | grown | F² | CD | refined | 0.04397 | 0.04837 | 0.08867 | 1.978 | 4.820 | 9.867 | 0.2287 |
 
-Grown and ungrown agree to within 3e-4 in R1, which is the expected result once grown F uses the asymmetric unit
-with all operations. `NOSPHERA2_XCW_GROWN_COPYSUM=1` (the old copy-sum) is not covered here.
+These grown rows are from 3f316b01's route, where grown F used the asymmetric unit with all operations and the grown
+atoms had sym_fact 0; grown and ungrown agreed to within 3e-4 in R1. Grown is copy-sum again (every atom's own f over
+the kept operations), which moves the grown rows of `matrix.good` by up to 8e-4 in R1.
 
 ## Open items
 
