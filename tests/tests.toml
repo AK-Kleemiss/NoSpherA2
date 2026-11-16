@@ -395,6 +395,24 @@ mtc_mult = [1, 1]
 mtc_charge = [0, 0]
 mtc_ECP = [0, 0]
 
+# The input's cores are not the model's: an all-electron model with -mtc_ECP 2 2 gives the log above. This case and
+# SALTED_ECP2/SALTED_ECP1 run in a scratch directory in tests/src/SaltedFchkTests.cpp (SaltedFchkCliTests), which also
+# compares the .tshb and the tables with the runs without the flag
+[SALTED_disorder_tshb_ECP2]
+directory = "Hybrid"
+good = "SALTED_disorder_tshb.good"
+
+[SALTED_disorder_tshb_ECP2.args]
+SALTED = "../SALTED/Model"
+cif = "ZP2.cif"
+dmin = 0.9
+no_gpu_salted = ""
+tshb = ""
+mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2]
+mtc_mult = [1, 1]
+mtc_charge = [0, 0]
+mtc_ECP = [2, 2]
+
 [SALTED]
 directory = "SALTED"
 
@@ -404,6 +422,30 @@ cif = "test_cysteine.cif"
 wfn = "test_cysteine.xyz"
 dmin = 0.73
 no_gpu_salted = ""
+
+[SALTED_ECP2]
+directory = "SALTED"
+good = "SALTED.good"
+
+[SALTED_ECP2.args]
+SALTED = "Model"
+cif = "test_cysteine.cif"
+wfn = "test_cysteine.xyz"
+dmin = 0.73
+no_gpu_salted = ""
+ECP = 2
+
+[SALTED_ECP1]
+directory = "SALTED"
+good = "SALTED.good"
+
+[SALTED_ECP1.args]
+SALTED = "Model"
+cif = "test_cysteine.cif"
+wfn = "test_cysteine.xyz"
+dmin = 0.73
+no_gpu_salted = ""
+ECP = 1
 
 [sucrose_IAM]
 directory = "sucrose_IAM_SF"
