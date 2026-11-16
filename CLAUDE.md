@@ -239,6 +239,12 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-16 (merge of the equicomb branch at `814e9a9c` into `salted-relpower-norm`), the rel_power normalisation and the
+symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index of `plan_norms`. `ctest` on a CUDA
+`release-windows-tests` build (GPU present) reports **1418 passed, 0 failed, 12 skipped** (2 disabled) of 1432; on Linux (AKL006,
+Slurm job 1795253, GCC 11.5 `release-linux-tests`, CPU only, one process per test) **1403 passed, 0 failed, 23 skipped**
+(2 disabled) of 1428. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (pTB cores), a pTB file (`.xtb`, `.stda`) declares its cores in mode 3 without `-ECP 3`;
 `WfnCoverageIoTests.PtbDeclaresItsCoresInModeThree` and `TomlIntegrationTests.SucrosePtbNoEcp` are new. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1414 passed, 0 failed, 12 skipped** (2 disabled) of 1428. See
@@ -266,6 +272,12 @@ As of 2026-11-16 (ECP table core), the table core of an ECP the reader detected 
 (def2 Thakkar), not the option's default mode 0; `TomlIntegrationTests.EcpAutoCore` and
 `EcpCoreTests.StreamedRiTableTakesTheReadersEcpMode` are new. `ctest --preset release-windows` on a CPU-only build reports
 **1403 passed, 0 failed, 12 skipped** (2 disabled) of 1417. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-13 (symmetric-site normalisation, branch `salted-relpower-norm`), the sparse equicomb zeroes lambda
+features that vanish by site symmetry, the empty-environment warning is taken from the density, and a model whose NORM
+block says `rel_power` (VERSION 7) divides every lambda > 0 block by the atom's lambda = 0 length;
+`SaltedFchkPredictorTests.RelPowerIsContinuousAtASymmetricSite` and `SaltedFchkEquicombTests.RelPowerMatchesSalted` (against SALTED's kernels) are new. `ctest -R "SALTED|Salted|salted"` on a CUDA
+`release-windows-tests` build: **59 passed, 0 failed** of 59; the full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-13 (equicomb follow-ups), the predictor keeps one descriptor buffer for all lambdas and the CUDA feature
 kernel builds mu >= 0 only; the zeroing of features that vanish by site symmetry moved to its own branch with the

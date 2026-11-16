@@ -54,6 +54,10 @@ public:
 	// The ECP the labels were computed with (ECP block, -salted_ecp), as -ECP counts them: 1 def2, 2 xTB, 3 pTB.
 	// The model then predicts valence densities only, and the core goes back on at prediction. 0: all-electron
 	int ecp_mode = 0;
+	// How each atom's lambda > 0 block is normalised (NORM block, inp.yaml descriptor.normalisation): "unit" divides it by
+	// its own length, "rel_power" by the length of the atom's full lambda = 0 block, which goes to zero continuously
+	// where the block vanishes by site symmetry. lambda = 0 is unit-normalised in both
+	std::string normalisation = "unit";
 
 	// The are initialized to -1 to check if they are set
 	// They are set in the populateFromFile function as static_cast<int>(neighspeX.size())
@@ -86,7 +90,9 @@ private:
 	// misreading it. Files written 8-9 Oct 2026 say 5 for the same format.
 	// VERSION 6 (-salted_ecp): an ECP block says the model predicts valence densities; without it the
 	// core of every heavy atom is missing, so an older build has to warn.
-	static const int SUPPORTED_VERSION = 6;
+	// VERSION 7 (pack_model.py with descriptor.normalisation rel_power): a NORM block says how the lambda > 0
+	// features are normalised; an older build would read the model as unit-normalised.
+	static const int SUPPORTED_VERSION = 7;
 	enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
 	std::filesystem::path filepath;

@@ -201,6 +201,11 @@ void SALTEDConfig::populateFromFile(const std::filesystem::path &filename)
 					this->trainfrac = std::stod(value);
 				else if (key == "dfbasis")
 					this->dfbasis = value;
+				else if (key == "normalisation")
+				{
+					err_checkf(value == "unit" || value == "rel_power", "Unknown normalisation " + value + " in " + filename.string(), std::cout);
+					this->normalisation = value;
+				}
 			}
 		}
 	}
@@ -478,6 +483,18 @@ void SALTED_BINARY_FILE::populate_config(SALTEDConfig& config) {
 		read_exact(file, config.ecp_mode, "ECP mode");
 		err_checkf(config.ecp_mode >= 0 && config.ecp_mode <= 3,
 			"Invalid ECP mode " + std::to_string(config.ecp_mode) + " in " + filepath.string(), std::cout);
+	}
+	config.normalisation = "unit";
+	if (has_block("NORM")) {
+		file.seekg(table_of_contents["NORM"], std::ios::beg);
+		skip_exact(file, 4, "block datatype for NORM");
+		read_exact(file, string_size, "NORM length");
+		err_checkf(string_size > 0 && string_size <= kMaxSaltedStringLength, "Invalid NORM length in " + filepath.string(), std::cout);
+		string_out.assign(static_cast<size_t>(string_size), '\0');
+		read_exact_bytes(file, string_out.data(), string_size, "NORM");
+		config.normalisation = std::string(string_out.begin(), string_out.end());
+		err_checkf(config.normalisation == "unit" || config.normalisation == "rel_power",
+			"Unknown normalisation " + config.normalisation + " in " + filepath.string(), std::cout);
 	}
 }
 
