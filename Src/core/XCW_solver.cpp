@@ -39,7 +39,7 @@ void XCW_solver::evaluate_model_term(const scf_t& scf, const bool timed) {
 	coupling_->evaluate_cryst_crit(dm_eff, timed && !second_order());
 	const bool unrestricted = scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted;
 	//at lambda 0 the Fock matrix takes none of it
-	if (lambda == 0) perturbation_.setZero((unrestricted ? 2 : 1) * nmo_, nmo_);
+	if (lambda == 0) perturbation_.setZero((unrestricted ? 2LL : 1LL) * nmo_, nmo_);
 	else coupling_->perturbation_matrix(perturbation_, unrestricted, lambda, timed && !second_order());
 	fit_ = coupling_->cryst_crit();
 	if (timed) throughput::record_time("XCW structure factors + perturbation", coupling_->grid_on_device(), get_msec(t0, get_time()));
