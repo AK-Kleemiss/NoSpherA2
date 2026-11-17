@@ -2152,7 +2152,7 @@ void print_nbo(const NboResults& r, std::ostream& out)
 }
 
 WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& space, const std::string& spec,
-				 const bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log)
+				 const bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log, vec2* expansion)
 {
 	const char* opt = nlmo ? "-nlmo_cube" : "-nbo_cube";
 	const int nspin = static_cast<int>(space.lewis.size());
@@ -2216,6 +2216,7 @@ WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& sp
 
 	WFN w(wavy);
 	picked.clear();
+	if (expansion) expansion->clear();
 	for (int s = 0; s < nspin; s++) {
 		const ivec& want = by_block[s];
 		if (want.empty()) continue;
@@ -2256,6 +2257,10 @@ WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& sp
 			const NboOrbital& o = r.orbitals[want[k] - 1];
 			const int slot = static_cast<int>(picked.size());
 			picked.emplace_back(want[k], nbo_label(o) + tag);
+			if (expansion) {
+				expansion->emplace_back(wavy.get_nmo(), 0.0);
+				for (int m = 0; m < nmo; m++) expansion->back()[mo_row[s][m]] = T(m, k);
+			}
 			//NAO weights per atom, the largest first
 			std::vector<std::pair<double, int>> share(space.nao.atoms.size());
 			for (size_t a = 0; a < share.size(); a++) share[a] = { 0.0, static_cast<int>(a) };

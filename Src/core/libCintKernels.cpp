@@ -272,6 +272,8 @@ ADD_FUNCS_TO_KERNEL(Coulomb2C_SPH, int2c2e_optimizer, GTOint2c, int2c2e_sph, COO
 ADD_FUNCS_TO_KERNEL(Coulomb2C_CRT, int2c2e_optimizer, GTOint2c, int2c2e_cart, COORDINATE_TYPE::CART)
 ADD_FUNCS_TO_KERNEL(Overlap2C_SPH, libcint::int1e_ovlp_optimizer, GTOint2c, libcint::int1e_ovlp_sph, COORDINATE_TYPE::SPH) //If this is suddenly wrong, use the NOOPT version
 ADD_FUNCS_TO_KERNEL(Overlap2C_CRT, libcint::int1e_ovlp_optimizer, GTOint2c, libcint::int1e_ovlp_cart, COORDINATE_TYPE::CART)
+//three components; hermi would mirror only the first, so no hermi
+ADD_FUNCS_TO_KERNEL_NOOPT(Dipole2C_SPH, GTOint2c, libcint::int1e_r_sph, COORDINATE_TYPE::SPH)
 
 ADD_FUNCS_TO_KERNEL_3C(Coulomb3C_SPH, int3c2e_optimizer, GTOnr3c_drv, int3c2e_sph, GTOnr3c_fill_s1, COORDINATE_TYPE::SPH)
 ADD_FUNCS_TO_KERNEL_3C(Coulomb3C_CRT, int3c2e_optimizer, GTOnr3c_drv, int3c2e_cart, GTOnr3c_fill_s1, COORDINATE_TYPE::CART)

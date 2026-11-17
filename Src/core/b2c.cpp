@@ -2468,7 +2468,7 @@ int basin_memo::settled(const d3 &p) const
 	return static_cast<int>(label);
 }
 
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop, const std::vector<shell_split> *split, const std::function<void(const std::function<int(const d3&)>&)> *probe, const bool probe_only)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop, const std::vector<shell_split> *split, const std::function<void(const std::function<int(const d3&)>&)> *probe, const bool probe_only, std::vector<basin_point> *points)
 {
 	if (!eli_field) eli = nullptr;
 	if (!eli) spin_pop = nullptr;
@@ -2560,6 +2560,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	vec pop(nb, 0.0);
 	volumes.assign(nb, 0.0);
 	if (spin_pop) spin_pop->assign(nb, vec(3, 0.0));
+	if (points) points->clear();
 	outside = 0.0;
 	double cutoff_outside = 0.0, unresolved_outside = 0.0;
 	const int nx = streaming ? 0 : cub->get_size(0), ny = streaming ? 0 : cub->get_size(1), nz = streaming ? 0 : cub->get_size(2);
@@ -3199,6 +3200,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 #pragma omp parallel num_threads(host_threads)
 		{
 			vec lp(nb, 0.0), lv(nb, 0.0), lspin(spin_pop ? 3 * (size_t)nb : 0, 0.0);
+			std::vector<basin_point> lpts;
 			double lo = 0.0, lc = 0.0, lu = 0.0;
 			long long lb = 0, ll = 0;
 			//ponytail: one triangle per basin per thread, nb * nmo^2 / 2 doubles each; the caller
@@ -3231,6 +3233,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				const double w = W[i];
 				if (w == 0.0) return;
 				const d3 p{ X[i], Y[i], Z[i] };
+				d3 rec_at = p;
 				bool settled;
 				int b = lookup(p, settled);
 				//The same density, taken from the orbital pass that also hands out phi
@@ -3252,6 +3255,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					lp[bb - 1] += w * rho * fr;
 					lv[bb - 1] += w * fr;
 					if (spin_pop) for (int k = 0; k < 3; k++) lspin[3 * (size_t)(bb - 1) + k] += w * fr * aux[1 + k];
+					if (points) lpts.push_back({ rec_at, w * rho * fr, bb });
 					accumulate(bb, w * fr);
 				};
 				if (rho < basin_density_cutoff) { give(0, 1.0); return; }
@@ -3286,13 +3290,17 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				const double wi = valence(along(0.5 * (inner + rc))) * (rc * rc * rc - inner * inner * inner);
 				const double wo = valence(along(0.5 * (rc + outer))) * (outer * outer * outer - rc * rc * rc);
 				const double sum = wi + wo;
-				if (sum > 0.0) { give(bi, wi / sum); give(bo, wo / sum); }
+				if (sum > 0.0) {
+					rec_at = along(0.5 * (inner + rc)); give(bi, wi / sum);
+					rec_at = along(0.5 * (rc + outer)); give(bo, wo / sum);
+				}
 				else give(centre_basin(), 1.0);
 			});
 #pragma omp critical
 			{
 				for (int b = 0; b < nb; b++) { pop[b] += lp[b]; volumes[b] += lv[b]; }
 				if (spin_pop) for (int b = 0; b < nb; b++) for (int k = 0; k < 3; k++) (*spin_pop)[b][k] += lspin[3 * (size_t)b + k];
+				if (points) points->insert(points->end(), lpts.begin(), lpts.end());
 				if (ovl) {
 					for (int b = 0; b < nb; b++)
 						for (size_t t = 0; t < ovl->S[b].size(); t++) ovl->S[b][t] += ls[b][t];
@@ -3656,7 +3664,7 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 				const bool lone_atom = atom_index2 < 0;
 				const double ratio = lone_atom ? 0.0 : std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
 				//Label a bond basin only for a bonded pair that brackets its maximum.
-				bool between = false;
+				bool between = false, bonded = false;
 				err_checkf(atom_index2 >= 0 || atoms.size() == 1, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
 				if (!lone_atom) {
 					const d3 p1 = atoms[atom_index1].get_pos();
@@ -3666,11 +3674,13 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 					const double r1 = (z1 > 0 && z1 < 114) ? constants::covalent_radii[z1] : 1.5;
 					const double r2 = (z2 > 0 && z2 < 114) ? constants::covalent_radii[z2] : 1.5;
 					const double dAB = std::sqrt((p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1]) + (p1[2] - p2[2]) * (p1[2] - p2[2]));
-					between = dAB <= constants::ang2bohr(1.3 * (r1 + r2)) &&
+					bonded = dAB <= constants::ang2bohr(1.3 * (r1 + r2));
+					between = bonded &&
 						(std::sqrt(min_dist1) + std::sqrt(min_dist2)) <= 1.25 * std::max(1e-5, dAB);
 				}
-				if (atoms[atom_index1].get_charge() == 1 && min_dist1 < 0.36) // The basin holding a proton: its maximum sits within 0.6 bohr of the nucleus
-					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1);
+				if (atoms[atom_index1].get_charge() == 1 && min_dist1 < 0.36) // The basin holding a proton: its maximum sits within 0.6 bohr of the nucleus; the bond to its nearest neighbour
+					result[i] = bonded ? atoms[atom_index2].get_label() + to_string(atom_index2) + "-" + atoms[atom_index1].get_label() + to_string(atom_index1) + " bond"
+						: atoms[atom_index1].get_label() + to_string(atom_index1);
 				else if (lone_atom) // lone atom: core inside the core radius, valence shell outside
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < core_dist ? " core" : " LP");
 				else if (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom

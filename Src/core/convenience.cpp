@@ -541,7 +541,8 @@ std::string help_message =
  "                                    basins of -eli_analysis, and beside them\n"
  "                                    on a thread of its own native NBO with\n"
  "                                    NPA, E2 and NRT (JSON as -nbo\n"
- "                                    writes it, log block printed last).\n"
+ "                                    writes it, log block printed last), and\n"
+ "                                    the -eli_contributions table.\n"
  "                                    Natural orbitals: Mueller DI, 1-RDM ELI-D,\n"
  "                                    E2(D); wiki Correlated-Wavefunctions.\n"
  "  -eli_analysis <wfn> [resolution radius]\n"
@@ -620,6 +621,10 @@ std::string help_message =
  "  -eli_only                          With -eli_analysis: skip the density critical\n"
  "                                    points and QTAIM basins, ELI-D only. With\n"
  "                                    -eli_basin_cube: only that cube, no basin integration.\n"
+ "  -eli_contributions                 With -eli_analysis: per ELI-D basin, where its electrons\n"
+ "                                    come from: QTAIM atoms (Raub-Jansen), Pipek-Mezey IBOs,\n"
+ "                                    Boys IBOs and NLMOs. Closed shell, .gbw/.molden.\n"
+ "                                    Always on in -fba.\n"
  "  -eli_basin_cube <A> <B>            With -eli_analysis: a cube of ELI-D inside the\n"
  "                                    A-B bond basins (element or label, e.g. Pt Zn),\n"
  "                                    zero outside, at the -eli_analysis resolution.\n"
@@ -2971,6 +2976,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-eli_only")
 		eli_only = true;
+	else if (temp == "-eli_contributions")
+		eli_contributions = true;
 	else if (temp == "-no_spin_eli")
 		spin_eli = false;
 	else if (temp == "-basin_analytic")
@@ -3647,6 +3654,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		properties.radius = 3.0;
 		i += 1;
 		fba = true;
+		eli_contributions = true;
 	}
 	//Runs inline rather than setting a flag: it has no cube or basin output to schedule
 	else if (temp == "-eli_family") {

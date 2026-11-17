@@ -936,6 +936,12 @@ TEST(TomlIntegrationTests, ELI_UH6)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, ELI_contributions_epoxide)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_contributions_epoxide");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");

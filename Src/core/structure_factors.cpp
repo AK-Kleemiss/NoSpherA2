@@ -143,17 +143,14 @@ structure_factors::structure_factors(options& opt_in) {
 		if (opt_in.xcw_settings.grown) {
 			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
-		}
-		if (opt_in.xcw_settings.grown && tuning("NOSPHERA2_XCW_GROWN_COPYSUM")) {
-			// Old route: delete the fully applied operations and sum every grown copy's own f over the kept ones. A site's copies
-			// are then not averaged over the operations, which is not the F Olex2 refines from the tscb (R1 0.777 vs 0.748 % on PPh4UF6)
+			// Fifth step of the symmetry resolution: Delete the fully applied operations and solve the symmetry factors for the operations that are kept;
+			// the grid integrates the images under the kept operations only, the table keeps every CIF operation's for Olex2
+			scatter_data.hkl_tsc = scatter_data.hkl_enlarged;
 			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl_table, scatter_data.hkl_enlarged, asym_atoms);
 		}
 		else {
-			// Symmetry factors of an ungrown model, also for an atom on a special position. A grown cluster only shapes the
-			// density and its partition: F is the asymmetric unit's f over all operations, as Olex2 computes it from the tscb
+			// Symmetry factors of an ungrown model, also for an atom on a special position
 			unit_cell.set_sym_fact_from_mult(asym_atoms);
-			for (asym_atom& at : asym_atoms) if (at.grown) at.sym_fact = 0.0;
 		}
 		summary << "Operations F_calc sums over (" << unit_cell.get_num_syms() << "):";
 		for (int op = 0; op < unit_cell.get_num_syms(); op++) summary << "  " << unit_cell.symop_string(op);
@@ -188,6 +185,10 @@ structure_factors::structure_factors(options& opt_in) {
 	// Generate k_pts and set the number of reflections
 	make_k_pts(model_data.nr_enlarged != 0 && scatter_data.hkl.size() == 0, opt_in.save_k_pts, unit_cell, scatter_data.hkl_enlarged, k_pt, std::cout, opt_in.debug);
 	model_data.nr_enlarged = scatter_data.hkl_enlarged.size();
+	if (scatter_data.hkl_tsc.size() > scatter_data.hkl_enlarged.size())
+		make_k_pts(false, false, unit_cell, scatter_data.hkl_tsc, k_pt_tsc, std::cout, opt_in.debug);
+	else
+		scatter_data.hkl_tsc = scatter_data.hkl_enlarged;
 
 	// Find all reflections that are above the I/sigma cutoff
 	const double i_sigma_cutoff = opt_in.xcw_settings.i_sigma_cutoff;
@@ -1494,19 +1495,19 @@ void structure_factors::calc_F_calc(const itsc_block& tsc) {
 	calc_F_calc(sfs);
 }
 
-//The tsc table of the wavefunctions at every entry of hkl_enlarged, by the usual tsc route
+//The tsc table of the wavefunctions at every entry of hkl_tsc, by the usual tsc route
 itsc_block structure_factors::tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log) {
 	svec known_atoms;
-	opt->m_hkl_list = scatter_data.hkl_enlarged;
+	opt->m_hkl_list = scatter_data.hkl_tsc;
 	opt->grid_cache = grids;
-	return calculate_scattering_factors<itsc_block, std::vector<WFN>&>(*opt, wavefunctions, log, known_atoms, 0, &k_pt);
+	return calculate_scattering_factors<itsc_block, std::vector<WFN>&>(*opt, wavefunctions, log, known_atoms, 0, k_pt_tsc.empty() ? &k_pt : &k_pt_tsc);
 }
 
 void structure_factors::calc_F_calc(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log) {
 	calc_F_calc(tsc_table(wavefunctions, grids, log));
 }
 
-void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log) {
+void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log, const double tol) {
 	ensure_inv_H2_weights();
 	ensure_cryst_weights();
 
@@ -1541,7 +1542,7 @@ void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted,
 		if (weighted) precompute *= inv_H2_[r];
 		pre[r] = precompute;
 	}
-	grid_contract(perturb, pre);
+	grid_contract(perturb, pre, tol > 0.0 && prefactor != 0.0 ? tol / std::abs(prefactor) : 0.0);
 	perturb *= prefactor;
 	if (unrestricted) {
 		perturb.conservativeResize(2 * model_data.nmo, Eigen::NoChange);
@@ -1630,9 +1631,11 @@ occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const 
 itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log, const bool refit_shares) {
 	itsc_block result;
 	const bool grid_tscb = !opt->electron_diffraction && !tuning("NOSPHERA2_XCW_GRID_TSCB_OLD");
-	cvec sfc;
-	const int nc = static_cast<int>(XG.inversion_link.size());
+	cvec sfc, sft;
+	const int nc = static_cast<int>(XG.inversion_link.size()), nt = static_cast<int>(scatter_data.hkl_tsc.size());
+	//e indexes hkl_tsc: the integrated entries, or every CIF operation's image for a grown model, transformed apart
 	auto grid_value = [&](const int at, const int e) {
+		if (!sft.empty()) return sft[static_cast<size_t>(at) * nt + e];
 		const cdouble v = sfc[static_cast<size_t>(at) * nc + XG.clean_of[e]];
 		return XG.is_inverse[e] ? std::conj(v) : v;
 	};
@@ -1646,6 +1649,7 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 		XG.refresh = XG.ws && refit_shares;
 		sfc = grid_sfc(D);
 		XG.refresh = false;
+		if (!k_pt_tsc.empty()) sft = grid_sf_at(k_pt_tsc);
 	}
 	if (grid_tscb && !tscb_scat_.empty()) {
 		cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
@@ -1659,7 +1663,7 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 		//first step on the grid route: learn the table's layout, each scatterer's atom by the closest grid column
 		if (grid_tscb) {
 			std::map<i3, int> e_of;
-			for (const i3& h : scatter_data.hkl_enlarged) e_of.emplace(h, static_cast<int>(e_of.size()));
+			for (const i3& h : scatter_data.hkl_tsc) e_of.emplace(h, static_cast<int>(e_of.size()));
 			const int nrow = static_cast<int>(result.reflection_size()), ns = static_cast<int>(result.get_scatterers().size());
 			ivec entry(nrow), atom(ns);
 			bool ok = true;

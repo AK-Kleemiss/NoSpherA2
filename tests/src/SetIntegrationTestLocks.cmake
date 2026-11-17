@@ -164,6 +164,7 @@ set_tests_properties(
     TomlIntegrationTests.SF_becke
     TomlIntegrationTests.SF_mbis
     TomlIntegrationTests.SF_embis
+    TomlIntegrationTests.ELI_contributions_epoxide
     TscLabelConverterTests.FixtureIdsMapOntoEpoxideLabels
     TscLabelConverterTests.ErrorsAreReportedNotThrown
     PROPERTIES

@@ -1,6 +1,9 @@
 name: GPU (Aspire)
-# Fat CUDA build + ctest on real NVIDIA hardware: the self-hosted laptop Aspire (GTX 1060, sm_61, 8 threads, 32 GB),
+# Fat CUDA + HIP build, SSE4.2 (NOS_AVX=OFF) like the hosted CI's release binaries, ctest on real NVIDIA hardware,
+# and the binaries uploaded as artifacts: the self-hosted laptop Aspire (GTX 1060, sm_61, 8 threads, 32 GB),
 # Windows runner as a service, Linux runner in WSL2 Ubuntu 24.04. Internet only through FLOWOFFICE's proxy.
+# The ROCm SDK comes from the ALL bootstrap's wheels in .mambaenv/rocm, fetched once and kept (clean: false);
+# CMakeLists picks it up from root.txt, so HIP_PATH stays unset.
 # No pull_request trigger on purpose: in a public repository a fork PR could otherwise run its own code on Aspire.
 # schedule and workflow_dispatch only act once this file is on the default branch (master).
 on:
@@ -39,18 +42,64 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
           arch: x64
+      # 11 Nov 2026: Windows Update ran the VS update as SYSTEM (no proxy), removed SDK 26100 and cancelled.
+      # vswhere -latest skips the incomplete instance, msvc-dev-cmd silently fell back to SDK 19041, and the PCH
+      # kept from the 26100 build (clean: false) broke every TU with corecrt.h redefinitions.
+      - name: toolchain guard
+        run: |
+          if (-not (& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath)) {
+            throw 'vswhere finds no complete Visual Studio instance - an interrupted VS update? Repair VS on Aspire.'
+          }
+          $b = 'build/release-windows'
+          $stamp = "$b/toolchain.stamp"
+          $now = "$env:WindowsSDKVersion|$env:VCToolsVersion"
+          Write-Host "toolchain: $now"
+          if ((Test-Path $b) -and (-not (Test-Path $stamp) -or (Get-Content $stamp -Raw).Trim() -ne $now)) {
+            Write-Host 'toolchain changed: dropping the precompiled headers'
+            Get-ChildItem $b -Recurse -Include 'cmake_pch*.pch', 'cmake_pch*.obj' | Remove-Item -Force
+          }
+          if (Test-Path $b) { Set-Content $stamp $now -NoNewline }
       - run: nvidia-smi
       - name: bootstrap
-        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9 -P scripts/BootstrapMicromamba.cmake
+        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9 -P scripts/BootstrapMicromamba.cmake
+      # the bootstrap is non-fatal by design; here a missing ROCm SDK must fail the run, not ship a CUDA-only binary
+      - name: ROCm SDK
+        run: |
+          if (-not (Test-Path .mambaenv/rocm/root.txt)) { throw 'ALL bootstrap fetched no ROCm SDK (proxy? see the bootstrap step)' }
+          $root = (Get-Content .mambaenv/rocm/root.txt -Raw).Trim()
+          Write-Host "ROCm root: $root"
+          & "$root/lib/llvm/bin/clang++.exe" --version
+          "HIP_PLATFORM=amd", "HIP_DEVICE_LIB_PATH=$root/lib/llvm/amdgcn/bitcode" | Out-File $env:GITHUB_ENV -Append -Encoding ascii
       - name: configure
         run: >-
-          cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
+          cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON -DNOS_AVX=OFF
           -DNOSPHERA2_GPU_AUTO=OFF -DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_CUDA_PORTABLE=ON
+          -DNOSPHERA2_USE_HIP=ON -DNOSPHERA2_HIP_PORTABLE=ON
           "-DCMAKE_CUDA_ARCHITECTURES=$env:CUDA_ARCHS"
       - name: build
         run: cmake --build --preset release-windows
       - name: test
         run: ctest --preset release-windows --output-on-failure
+      - name: package
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Compress-Archive -Path build/release-windows/bin/* -DestinationPath artifacts/NoSpherA2-windows-x64-gpu.zip -Force
+          Get-ChildItem artifacts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: NoSpherA2-windows-x64-gpu
+          path: artifacts/NoSpherA2-windows-x64-gpu.zip
+          if-no-files-found: error
+      - name: upload test logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-logs-NoSpherA2-windows-x64-gpu
+          if-no-files-found: ignore
+          path: |
+            build/release-windows/Testing/Temporary
+            build/release-windows/CMakeFiles/CMakeConfigureLog.yaml
+            build/release-windows/CMakeCache.txt
 
   # After the Windows job, not beside it: both share the same 8 threads and 32 GB
   linux:
@@ -67,13 +116,47 @@ jobs:
           submodules: recursive
       - run: nvidia-smi
       - name: bootstrap
-        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9 -P scripts/BootstrapMicromamba.cmake
+        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9 -P scripts/BootstrapMicromamba.cmake
+      - name: ROCm SDK
+        run: |
+          set -euo pipefail
+          test -f .mambaenv/rocm/root.txt || { echo 'ALL bootstrap fetched no ROCm SDK (proxy? see the bootstrap step)'; exit 1; }
+          root="$(cat .mambaenv/rocm/root.txt)"
+          echo "ROCm root: ${root}"
+          "${root}/lib/llvm/bin/clang++" --version | head -n 1
+          # LD_LIBRARY_PATH as in the hosted CI: the tests then see a HIP runtime with no AMD device behind it
+          {
+            echo "HIP_PLATFORM=amd"
+            echo "HIP_DEVICE_LIB_PATH=${root}/lib/llvm/amdgcn/bitcode"
+            echo "LD_LIBRARY_PATH=${root}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+          } >> "${GITHUB_ENV}"
       - name: configure
         run: >-
-          cmake --preset release-linux -DNOSPHERA2_BUILD_TESTS=ON
+          cmake --preset release-linux -DNOSPHERA2_BUILD_TESTS=ON -DNOS_AVX=OFF
           -DNOSPHERA2_GPU_AUTO=OFF -DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_CUDA_PORTABLE=ON
+          -DNOSPHERA2_USE_HIP=ON -DNOSPHERA2_HIP_PORTABLE=ON
           "-DCMAKE_CUDA_ARCHITECTURES=$CUDA_ARCHS"
       - name: build
         run: cmake --build --preset release-linux
       - name: test
         run: ctest --preset release-linux --output-on-failure
+      - name: package
+        run: |
+          mkdir -p artifacts
+          tar -czf artifacts/NoSpherA2-linux-x86_64-gpu.tar.gz -C build/release-linux/bin .
+          ls -lah artifacts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: NoSpherA2-linux-x86_64-gpu
+          path: artifacts/NoSpherA2-linux-x86_64-gpu.tar.gz
+          if-no-files-found: error
+      - name: upload test logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-logs-NoSpherA2-linux-x86_64-gpu
+          if-no-files-found: ignore
+          path: |
+            build/release-linux/Testing/Temporary
+            build/release-linux/CMakeFiles/CMakeConfigureLog.yaml
+            build/release-linux/CMakeCache.txt

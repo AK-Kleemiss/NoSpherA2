@@ -52,7 +52,7 @@ namespace
 	}
 }
 
-IBOResult intrinsic_bond_orbitals(const WFN &wavy)
+IBOResult intrinsic_bond_orbitals(const WFN &wavy, const bool boys)
 {
 	err_checkf(!wavy.get_is_unrestricted(), "IBO: only closed-shell (RHF/RKS) wavefunctions are supported; this one is unrestricted. "
 				"Localise alpha and beta separately in the program that wrote it.", std::cout);
@@ -161,10 +161,30 @@ IBOResult intrinsic_bond_orbitals(const WFN &wavy)
 	for (int mu = n2 - 1; mu >= 0; mu--) first[iao_atom[mu]] = mu;
 	for (int a = ncen - 1; a >= 0; a--) first[a] = std::min(first[a], first[a + 1]);
 	auto pop = [&](const int a, const int i, const int j) { return B.block(first[a], i, first[a + 1] - first[a], 1).cwiseProduct(B.block(first[a], j, first[a + 1] - first[a], 1)).sum(); };
+	//Boys: <i|r_c|j> over the occupied MOs; libcint r is about the origin, the functional is origin-invariant
+	r.boys = boys;
+	std::array<MatrixXd, 3> R;
+	if (boys) {
+		vec dflat;
+		compute2C<Dipole2C_SPH>(pw, dflat, 3);
+		err_checkf(dflat.size() == 3 * static_cast<size_t>(n1) * n1, "Boys: dipole integrals have the wrong size", std::cout);
+		for (int c = 0; c < 3; c++) {
+			MatrixXd D(n1, n1);
+			for (int j = 0; j < n1; j++)
+				for (int i = 0; i < n1; i++) {
+					const double v = dflat[i + static_cast<size_t>(j) * n1 + static_cast<size_t>(c) * n1 * n1];
+					D(i, j) = flip[i] != flip[j] ? -v : v;
+				}
+			R[c] = C.transpose() * D * C;
+		}
+	}
 	auto functional = [&]() {
 		double f = 0.0;
 		for (int k = 0; k < nocc; k++)
-			for (int a = 0; a < ncen; a++) f += std::pow(pop(a, k, k), 4);
+			if (boys)
+				for (int c = 0; c < 3; c++) f += R[c](k, k) * R[c](k, k);
+			else
+				for (int a = 0; a < ncen; a++) f += std::pow(pop(a, k, k), 4);
 		return f;
 	};
 	r.functional_start = functional();
@@ -174,11 +194,18 @@ IBOResult intrinsic_bond_orbitals(const WFN &wavy)
 		for (int i = 0; i < nocc; i++)
 			for (int j = 0; j < i; j++) {
 				double Aij = 0.0, Bij = 0.0;
-				for (int a = 0; a < ncen; a++) {
-					const double qii = pop(a, i, i), qjj = pop(a, j, j), qij = pop(a, i, j);
-					Aij += -std::pow(qii, 4) - std::pow(qjj, 4) + 6.0 * (qii * qii + qjj * qjj) * qij * qij + qii * qii * qii * qjj + qii * qjj * qjj * qjj;
-					Bij += 4.0 * qij * (qii * qii * qii - qjj * qjj * qjj);
-				}
+				if (boys)
+					for (int c = 0; c < 3; c++) {
+						const double d = R[c](i, i) - R[c](j, j), x = R[c](i, j);
+						Aij += x * x - 0.25 * d * d;
+						Bij += x * d;
+					}
+				else
+					for (int a = 0; a < ncen; a++) {
+						const double qii = pop(a, i, i), qjj = pop(a, j, j), qij = pop(a, i, j);
+						Aij += -std::pow(qii, 4) - std::pow(qjj, 4) + 6.0 * (qii * qii + qjj * qjj) * qij * qij + qii * qii * qii * qjj + qii * qjj * qjj * qjj;
+						Bij += 4.0 * qij * (qii * qii * qii - qjj * qjj * qjj);
+					}
 				grad += Bij * Bij;
 				const double phi = 0.25 * std::atan2(Bij, -Aij), c = std::cos(phi), s = std::sin(phi);
 				const Eigen::VectorXd bi = B.col(i), ui = U.col(i);
@@ -186,10 +213,19 @@ IBOResult intrinsic_bond_orbitals(const WFN &wavy)
 				B.col(j) = -s * bi + c * B.col(j);
 				U.col(i) = c * ui + s * U.col(j);
 				U.col(j) = -s * ui + c * U.col(j);
+				if (boys)
+					for (MatrixXd &M : R) {
+						const Eigen::VectorXd mi = M.col(i);
+						M.col(i) = c * mi + s * M.col(j);
+						M.col(j) = -s * mi + c * M.col(j);
+						const Eigen::RowVectorXd ri = M.row(i);
+						M.row(i) = c * ri + s * M.row(j);
+						M.row(j) = -s * ri + c * M.row(j);
+					}
 			}
 		if (std::sqrt(grad) < 1e-10) break;
 	}
-	err_checkf(r.sweeps <= 1000, "IBO: localisation did not converge in 1000 sweeps", std::cout);
+	err_checkf(r.sweeps <= 1000, boys ? "Boys: localisation did not converge in 1000 sweeps" : "IBO: localisation did not converge in 1000 sweeps", std::cout);
 	r.functional = functional();
 	//populations, energies, classification
 	const MatrixXd L = C * U, SL = S1 * L;
@@ -252,11 +288,22 @@ IBOResult intrinsic_bond_orbitals(const WFN &wavy)
 	return r;
 }
 
+std::string ibo_label(const IBOResult &r, const WFN &wavy, const int k)
+{
+	static const char *tag[] = {"CR ", "LP ", "BD ", "DL "};
+	std::string s = tag[static_cast<int>(r.kind[k])] + atom_label(wavy, r.centres[k][0]);
+	for (size_t c = 1; c < r.centres[k].size(); c++) s += "-" + atom_label(wavy, r.centres[k][c]);
+	return s;
+}
+
 void print_ibo(const IBOResult &r, const WFN &wavy, std::ostream &file)
 {
 	using namespace std;
 	const int ncen = wavy.get_ncen(), nocc = static_cast<int>(r.mos.size());
-	file << "\nIntrinsic atomic orbitals and intrinsic bond orbitals (IAO/IBO, MINAO reference, exponent 4)\n";
+	if (r.boys)
+		file << "\nIntrinsic atomic orbitals (MINAO reference) and Boys-localised orbitals\n";
+	else
+		file << "\nIntrinsic atomic orbitals and intrinsic bond orbitals (IAO/IBO, MINAO reference, exponent 4)\n";
 	citations::cite(citations::Method::IBO, file);
 	file << "\nIAO partial charges\n" << fixed << setprecision(5);
 	double total = 0.0;
@@ -265,7 +312,7 @@ void print_ibo(const IBOResult &r, const WFN &wavy, std::ostream &file)
 		total += r.charge[a];
 	}
 	file << "  " << left << setw(6) << "Total" << right << setw(11) << total << "\n";
-	file << "\nLocalisation sum_k sum_A (q_A^k)^4: " << setprecision(10) << r.functional_start << " (canonical) -> " << r.functional
+	file << (r.boys ? "\nLocalisation sum_k |<k|r|k>|^2 (bohr^2): " : "\nLocalisation sum_k sum_A (q_A^k)^4: ") << setprecision(10) << r.functional_start << " (canonical) -> " << r.functional
 		 << " after " << r.sweeps << " sweeps, " << nocc << " doubly occupied orbitals\n" << setprecision(5);
 	file << "IBO, orbital energy (Eh, Fock diagonal), then each atom with IAO population >= 0.01 and its Mulliken population [ ]\n";
 	const char *title[] = {"Core", "Lone pairs", "Bond-like (two-centre, top two >= 0.85)", "Delocalised"};

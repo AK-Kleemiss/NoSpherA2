@@ -213,9 +213,10 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
  * NLMOs are the occupied orbitals of maximum overlap with their Lewis NBOs: the NBOs projected on the occupied
  * space (Gamma / c, c = 2 closed shell, 1 per spin) and Loewdin-orthogonalised, Reed and Weinhold's NLMOs
  * (J. Chem. Phys. 83 (1985) 1736).  picked[k] is the printed number and label of slot k.
+ * expansion, if given: (*expansion)[k][m] = coefficient of WFN MO m in slot k, 0 for MOs of the other spin.
  */
 WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& space, const std::string& spec,
-				 bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log);
+				 bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log, vec2* expansion = nullptr);
 
 /** Print the tables of a native result in NoSpherA2's table layout; the JSON keeps gennbo's labels. */
 void print_nbo(const NboResults& results, std::ostream& out);

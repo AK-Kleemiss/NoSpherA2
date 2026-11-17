@@ -1292,6 +1292,8 @@ struct options
 	svec eli_basin_atoms;
 	//-eli_only: -eli_analysis without the density critical points and QTAIM basins
 	bool eli_only = false;
+	//-eli_contributions: with -eli_analysis, what each ELI-D basin's electrons come from (QTAIM atoms, PM/Boys IBOs, NLMOs)
+	bool eli_contributions = false;
 	//-eli_mask_cube: ELI-D on the nonzero voxels of this cube's grid, nothing else
 	std::filesystem::path eli_mask_cube;
 	//-no_spin_eli: skip the spin-resolved ELI-D basins of a spin-polarised wavefunction

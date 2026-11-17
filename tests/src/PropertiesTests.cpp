@@ -1256,8 +1256,14 @@ TEST(PropertiesBasinTests, EliLabelsCoreLonePairBondAndProton)
 	EXPECT_EQ(labels[0], "C0 core");
 	EXPECT_EQ(labels[1], "C0-O1 bond");
 	EXPECT_EQ(labels[2], "O1 LP");
-	EXPECT_EQ(labels[3], "H2");
+	EXPECT_EQ(labels[3], "C0-H2 bond");   // H 2.0 bohr from C: the proton's basin is the C-H bond
 	EXPECT_EQ(labels[4], "O1 core");
+
+	// a proton beyond 1.3 * (r_C + r_H) of every atom keeps its own label
+	atoms[2] = atom("H", atomID(), 3, -8.0, 0.0, 0.0, 1);
+	const svec lone = assign_labels_to_basins({ d4{ -7.6, 0.0, 0.0, 0.9 } }, atoms, false, 1);
+	ASSERT_EQ(lone.size(), 1u);
+	EXPECT_EQ(lone[0], "H2");
 }
 
 // Two nearest nuclei are not a bond unless the maximum lies between them. Hydrogen is where it shows: for

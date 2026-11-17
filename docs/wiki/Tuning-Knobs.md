@@ -46,7 +46,9 @@ page does not mention, and any name here that no source reads any more.
 | --- | --- | --- | --- |
 | `NOSPHERA2_XCW_GRID_DIRECT` | off | Direct-sum transform of the grid instead of Fourier-Bessel. | `xcw_grid.cpp` |
 | `NOSPHERA2_XCW_GRID_FB_H` | `0.25` | Node step h r_max of the 4-point Lagrange table of the Fourier-Bessel transform; error ~ (h r)^4. | `xcw_grid.cpp` |
-| `NOSPHERA2_XCW_GRID_DTOL` | `0` (off) | Per-block bound on the \|dF\| a kept rho may carry (host only). Off because an SCF moves every element of D each cycle. | `xcw_grid.cpp` |
+| `NOSPHERA2_XCW_GRID_DTOL` | `0` (off) | Work in progress, no significant speed-up yet. Incremental F_calc in SCF iterations outside TRAH: a grid block keeps its rho from the last iteration while its bound on \|df_g\| (electrons), summed over the iterations it is kept, fits in its atom's share of this value; an atom with no block integrated keeps its transform. Host, Fourier-Bessel and grid partition only. | `xcw_grid.cpp` |
+| `NOSPHERA2_XCW_GRID_PTOL` | `0` (off) | Work in progress, no significant speed-up yet. Incremental perturbation in SCF iterations outside TRAH: a grid block keeps its part of P from the last iteration while its bound on the entries of lambda P (Eh) fits in this value. Host only. | `XCW_wrapper.cpp` |
+| `NOSPHERA2_XCW_GRID_FULL` | `8` | Work in progress. Every how many incremental evaluations F_calc and the perturbation are built from every block again. | `xcw_grid.cpp` |
 | `NOSPHERA2_XCW_GRID_TIME` | off | Wall time of each grid stage, printed per call. | `xcw_grid.cpp` |
 | `NOSPHERA2_XCW_GRID_AO_TOL` | `-acc` cutoff | AO value below which a block drops an AO; below 1e-20 also turns the Morton reordering off. | `structure_factors.cpp` |
 | `NOSPHERA2_XCW_GRID_NO_MORTON` | off | Keep the grid points in shell order instead of Morton order. Sums do not depend on the order; only the speed does. | `structure_factors.cpp` |

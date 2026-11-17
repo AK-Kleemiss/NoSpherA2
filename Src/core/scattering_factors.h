@@ -55,7 +55,11 @@ struct scatter_data {
 	hkl_list hkl;
 	// hkl plus the twin images R h (-twin): the reflections the written table covers; the fit stays on hkl
 	hkl_list hkl_table;
+	// The images of hkl_table under the operations F_calc sums over, the entries the grid integrates
 	hkl_list hkl_enlarged;
+	// The images of hkl_table under every CIF operation, the rows of the written tsc table; hkl_enlarged unless a grown model
+	// deleted operations
+	hkl_list hkl_tsc;
 	// hkl_enlarged with one entry of every inversion related pair, see cell::remove_inv_vectors
 	hkl_list inversion_cleaned_hkl;
 	cvec anom_correction;

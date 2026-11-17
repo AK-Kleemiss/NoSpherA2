@@ -81,12 +81,20 @@ public:
 		ivec clean_of;
 		bvec is_inverse;
 		std::shared_ptr<struct xcw_fb> fb; //the planned Fourier-Bessel transform of every atom grid, null: the direct sum
-		//grid_F's change-only update: a block whose rho can have moved by less than NOSPHERA2_XCW_GRID_DTOL
-		//since it was last integrated keeps its rho. bound = Sum_p w_p (Sum_mu |chi_mu|)^2 per block, so
-		//max|dD| bound bounds Sum_p |w drho| and with it |dF|; drift sums that over the calls it was kept
-		occ::Mat D_last;
-		vec2 rho_last;
-		vec bound, drift;
+		//Incremental evaluation along an SCF (track). A block keeps its rho while 2 Sum_munu |dD| A_munu, A = Sum_p w_p
+		//|chi_mu chi_nu| (absS, upper triangle), summed with drift over the calls it was kept, fits in its atom's share of
+		//NOSPHERA2_XCW_GRID_DTOL, a bound on |df_g|; an atom with no block integrated keeps f_g. The perturbation keeps a
+		//block's part of P_last while Sum_p |V_p - V_app,p| m2_p, m2 = max_mu chi_mu^2, fits in its tolerance, V_app being
+		//the potential that part was built from. Every NOSPHERA2_XCW_GRID_FULL calls both are built in full.
+		//WIP, off by default: no significant speed-up yet (the grid is ~5% of a P1 def2-TZVP scan, ~0.1% of a UF6 iteration)
+		occ::Mat D_last, P_last;
+		vec2 rho_last, V_app, m2;
+		vec drift;
+		std::vector<std::vector<float>> absS;
+		cvec sfc_last;
+		std::vector<char> todo, todo_b;
+		bool track = false;
+		int f_calls = 0, p_calls = 0;
 		//the block stages run on the device (xcw_grid_gpu.h), atom grid g's points from gpu_off[g] there
 		bool on_device = false;
 		ivec gpu_off;
@@ -112,13 +120,17 @@ public:
 	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table.
 	//The atoms' shares come from the grid weights, or from the RI fit when XR.on
 	cvec grid_sfc(const dMatrix2& D);
+	//the per-atom transform of the partition grid_sfc last evaluated at the points k [3][n], [g * n + i]: the rows of
+	//the table a grown model does not integrate
+	cvec grid_sf_at(const vec2& k);
 	//out = Sum_r Re(pre_r dF_r/dD(mu, nu)) over the fit set, the transpose of grid_F: the walk the perturbation and its
 	//response share; nmo x nmo, symmetric, without any prefactor
-	void grid_contract(occ::Mat& out, const cvec& pre);
+	//tol > 0: incremental against the last such call, an atom's part left out while it can move out by less than tol
+	void grid_contract(occ::Mat& out, const cvec& pre, const double tol = 0.0);
 	//the weighted density 2 w_p rho(p) of every atom grid, grid_sfc's first half
 	vec2& grid_rho(const dMatrix2& D);
-	//out += Sum_p chi_mu V_p chi_nu over the blocks, the transpose of grid_rho for V_p = w_p v_p
-	void grid_apply_V(const vec2& V, occ::Mat& out);
+	//out += Sum_p chi_mu V_p chi_nu over the blocks in todo (indexed as grid_rho lists them, all when null), the transpose of grid_rho for V_p = w_p v_p
+	void grid_apply_V(const vec2& V, occ::Mat& out, const std::vector<char>* todo = nullptr);
 
 	//The atoms' shares of rho as an RI fit (-xcw_partition ri) instead of the grid weights: c = H^-1 (2 B D + R^T S^2 T(D)),
 	//B = (mu nu|P) from occ's density-fitting engine, H = J + R^T S^2 R, R the analytic multipoles of the aux functions about
@@ -150,6 +162,8 @@ public:
 	//to be the transpose of F_calc, whichever partition runs, with the shares the grid holds
 	void check_adjoint();
 	cvec ri_sfc(const dMatrix2& D);
+	//F_P at the points k of the aux functions on atom only (every atom for -1), [atom][j nk + i]
+	void ri_kernels(const vec& kx, const vec& ky, const vec& kz, std::vector<cvec>& F, const int only) const;
 	void ri_contract(const cvec& H, occ::Mat& out);
 
 	//The entries of a rank-N symmetric tensor stored packed in the order i <= j <= k (<= l): the powers of x, y
@@ -181,6 +195,8 @@ public:
 	std::shared_ptr<BasisSet> orbital_basis;
 	// Store the k points
 	vec2 k_pt;
+	// The k points of hkl_tsc, empty while it is hkl_enlarged
+	vec2 k_pt_tsc;
 	// The refined extinction coefficient, or the six Voigt components X11 X22 X33 X12 X13 X23
 	// of the anisotropic tensor. Empty when no model is active, which is what every extinction
 	// branch tests on.
@@ -309,11 +325,12 @@ public:
 	void calc_F_calc(const itsc_block& tsc);
 	// F_calc from wavefunctions, through the tsc table tsc_table computes for them
 	void calc_F_calc(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
-	// The tsc table of the wavefunctions at every entry of hkl_enlarged; grids keeps the integration grids for the next call
+	// The tsc table of the wavefunctions at every entry of hkl_tsc; grids keeps the integration grids for the next call
 	itsc_block tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
 
-	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block
-	void perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log);
+	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block;
+	// tol > 0 builds it incrementally, each atom's part kept while its entries can move by less than tol
+	void perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log, const double tol = 0.0);
 	// lambda times the change of the perturbation matrix for a change dD_eff of the density, the scale
 	// moving along; leaves F_calc and the scale as they were
 	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda);
@@ -330,7 +347,7 @@ public:
 	itsc_block result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log, const bool refit_shares);
 	// What result_table keeps between steps: the integration grids of the tsc route and, on the grid route,
 	// the layout of the first table: its scatterers, hkl rows, the asym atom of each scatterer and the
-	// hkl_enlarged entry of each row
+	// hkl_tsc entry of each row
 	GridManager tsc_grids;
 	ScattererLabels tscb_scat_;
 	ivec2 tscb_hkl_;

@@ -56,9 +56,9 @@ private:
 	void report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result);
 
 	// SCF_coupling: what the SCF asks of the structure factors, see XCW_solver.h
-	void evaluate_cryst_crit(const dMatrix2& dm_eff) override;
+	void evaluate_cryst_crit(const dMatrix2& dm_eff, const bool incremental) override;
 	fit_quality cryst_crit() const override;
-	void perturbation_matrix(occ::Mat& perturb, const bool unrestricted) override;
+	void perturbation_matrix(occ::Mat& perturb, const bool unrestricted, const double lambda, const bool incremental) override;
 	occ::Mat perturbation_matrix_response(const dMatrix2& dD_eff, const double lambda) override;
 	void save_F_calc() override;
 	void restore_F_calc() override;
