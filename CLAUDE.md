@@ -239,6 +239,8 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-18 (`-SALTED_distance` review fixes, `b77e294b`), atoms with no environment are listed as such, a non-numeric eigcut stops, the CSV quotes the model path and the novelty restores the predictor's state; three tests are new (`KernelNoveltyDropsEigenvaluesBelowEigcut`, `KernelNoveltyTakesTheEigcutFromTheFlag`, `KernelNoveltyReportsSharedModels`). `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1439 passed, 0 failed, 12 skipped** (2 disabled) of 1453; on Linux (AKL048, Slurm job 1828612, GCC 11.5 `release-linux-tests`, CPU only, one process per test) **1424 passed, 0 failed, 23 skipped** (2 disabled) of 1449. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-18 (`-SALTED_distance`, branch `salted-distance` on master `747450e6`), the per-atom lambda = 0 kernel novelty
 matches `kernel_novelty_salted.py` to 5e-13 on cysteine and water; five tests are new (four `KernelNovelty*` and
 `TomlIntegrationTests.SaltedDistance`). `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1436 passed,
