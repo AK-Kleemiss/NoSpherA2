@@ -19,12 +19,16 @@ struct SALTED_model_store
 
 //-SALTED_distance, one atom and one model covering it: kmax0 the largest l = 0 kernel to a reference environment
 //(row nearest of the model's block), self = p0.p0, nov0 = 1 - |k0^zeta V|^2 / self^zeta the share of the atom's own
-//kernel outside the span of the references, role assigned/shared/alternative, status ok/filled/empty environment/not computable
+//kernel outside the span of the references, role assigned/shared/alternative, status ok/filled/empty environment/not computable;
+//split: neighbour pair channel -> (|p0_c|^2 / self, its share of nov0, the shares summing to nov0), empty unless zeta is an
+//integer; absent: the channels of the atom no reference environment of its element has; path: how K_MM was inverted
 struct salted_novelty
 {
 	int atom = -1, nearest = -1;
-	std::string label, element, model, role, status;
-	double kmax0 = NAN, cosine = NAN, self = NAN, nov0 = NAN;
+	std::string label, element, model, role, status, path;
+	double kmax0 = NAN, cosine = NAN, self = NAN, nov0 = NAN, zeta = NAN;
+	std::map<std::string, std::pair<double, double>> split;
+	svec absent;
 };
 
 //The SALTED prediction for a structure as a flat table with its coefficients, so rho and the ESP
@@ -78,6 +82,10 @@ private:
 	bool novelty_eig = false;
 	vec kmax0{}, self0{}, nov0{};
 	ivec nearest0{};
+	// per atom of wavy its salted_novelty split and absent channels, per species the K_MM path
+	std::vector<std::map<std::string, std::pair<double, double>>> split0{};
+	std::vector<svec> absent0{};
+	std::map<std::string, std::string> path0{};
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
 	vec merge_predictions();
 	// Estimate what the spherically filled atoms should carry, so the size of the

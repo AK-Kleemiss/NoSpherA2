@@ -14,6 +14,7 @@
 #include "wfn_class.h"
 #include "basis_set.h"
 #include "citations.h"
+#include <nlohmann/json.hpp>
 #include <cstring>
 #include <filesystem>
 
@@ -584,6 +585,9 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 		p.self0.assign(n, NAN);
 		p.nov0.assign(n, NAN);
 		p.nearest0.assign(n, -1);
+		p.split0.assign(n, {});
+		p.absent0.assign(n, {});
+		p.path0.clear();
 		p.predict();
 		p.shrink_intermediate_vectors();
 		p.score_only = false;
@@ -653,6 +657,10 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 			r.nearest = s.nearest0[p];
 			r.self = s.self0[p];
 			r.nov0 = s.nov0[p];
+			r.zeta = s.config.zeta;
+			r.split = s.split0[p];
+			r.absent = s.absent0[p];
+			if (s.path0.count(r.element)) r.path = s.path0.at(r.element);
 			r.status = r.self == 0.0 ? "empty environment" : std::isnan(r.nov0) ? "not computable" : "ok";
 			rows.push_back(r);
 		}
@@ -673,10 +681,41 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 	log << "SALTED kernel novelty at lambda = 0, eigcut " << eigcut << ": nov0 is 0 inside the span of the model's reference environments and 1 outside it\n"
 		<< std::left << std::setw(6) << "Atom" << std::setw(8) << "Label" << std::setw(4) << "El" << std::setw(32) << "Model" << std::setw(12) << "Role"
 		<< std::right << std::setw(10) << "kmax0" << std::setw(10) << "cosine" << std::setw(10) << "nov0" << "  status\n";
+	//the two largest of v as percentages of nov0, the rest as others
+	auto largest = [](std::vector<std::pair<double, std::string>> v, const double nov) {
+		std::sort(v.rbegin(), v.rend());
+		std::ostringstream s;
+		double rest = 0.0;
+		for (int i = 0; i < (int)v.size(); i++)
+			if (i < 2) s << (i ? ", " : "") << v[i].second << " " << std::lround(100.0 * v[i].first / nov) << " %";
+			else rest += v[i].first;
+		if (v.size() > 2) s << ", others " << std::lround(100.0 * rest / nov) << " %";
+		return s.str();
+	};
+	//element shares: channel (e, e) counts to e, (e, f) half to each
+	auto elements = [](const salted_novelty& r) {
+		std::map<std::string, double> s;
+		for (const auto& [c, v] : r.split)
+		{
+			const size_t d = c.find('-');
+			s[c.substr(0, d)] += 0.5 * v.second;
+			s[c.substr(d + 1)] += 0.5 * v.second;
+		}
+		return s;
+	};
+	std::set<std::string> no_split;
 	for (const auto& r : rows)
+	{
 		log << std::left << std::setw(6) << r.atom + 1 << std::setw(8) << r.label << std::setw(4) << r.element << std::setw(32) << name(r.model)
 			<< std::setw(12) << (r.role.empty() ? "-" : r.role) << std::right << std::setw(10) << num(r.kmax0) << std::setw(10) << num(r.cosine)
 			<< std::setw(10) << num(r.nov0) << "  " << r.status << "\n";
+		if (r.status == "ok" && !(r.zeta >= 1.0 && r.zeta == std::floor(r.zeta))) no_split.insert(name(r.model) + " (zeta " + std::to_string(r.zeta) + ")");
+		if (r.split.empty() || !(r.nov0 > 1e-6)) continue;
+		std::vector<std::pair<double, std::string>> c, e;
+		for (const auto& [k, v] : r.split) c.push_back({ v.second, k });
+		for (const auto& [k, v] : elements(r)) e.push_back({ v, k });
+		log << "      from: " << largest(c, r.nov0) << "; elements: " << largest(e, r.nov0) << "\n";
+	}
 	std::map<std::string, std::vector<std::pair<double, int>>> el;
 	for (int i = 0; i < (int)rows.size(); i++)
 		if (rows[i].role == "assigned" && rows[i].status == "ok") el[rows[i].element].push_back({ rows[i].nov0, i });
@@ -690,6 +729,23 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 		log << "  " << std::left << std::setw(3) << e << "n = " << n << ", median " << num(med) << ", max " << num(top.nov0)
 			<< " (atom " << top.atom + 1 << ", " << top.label << ")\n";
 	}
+	for (const auto& m : no_split) log << "Channel split not available for " << m << ": its shares are sums of squares only for integer zeta\n";
+	std::map<std::string, std::map<std::string, ivec>> absent;
+	for (const auto& r : rows)
+		if (r.role == "assigned")
+			for (const auto& c : r.absent) absent[r.element][c].push_back(r.atom + 1);
+	log << "Channels absent from the model's references:" << (absent.empty() ? " none" : "");
+	for (const auto& [e, cs] : absent)
+	{
+		log << (e == absent.begin()->first ? " " : "; ") << e << ":";
+		for (const auto& [c, at] : cs)
+		{
+			log << (c == cs.begin()->first ? " " : ", ") << c << " (atom" << (at.size() > 1 ? "s " : " ");
+			for (int i = 0; i < (int)at.size(); i++) log << (i ? ", " : "") << at[i];
+			log << ")";
+		}
+	}
+	log << "\n";
 	const std::filesystem::path csv = xyz.stem().string() + "_salted_distance.csv";
 	std::ofstream o(csv);
 	o << "atom,label,element,model,role,kmax0,cosine,nov0,status,nearest,p0p0\n" << std::setprecision(12);
@@ -706,7 +762,31 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 		if (!std::isnan(r.self)) o << r.self;
 		o << "\n";
 	}
-	log << "Wrote " << csv.string() << std::endl;
+	nlohmann::ordered_json j{ { "model", model.generic_string() }, { "xyz", xyz.generic_string() }, { "eigcut", eigcut },
+		{ "models", nlohmann::ordered_json::object() }, { "atoms", nlohmann::ordered_json::array() } };
+	for (const auto& r : rows)
+	{
+		nlohmann::ordered_json a{ { "atom", r.atom + 1 }, { "label", r.label }, { "element", r.element }, { "model", r.model }, { "role", r.role },
+			{ "kmax0", r.kmax0 }, { "cosine", r.cosine }, { "nov0", r.nov0 }, { "status", r.status },
+			{ "nearest", r.nearest >= 0 ? nlohmann::ordered_json(r.nearest) : nlohmann::ordered_json() }, { "p0p0", r.self },
+			{ "channels", nlohmann::ordered_json::object() }, { "elements", nlohmann::ordered_json::object() }, { "absent", r.absent } };
+		//share: the channel's part of nov0 (the shares sum to nov0), fraction: share / nov0, environment: |p0_c|^2 / p0.p0
+		for (const auto& [c, v] : r.split)
+			a["channels"][c] = { { "share", v.second }, { "fraction", v.second / r.nov0 }, { "environment", v.first },
+				{ "absent", std::find(r.absent.begin(), r.absent.end(), c) != r.absent.end() } };
+		for (const auto& [e, v] : elements(r)) a["elements"][e] = { { "share", v }, { "fraction", v / r.nov0 } };
+		if (!r.model.empty())
+		{
+			nlohmann::ordered_json& m = j["models"][r.model];
+			m["zeta"] = r.zeta;
+			m["split"] = r.zeta >= 1.0 && r.zeta == std::floor(r.zeta);
+			if (!r.path.empty()) m["path"][r.element] = r.path;
+		}
+		j["atoms"].push_back(a);
+	}
+	const std::filesystem::path json = xyz.stem().string() + "_salted_distance.json";
+	std::ofstream(json) << j.dump(1, '\t') << "\n";
+	log << "Wrote " << csv.string() << " and " << json.string() << std::endl;
 	return rows;
 }
 
@@ -1379,9 +1459,89 @@ vec SALTEDPredictor::predict()
 						self0[a] = pp;
 						nov0[a] = ok && pp > 0.0 ? 1.0 - q / std::pow(pp, config.zeta) : NAN;
 					}
+					const double psi_s = _elapsed(_t_psi);
+					const auto _t_split = std::chrono::steady_clock::now();
+					path0[spe] = chol ? "Cholesky" : "eigendecomposition";
+					const double z = config.zeta;
+					int nch = 0;
+					if (ok && z >= 1.0 && z == std::floor(z))
+					{
+						// h_c(x, y) = (x_c.y_c) (x.y)^(zeta-1) over the neighbour pair channels c sums to the kernel, so with
+						// alpha = K_MM^+ k0^zeta the residual |phi(p) - sum_m alpha_m phi(f_m)|^2 = nov0 self^zeta splits into
+						// A_c = h_c(p, p) - 2 sum_m alpha_m h_c(p, f_m) + alpha^T (G_c o G^(zeta-1)) alpha, G_c = F_c F_c^T,
+						// each a sum of squares over the tensor blocks for integer zeta
+						const int n = (int)k.extent(0), nr2 = config.nspe2 * config.nrad2;
+						// feature g = (n1 nr2 + n2) llmax + l, n1 = s1 nrad1 + n over neighspe1 (featomic keeps the order of the selected keys), n2 alike
+						auto rank = [this](const std::string& x) {
+							const int i = (int)(std::find(config.neighspe1.begin(), config.neighspe1.end(), x) - config.neighspe1.begin());
+							return i < config.nspe1 ? i : config.nspe1 + (int)(std::find(config.neighspe2.begin(), config.neighspe2.end(), x) - config.neighspe2.begin());
+						};
+						std::map<std::string, ivec> cols;
+						for (int f = 0; f < (int)pvec_lam.extent(1); f++)
+						{
+							const int64_t g = config.sparsify ? vfps[0][f] : f;
+							if (g >= (int64_t)llmax * config.nspe1 * config.nrad1 * nr2) continue;
+							std::string s1 = config.neighspe1[g / ((int64_t)llmax * nr2) / config.nrad1], s2 = config.neighspe2[(g / llmax) % nr2 / config.nrad2];
+							if (rank(s2) < rank(s1)) std::swap(s1, s2);
+							cols[s1 + "-" + s2].push_back(f);
+						}
+						dMatrix2 At(n, M), kz1(z == 1.0 ? 0 : n, M);
+						if (chol) std::copy(y.begin(), y.end(), At.data());
+						else if (r > 0) At = dot(psi, V, false, true);
+						const dMatrix2 Gz = z == 1.0 ? dMatrix2() : elementWiseExponentiation(RR, z - 1.0);
+						vec pp(n, 0.0), Gc(z == 1.0 ? 0 : (size_t)M * M), HA(z == 1.0 ? 0 : (size_t)n * M);
+						for (int i = 0; i < n; i++)
+						{
+							for (int f = 0; f < (int)pvec_lam.extent(1); f++) pp[i] += pvec_lam(i, f) * pvec_lam(i, f);
+							if (z != 1.0) for (int m = 0; m < M; m++) kz1(i, m) = std::pow(k(i, m), z - 1.0);
+						}
+						for (const auto& [name, cs] : cols)
+						{
+							const int w = (int)cs.size();
+							dMatrix2 Pc(n, w), Fc(M, w);
+							double sp = 0.0, sf = 0.0;
+							for (int i = 0; i < n; i++) for (int j = 0; j < w; j++) sp += std::abs(Pc(i, j) = pvec_lam(i, cs[j]));
+							for (int m = 0; m < M; m++) for (int j = 0; j < w; j++) sf += std::abs(Fc(m, j) = R(m, cs[j]));
+							if (sp == 0.0 && sf == 0.0) continue;
+							nch++;
+							vec A(n, 0.0);
+							if (sf > 0.0)
+							{
+								const dMatrix2 S = dot(Pc, Fc, false, true);
+								if (z == 1.0)
+								{
+									// alpha^T G_c alpha = |F_c^T alpha|^2
+									const dMatrix2 B = dot(At, Fc, false, false);
+									for (int i = 0; i < n; i++) for (int j = 0; j < w; j++) A[i] += B(i, j) * B(i, j);
+								}
+								else
+								{
+									// G_c o G^(zeta-1) on the lower triangle, the one syrk writes and symm reads
+									cblas_dsyrk(CblasRowMajor, CblasLower, CblasNoTrans, M, w, 1.0, Fc.data(), w, 0.0, Gc.data(), M);
+#pragma omp parallel for
+									for (int m = 0; m < M; m++)
+										for (int x = 0; x <= m; x++) Gc[(size_t)m * M + x] *= Gz(m, x);
+									cblas_dsymm(CblasRowMajor, CblasRight, CblasLower, n, M, 1.0, Gc.data(), M, At.data(), M, 0.0, HA.data(), M);
+									for (int i = 0; i < n; i++) for (int m = 0; m < M; m++) A[i] += At(i, m) * HA[(size_t)i * M + m];
+								}
+#pragma omp parallel for
+								for (int i = 0; i < n; i++)
+									for (int m = 0; m < M; m++) A[i] -= 2.0 * At(i, m) * S(i, m) * (z == 1.0 ? 1.0 : kz1(i, m));
+							}
+							for (int i = 0; i < n; i++)
+							{
+								const int a = centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]];
+								if (std::isnan(nov0[a])) continue;
+								double pc = 0.0;
+								for (int j = 0; j < w; j++) pc += Pc(i, j) * Pc(i, j);
+								split0[a][name] = { pc / pp[i], (A[i] + pc * std::pow(pp[i], z - 1.0)) / std::pow(pp[i], z) };
+								if (sf == 0.0 && pc > 0.0) absent0[a].push_back(name);
+							}
+						}
+					}
 					if (ProgressBar::report_counts)
 						std::cout << "[novelty] " << spe << (chol ? ": K_MM Cholesky " : ": K_MM eigendecomposition ") << eig_s << " s (rank " << r << " of " << M
-								  << "), psi " << _elapsed(_t_psi) << " s" << std::endl;
+								  << "), psi " << psi_s << " s, channel split " << _elapsed(_t_split) << " s (" << nch << " channels)" << std::endl;
 				}
 			}
 
