@@ -569,6 +569,8 @@ vec SALTEDPredictor::merge_predictions()
 std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, const double eigcut)
 {
 	auto pass = [eigcut](SALTEDPredictor& p, const ivec& c) {
+		const ivec c0 = p.centres;
+		const double e0 = p.novelty_eigcut;
 		p.centres = c;
 		p.score_only = true;
 		p.novelty_eigcut = eigcut;
@@ -584,6 +586,8 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 		p.predict();
 		p.shrink_intermediate_vectors();
 		p.score_only = false;
+		p.centres = c0;
+		p.novelty_eigcut = e0;
 	};
 	// (model, index there, role) per atom of wavy, model -1 for this one
 	std::vector<std::vector<std::tuple<int, int, std::string>>> cand(wavy.get_ncen());
@@ -622,6 +626,13 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 		}
 	}
 	const ivec idx = map_atoms(full, wavy);
+	// the filter hands an atom of a model's element with nothing within rcut to the fill too
+	auto known = [this](const std::string& e) {
+		if (sub_models.empty()) return std::find(config.species.begin(), config.species.end(), e) != config.species.end();
+		for (const auto& s : sub_models)
+			if (std::find(s->config.species.begin(), s->config.species.end(), e) != s->config.species.end()) return true;
+		return false;
+	};
 	std::vector<salted_novelty> rows;
 	for (int a = 0; a < full.get_ncen(); a++)
 	{
@@ -629,11 +640,11 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 		r.atom = a;
 		r.label = full.get_atom_label(a);
 		r.element = constants::atnr2letter(full.get_atom_charge(a));
-		if (idx[a] < 0) { r.status = "filled"; rows.push_back(r); continue; }
+		if (idx[a] < 0) { r.status = known(r.element) ? "empty environment" : "filled"; rows.push_back(r); continue; }
 		for (const auto& [m, p, role] : cand[idx[a]])
 		{
 			const SALTEDPredictor& s = m < 0 ? *this : *sub_models[m];
-			r.model = (s.SALTED_DIR / s.config.salted_filename).string();
+			r.model = (s.SALTED_DIR / s.config.salted_filename).generic_string();
 			r.role = role;
 			r.kmax0 = s.kmax0[p];
 			r.cosine = s.env_score[p];
@@ -683,7 +694,7 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 	auto cell = [&o](const double x) { if (!std::isnan(x)) o << x; o << ","; };
 	for (const auto& r : rows)
 	{
-		o << r.atom + 1 << "," << r.label << "," << r.element << "," << r.model << "," << r.role << ",";
+		o << r.atom + 1 << "," << r.label << "," << r.element << "," << std::quoted(r.model, '"', '"') << "," << r.role << ",";
 		cell(r.kmax0);
 		cell(r.cosine);
 		cell(r.nov0);

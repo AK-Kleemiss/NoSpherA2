@@ -840,7 +840,10 @@ std::string help_message =
  "                                    training span: lambda = 0 kernel novelty\n"
  "                                    (0 inside, 1 outside), largest kernel and\n"
  "                                    cosine to a reference environment; eigcut\n"
- "                                    default 1e-10. Writes <xyz>_salted_distance.csv.\n"
+ "                                    default 1e-10. Writes the CSV\n"
+ "                                    <xyz stem>_salted_distance.csv in the\n"
+ "                                    working directory; -no_gpu_salted, if\n"
+ "                                    wanted, must come before it.\n"
  "  -SALTED_COEFS <model-dir>         Write SALTED_COEFS.npy (requires -wfn).\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
@@ -3339,7 +3342,14 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		if (use_gpu && gpu_salted)
 			sf_gpu_warmup_start();
 #endif
-		salted_distance(arguments[i + 1], arguments[i + 2], i + 3 < argc && arguments[i + 3].find("-") != 0 ? stod(arguments[i + 3]) : 1e-10, *this);
+		double eigcut = 1e-10;
+		if (i + 3 < argc && arguments[i + 3].find("-") != 0)
+		{
+			char* end = nullptr;
+			eigcut = std::strtod(arguments[i + 3].c_str(), &end);
+			err_checkf(end != arguments[i + 3].c_str() && *end == '\0', "-SALTED_distance: the eigcut after the xyz must be a number, not " + arguments[i + 3], std::cout);
+		}
+		salted_distance(arguments[i + 1], arguments[i + 2], eigcut, *this);
 		finished = true; return true;
 	}
 	else if (temp == "-mtc")
