@@ -89,6 +89,7 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -1.1221e+00    -1.0858e+00     8.3089e-01
     DelSqRho  :        -1.3770
     Bond Ellipticity:         0.0334
+    Bond Path :   N0-H1   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
    V         :    -4.4986e-01   G         :         0.0528   K         :     3.9705e-01   L         :     3.4424e-01
 
   CP   7  [bond        ]  converged   H2-N0 bond
@@ -98,6 +99,7 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -1.1220e+00    -1.0858e+00     8.3089e-01
     DelSqRho  :        -1.3769
     Bond Ellipticity:         0.0334
+    Bond Path :   N0-H2   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
    V         :    -4.4985e-01   G         :         0.0528   K         :     3.9704e-01   L         :     3.4423e-01
 
   CP   8  [bond        ]  converged   H3-N0 bond
@@ -107,6 +109,7 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -1.1220e+00    -1.0857e+00     8.3089e-01
     DelSqRho  :        -1.3769
     Bond Ellipticity:         0.0334
+    Bond Path :   N0-H3   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
    V         :    -4.4984e-01   G         :         0.0528   K         :     3.9703e-01   L         :     3.4422e-01
 
   CP   9  [bond        ]  converged   Li4-N0 bond
@@ -116,11 +119,12 @@ Density Critical Points (9 found):
     HessRho_EigVals:    -6.1343e-02    -6.1342e-02     3.4404e-01
     DelSqRho  :         0.2214
     Bond Ellipticity:         0.0000
+    Bond Path :   N0-Li4   BPL :         3.6882   GPL :         3.6882   BPL-GPL :         0.0000 bohr
    V         :    -4.0482e-02   G         :         0.0479   K         :    -7.4285e-03   L         :    -5.5339e-02
 
 Assigning basins along the density gradient...
 I found 5 Basins.
-  ELI-D maxima search on the host: auto, the host field costs 2.29 us a point, below 15
+  ELI-D maxima search on the host: auto, the host field costs 5.04 us a point, below 15
 ELI-D maxima from the analytic field: 8
 ELI-D basin boundaries from the analytic field (the default).
 Shell saddle merge (phi 0.9900, shell persistence 0.0005): 0 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
@@ -150,18 +154,18 @@ QTAIM Analysis (atomic quadrature grids):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 66074 grid points.
-  ELI-D basin field on the host: auto, the host field costs 2.44 us a point, below 15
+  ELI-D basin field on the host: auto, the host field costs 5.18 us a point, below 15
 Quadrature points sent along the field: 46898, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
       1  Li4 core               2.0219     16.7635         43.7858    -10.574     13.777      2.315
-      2  Li4 LP                 0.6843    809.8272         14.5564    -10.708     19.268      2.471
+      2  Li4 LP(1)              0.6843    809.8272         14.5564    -10.708     19.268      2.471
       3  N0 core                2.1085      0.4452         12.9571    -10.483     10.089      2.209
-      4  Li4 LP                 0.0911     30.8130         12.6891    -10.676     17.954      2.434
-      5  H1                     1.9167    119.7560          4.6691     -9.399      9.356      3.743
-      6  H2                     1.9205    118.1500          4.6691    -12.344      9.323      2.334
-      7  H3                     1.9365    119.8317          4.6690     -9.653      9.442      0.489
+      4  Li4 LP(2)              0.0911     30.8130         12.6891    -10.676     17.954      2.434
+      5  N0-H1 bond             1.9167    119.7560          4.6691     -9.399      9.356      3.743
+      6  N0-H2 bond             1.9205    118.1500          4.6691    -12.344      9.323      2.334
+      7  N0-H3 bond             1.9365    119.8317          4.6690     -9.653      9.442      0.489
       8  N0-Li4 bond            2.1717     56.0647          1.9677    -10.517     11.461      2.248
   total in basins: 12.8512   outside every basin: 0.1559
 

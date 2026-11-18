@@ -684,6 +684,16 @@ good = "uh6_eli.good"
 [ELI_UH6.args]
 eli_analysis = "uh6.gbw"
 
+# Every column of the contribution table sums to its ELI-D basin population.
+[ELI_contributions_epoxide]
+directory = "epoxide_gbw"
+good = "eli_contributions.good"
+
+[ELI_contributions_epoxide.args]
+no_spin_eli = ""
+eli_contributions = ""
+eli_analysis = "epoxide.gbw"
+
 [RGBI_NH3Li_ANO]
 directory = "RGBI"
 good = "nh3li_ano.good"
@@ -1054,6 +1064,13 @@ directory = "epoxide_gbw"
 
 [laplacian_bonds.args]
 laplacian_bonds = "epoxide.gbw"
+
+# The same along the traced QTAIM bond paths; the log lists BPL and GPL per bond critical point
+[laplacian_bond_paths]
+directory = "epoxide_gbw"
+
+[laplacian_bond_paths.args]
+laplacian_bond_paths = "epoxide.gbw"
 
 # .47 export, checked against our own output; the first 9948 numbers agree with
 # the ORCA-written NBO/reference.47 to 6e-10 (the reference carries extra sections)

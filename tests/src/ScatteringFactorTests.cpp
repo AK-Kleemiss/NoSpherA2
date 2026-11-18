@@ -948,6 +948,74 @@ TEST(ScatteringFactorBlockTests, NonIntegerIndicesWriter)
 	EXPECT_NE(text.find("0.500 0.000 1.250 2.00000000e+00,0.00000000e+00"), std::string::npos);
 }
 
+//the rows as the serial stream writer formatted them before the chunked to_chars writer
+template <typename T>
+static std::string stream_tsc_rows(const std::vector<std::vector<T>>& idx, const cvec2& sf)
+{
+	std::ostringstream out;
+	for (size_t r = 0; r < idx[0].size(); r++)
+	{
+		for (int d = 0; d < 3; d++)
+		{
+			if constexpr (std::is_same_v<T, double>)
+				out << std::fixed << std::setprecision(3);
+			out << idx[d][r] << ' ';
+		}
+		for (const auto& row : sf)
+			out << std::scientific << std::setprecision(8) << std::real(row[r]) << ',' << std::imag(row[r]) << ' ';
+		out << '\n';
+	}
+	return out.str();
+}
+
+//37 scatterers make 3378-row chunks; 7919 reflections leave a partial chunk at 1, 3 and 8 threads (some threads idle)
+TEST(ScatteringFactorBlockTests, ChunkedTextWriterMatchesTheStream)
+{
+	const int ns = 37, nr = 7919;
+	std::mt19937 gen(7);
+	std::uniform_real_distribution<double> mant(-10.0, 10.0);
+	std::uniform_int_distribution<int> ex(-300, 300), hkl(-60, 60);
+	const vec special{ 0.0, -0.0, 5e-324, -2.2250738585072014e-308, 1.7976931348623157e308, 9.999999995, -9.9999999949999,
+		1e-5, 123456789.0, std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity() };
+	cvec2 sf(ns, cvec(nr));
+	for (int a = 0; a < ns; a++)
+		for (int r = 0; r < nr; r++)
+			sf[a][r] = (r + a) % 5 == 0 ? cdouble(special[(r + a) % special.size()], special[(3 * r + a) % special.size()])
+				: cdouble(mant(gen) * std::pow(10.0, ex(gen)), mant(gen) * std::pow(10.0, ex(gen) / 10));
+	svec labels;
+	for (int a = 0; a < ns; a++)
+		labels.push_back("C" + std::to_string(a + 1));
+	ivec2 idx(3, ivec(nr));
+	vec2 idx_d(3, vec(nr));
+	for (int r = 0; r < nr; r++)
+		for (int d = 0; d < 3; d++)
+		{
+			idx[d][r] = hkl(gen);
+			idx_d[d][r] = r % 7 == d ? -0.0 : idx[d][r] * 0.25 - 0.0005 * d;
+		}
+	//indices longer than 40 characters, and a NaN index (the block refuses NaN form factors);
+	//no -NaN: macOS printf drops its sign, to_chars keeps it
+	idx_d[0][1] = 1e36, idx_d[1][2] = -1.7976931348623157e308, idx_d[2][3] = std::numeric_limits<double>::quiet_NaN();
+	const block b(sf, labels, idx);
+	const tsc_block<double, cdouble> bd(sf, labels, idx_d);
+	const std::string expected = stream_tsc_rows(idx, sf), expected_d = stream_tsc_rows(idx_d, sf);
+	const int threads = omp_get_max_threads();
+	const fs::path out = tmp("chunked.tsc");
+	for (const int t : { 1, 3, 8 })
+	{
+		omp_set_num_threads(t);
+		b.write_tsc_file("chunked.cif", out);
+		std::string text = slurp(out);
+		EXPECT_EQ(text.rfind("TITLE: chunked\nSYMM: expanded\nSCATTERERS: C1 C2 ", 0), 0u);
+		EXPECT_TRUE(text.substr(text.find("DATA:\n") + 6) == expected) << t << " threads";
+		bd.write_tsc_file_non_integer("chunked.cif", out);
+		text = slurp(out);
+		EXPECT_TRUE(text.substr(text.find("DATA:\n") + 6) == expected_d) << t << " threads, non-integer indices";
+	}
+	omp_set_num_threads(threads);
+	fs::remove(out);
+}
+
 //the CIF block names the partition and lists the reflections with real and imaginary parts
 TEST(ScatteringFactorBlockTests, CifBlockNamesPartition)
 {

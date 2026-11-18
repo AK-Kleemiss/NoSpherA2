@@ -708,3 +708,60 @@ TEST(Topology, CovalentFragmentCountIsGeometryOnly)
 	opt.bond_scale = 10.0;
 	EXPECT_EQ(topology::covalent_fragment_count(water_and_he, opt), 1);
 }
+
+//Two equal Gaussians: the bond path is the axis, so BPL = GPL and the bond point sits halfway.
+//a = 2 keeps each maximum within 1E-3 bohr of its centre, inside the 2h snap
+TEST(Topology, BondPathOfTwoCentresIsTheirAxis)
+{
+	const std::vector<topology::nucleus> nuc{ { d3{ -1.0, 0.0, 0.0 }, 1 }, { d3{ 1.0, 0.0, 0.0 }, 1 } };
+	gaussian_sum src;
+	src.a = 2.0;
+	for (const topology::nucleus& n : nuc) src.centres.push_back(n.pos);
+	const topology::bond_path bp = topology::trace_bond_path(src, d3{ 0.0, 0.0, 0.0 }, nuc);
+	EXPECT_EQ(bp.a, 0);
+	EXPECT_EQ(bp.b, 1);
+	EXPECT_EQ(bp.gap_a, 0.0);
+	EXPECT_EQ(bp.gap_b, 0.0);
+	EXPECT_NEAR(bp.gpl, 2.0, 1E-12);
+	EXPECT_NEAR(bp.bpl, 2.0, 1E-9);
+	EXPECT_EQ(bp.points.front(), nuc[0].pos);
+	EXPECT_EQ(bp.points.back(), nuc[1].pos);
+	EXPECT_EQ(bp.points[bp.bcp_index], (d3{ 0.0, 0.0, 0.0 }));
+	for (const d3& p : bp.points) {
+		EXPECT_NEAR(p[1], 0.0, 1E-12);
+		EXPECT_NEAR(p[2], 0.0, 1E-12);
+	}
+}
+
+//An octahedron edge: the path between two vertices bends off their chord, in the plane of the
+//edge and the centre, so BPL > GPL; rho rises monotonically from the bond point to either end
+TEST(Topology, OctahedronEdgeBondPathIsCurved)
+{
+	const std::vector<topology::nucleus> nuc = octahedron_nuclei(2.0);
+	const gaussian_sum src = octahedron_source(nuc, 1.0);
+	const topology::result r = topology::analyze_topology(src, nuc, gaussian_options());
+	const topology::cp* edge = nullptr;
+	for (const topology::cp& p : r.points)
+		if (p.kind == topology::cp_kind::bond && p.position[0] > 0.0 && p.position[1] > 0.0 && std::abs(p.position[2]) < 1E-6)
+			edge = &p;
+	ASSERT_NE(edge, nullptr);
+	const topology::bond_path bp = topology::trace_bond_path(src, edge->position, nuc);
+	//+x is nucleus 0, +y is nucleus 2
+	EXPECT_EQ(bp.a, 0);
+	EXPECT_EQ(bp.b, 2);
+	EXPECT_EQ(bp.gap_a, 0.0);
+	EXPECT_EQ(bp.gap_b, 0.0);
+	EXPECT_NEAR(bp.gpl, 2.0 * std::sqrt(2.0), 1E-12);
+	EXPECT_GT(bp.bpl - bp.gpl, 1E-3) << "an edge path that follows the chord is the straight line again";
+	//the snapped ends are left out: each maximum sits a few 1E-3 bohr inside its vertex
+	d3 g;
+	double H[9];
+	double last = 0.0;
+	for (size_t k = 1; k + 1 < bp.points.size(); k++) {
+		EXPECT_NEAR(bp.points[k][2], 0.0, 1E-9);
+		const double rho = calculate_hessian(src, bp.points[k], g, H);
+		if (k > 1 && k <= bp.bcp_index) EXPECT_LT(rho, last) << "point " << k;
+		if (k > bp.bcp_index) EXPECT_GT(rho, last) << "point " << k;
+		last = rho;
+	}
+}

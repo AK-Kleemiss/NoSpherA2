@@ -1,0 +1,316 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Analysing ELI basins in the wavefunction...
+[ELI-D] Kohout, Pernal, Wagner & Grin, Theor. Chem. Acc. 112 (2004) 453, DOI 10.1007/s00214-004-0615-y
+Atom positions:
+  Atom 0: (0.746372, 13.1896, 1.51764)
+  Atom 1: (0.635956, 14.8996, 3.61901)
+  Atom 2: (1.35246, 14.207, 5.22086)
+  Atom 3: (0.879869, 16.708, 3.24462)
+  Atom 4: (-1.6639, 13.7261, 2.66918)
+  Atom 5: (-2.82524, 14.6222, 1.61941)
+  Atom 6: (-2.38149, 12.3305, 3.58188)
+Density critical points from the analytic field: NCP 7, BCP 7, RCP 1, CCP 0; Poincare-Hopf sum 1 against 1 (COMPLETE)
+Density Critical Points (15 found):
+
+  CP   1  [attractor   ]  converged   O0
+    Position  :         0.7464        13.1896         1.5177
+    Rho       :       279.3882
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.8843e+05    -3.8842e+05    -3.8840e+05
+    DelSqRho  :  -1165247.4446
+   V         :    -2.9141e+05   G         :        49.5697   K         :     2.9136e+05   L         :     2.9131e+05
+
+  CP   2  [attractor   ]  converged   C4
+    Position  :        -1.6639        13.7261         2.6692
+    Rho       :       112.4448
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.6350e+04    -8.6348e+04    -8.6347e+04
+    DelSqRho  :   -259044.8408
+   V         :    -6.4773e+04   G         :         5.9567   K         :     6.4767e+04   L         :     6.4761e+04
+
+  CP   3  [attractor   ]  converged   C1
+    Position  :         0.6360        14.8996         3.6190
+    Rho       :       112.3822
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.6295e+04    -8.6293e+04    -8.6293e+04
+    DelSqRho  :   -258881.6817
+   V         :    -6.4732e+04   G         :         5.8570   K         :     6.4726e+04   L         :     6.4720e+04
+
+  CP   4  [attractor   ]  converged   H5
+    Position  :        -2.7790        14.5879         1.6606
+    Rho       :         0.4624
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -4.9506e+00    -4.9356e+00    -4.0552e+00
+    DelSqRho  :       -13.9414
+   V         :    -3.5145e+00   G         :         0.0146   K         :     3.4999e+00   L         :     3.4853e+00
+
+  CP   5  [attractor   ]  converged   H6
+    Position  :        -2.3533        12.3842         3.5470
+    Rho       :         0.4598
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -4.9372e+00    -4.9223e+00    -4.0583e+00
+    DelSqRho  :       -13.9178
+   V         :    -3.5081e+00   G         :         0.0143   K         :     3.4938e+00   L         :     3.4794e+00
+
+  CP   6  [attractor   ]  converged   H3
+    Position  :         0.8715        16.6420         3.2578
+    Rho       :         0.4424
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -4.7946e+00    -4.7804e+00    -3.9781e+00
+    DelSqRho  :       -13.5531
+   V         :    -3.4139e+00   G         :         0.0128   K         :     3.4011e+00   L         :     3.3883e+00
+
+  CP   7  [attractor   ]  converged   H2
+    Position  :         1.3273        14.2315         5.1644
+    Rho       :         0.4354
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -4.7419e+00    -4.7282e+00    -3.9543e+00
+    DelSqRho  :       -13.4244
+   V         :    -3.3803e+00   G         :         0.0121   K         :     3.3682e+00   L         :     3.3561e+00
+
+  CP   8  [bond        ]  converged   H5-C4 bond
+    Position  :        -2.3874        14.2986         2.0034
+    Rho       :         0.3697
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.0610e+00    -1.0150e+00     2.5303e-01
+    DelSqRho  :        -1.8229
+    Bond Ellipticity:         0.0453
+    Bond Path :   C4-H5   BPL :         1.8078   GPL :         1.8038   BPL-GPL :         0.0039 bohr   end maxima off nuclei by 0.0000 / 0.0707
+   V         :    -5.9975e-01   G         :         0.0720   K         :     5.2774e-01   L         :     4.5572e-01
+
+  CP   9  [bond        ]  converged   H6-C4 bond
+    Position  :        -2.1080        12.8415         3.2475
+    Rho       :         0.3658
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.0461e+00    -1.0002e+00     2.6464e-01
+    DelSqRho  :        -1.7817
+    Bond Ellipticity:         0.0458
+    Bond Path :   C4-H6   BPL :         1.8174   GPL :         1.8154   BPL-GPL :         0.0021 bohr   end maxima off nuclei by 0.0000 / 0.0700
+   V         :    -5.8558e-01   G         :         0.0701   K         :     5.1550e-01   L         :     4.4542e-01
+
+  CP  10  [bond        ]  converged   H3-C1 bond
+    Position  :         0.7947        16.0471         3.3728
+    Rho       :         0.3469
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -9.7529e-01    -9.2993e-01     2.9499e-01
+    DelSqRho  :        -1.6102
+    Bond Ellipticity:         0.0488
+    Bond Path :   C1-H3   BPL :         1.8635   GPL :         1.8627   BPL-GPL :         0.0008 bohr   end maxima off nuclei by 0.0000 / 0.0686
+   V         :    -5.2120e-01   G         :         0.0593   K         :     4.6188e-01   L         :     4.0256e-01
+
+  CP  11  [bond        ]  converged   H2-C1 bond
+    Position  :         1.0929        14.4547         4.6356
+    Rho       :         0.3385
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -9.4112e-01    -8.9887e-01     3.0705e-01
+    DelSqRho  :        -1.5329
+    Bond Ellipticity:         0.0470
+    Bond Path :   C1-H2   BPL :         1.8886   GPL :         1.8865   BPL-GPL :         0.0021 bohr   end maxima off nuclei by 0.0000 / 0.0666
+   V         :    -4.9529e-01   G         :         0.0560   K         :     4.3926e-01   L         :     3.8323e-01
+
+  CP  12  [bond        ]  converged   C1-C4 bond
+    Position  :        -0.5882        14.3849         3.2444
+    Rho       :         0.2589
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -4.8740e-01    -3.9712e-01     3.4175e-01
+    DelSqRho  :        -0.5428
+    Bond Ellipticity:         0.2273
+    Bond Path :   C1-C4   BPL :         2.7782   GPL :         2.7511   BPL-GPL :         0.0271 bohr
+   V         :    -3.1514e-01   G         :         0.0897   K         :     2.2542e-01   L         :     1.3570e-01
+
+  CP  13  [bond        ]  converged   C1-O0 bond
+    Position  :         0.6819        14.2637         2.8344
+    Rho       :         0.2462
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -4.7681e-01    -2.8768e-01     4.4714e-01
+    DelSqRho  :        -0.3173
+    Bond Ellipticity:         0.6574
+    Bond Path :   O0-C1   BPL :         2.7156   GPL :         2.7115   BPL-GPL :         0.0041 bohr
+   V         :    -5.0928e-01   G         :         0.2150   K         :     2.9431e-01   L         :     7.9337e-02
+
+  CP  14  [bond        ]  converged   C4-O0 bond
+    Position  :        -0.7583        13.5280         2.2413
+    Rho       :         0.2417
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -4.6042e-01    -2.6821e-01     4.4844e-01
+    DelSqRho  :        -0.2802
+    Bond Ellipticity:         0.7166
+    Bond Path :   O0-C4   BPL :         2.7291   GPL :         2.7246   BPL-GPL :         0.0045 bohr
+   V         :    -4.9162e-01   G         :         0.2108   K         :     2.8084e-01   L         :     7.0048e-02
+
+  CP  15  [ring        ]  converged
+    Position  :        -0.1880        14.0079         2.7032
+    Rho       :         0.2113
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -3.9112e-01     1.7040e-01     4.8971e-01
+    DelSqRho  :         0.2690
+   V         :    -3.1791e-01   G         :         0.1926   K         :     1.2533e-01   L         :    -6.7247e-02
+
+QTAIM attractors from the analytic field: 7 (7 nuclei, 0 non-nuclear)
+  ELI-D maxima search on the host: auto, the host field costs 4.82 us a point, below 15
+ELI-D maxima from the analytic field: 12
+ELI-D basin boundaries from the analytic field (the default).
+Shell saddle merge (phi 0.9900, shell persistence 0.0005): 5 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 103342 grid points.
+  QTAIM basin field on the host: auto, the host field costs 2.46 us a point, below 15
+Quadrature points sent along the field: 62830, left the grid: 0
+
+QTAIM Analysis (atomic quadrature grids):
+[QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
+[QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013
+  basin  label               electrons     charge      volume         maximum        x          y          z
+      1  O0                     8.8820    -0.8820    175.6639        279.3881      0.746     13.190      1.518
+      2  C1                     5.4628     0.5372     86.2775        112.3822      0.636     14.900      3.619
+      3  H2                     1.0340    -0.0340    100.9485          0.4261      1.352     14.207      5.221
+      4  H3                     1.0402    -0.0402    100.7268          0.4326      0.880     16.708      3.245
+      5  C4                     5.4385     0.5615     82.1529        112.4448     -1.664     13.726      2.669
+      6  H5                     1.0641    -0.0641     99.2382          0.4514     -2.825     14.622      1.619
+      7  H6                     1.0639    -0.0639     99.1816          0.4491     -2.381     12.331      3.582
+  total in basins: 23.9856   outside every basin: 0.0144
+
+Delocalization indices (12 occupied orbitals):
+[LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
+  sum over basins and outside of S^A - identity: 1.78e-06   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
+
+  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
+  B includes the region beyond rho = 1e-04 e/bohr^3.
+      1  O0                     8.8820      7.7962            1.0858     -0.0000
+      2  C1                     5.4628      3.5385            1.9243     -0.0000
+      3  H2                     1.0340      0.4765            0.5575     -0.0000
+      4  H3                     1.0402      0.4806            0.5597     -0.0000
+      5  C4                     5.4385      3.5124            1.9261     -0.0000
+      6  H5                     1.0641      0.5000            0.5641      0.0000
+      7  H6                     1.0639      0.4996            0.5643      0.0000
+
+  basin pair                                delta(A,B)
+  C4                H5                      0.9656
+  C4                H6                      0.9635
+  C1                H3                      0.9601
+  C1                H2                      0.9556
+  O0                C1                      0.9489
+  O0                C4                      0.9391
+  C1                C4                      0.8988
+  O0                H6                      0.0709
+  O0                H5                      0.0701
+  O0                H2                      0.0693
+  O0                H3                      0.0683
+  H5                H6                      0.0418
+  H3                C4                      0.0402
+  C1                H6                      0.0400
+  H2                C4                      0.0388
+  C1                H5                      0.0388
+  H2                H3                      0.0388
+  4 further pairs below 0.01
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 103342 grid points.
+  ELI-D basin field on the host: auto, the host field costs 4.99 us a point, below 15
+Quadrature points sent along the field: 72369, left the grid: 0
+
+ELI-D Analysis (atomic quadrature grids):
+  basin  label               electrons      volume         maximum        x          y          z
+      1  C1 core                2.0935      0.7973         16.2411      0.636     14.899      3.618
+      2  C4 core                2.0936      0.7900         16.1458     -1.663     13.726      2.669
+      3  O0 core                2.1198      0.2620         12.8976      0.746     13.190      1.518
+      4  C1-H2 bond             2.1623    132.5211          5.5746      1.394     14.184      5.287
+      5  C1-H3 bond             2.1658    130.8708          5.5022      0.904     16.783      3.229
+      6  C4-H6 bond             2.1711    125.8505          5.3878     -2.417     12.270      3.611
+      7  C4-H5 bond             2.1701    126.8710          5.3703     -2.876     14.652      1.574
+      8  C4-C1 bond             1.7753     48.2587          1.9161     -0.844     14.601      3.553
+      9  O0 LP(1)               2.6883     81.4410          1.8299      1.090     12.185      1.955
+     10  O0 LP(2)               2.6871     81.9020          1.8295      0.794     13.840      0.573
+     11  O0-C1 bond             0.9505      7.4965          1.5206      1.051     14.070      2.507
+     12  O0-C4 bond             0.9082      7.1284          1.5136     -0.558     13.219      1.828
+  total in basins: 23.9856   outside every basin: 0.0144
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 103342 grid points.
+  QTAIM basin field on the host: auto, the host field costs 2.95 us a point, below 15
+
+ELI-D basin contributions (electrons; contributors >= 0.0500 e, largest first)
+  atoms numbered from 0 in every column, as in the QTAIM and ELI-D tables; (rest) is what a column leaves unlisted
+  ELI-D basin                    | QTAIM (Raub-Jansen)    | PM-IBO                 | Boys-IBO               | NLMO                  
+     1 C1 core             2.094 |                        |                        |                        | CR C1            1.894
+                                 |                        |                        |                        | BD C1-H2         0.054
+                                 | C1               2.094 | CR C1            1.910 | CR C1            1.911 | BD C1-H3         0.054
+                                 | (rest)           0.000 | (rest)           0.184 | (rest)           0.183 | (rest)           0.092
+  ----------------------------------------------------------------------------------------------------------------------------------
+     2 C4 core             2.094 |                        |                        |                        | CR C4            1.892
+                                 |                        |                        |                        | BD C4-H5         0.055
+                                 | C4               2.094 | CR C4            1.908 | CR C4            1.910 | BD C4-H6         0.055
+                                 | (rest)           0.000 | (rest)           0.185 | (rest)           0.184 | (rest)           0.092
+  ----------------------------------------------------------------------------------------------------------------------------------
+     3 O0 core             2.120 |                        | CR O0            1.880 | CR O0            1.885 | CR O0            1.862
+                                 |                        | LP(2) O0         0.080 | LP(1) O0         0.065 | LP(2) O0         0.080
+                                 |                        | LP(1) O0         0.056 | LP(2) O0         0.065 | LP(1) O0         0.068
+                                 |                        | BD O0-C1         0.051 | BD O0-C1         0.051 | BD O0-C1         0.054
+                                 | O0               2.120 | BD O0-C4         0.051 | BD O0-C4         0.051 | BD O0-C4         0.054
+                                 | (rest)           0.000 | (rest)           0.001 | (rest)           0.003 | (rest)           0.001
+  ----------------------------------------------------------------------------------------------------------------------------------
+     4 C1-H2 bond          2.162 |                        | BD C1-H2         1.711 | BD C1-H2         1.715 | BD C1-H2         1.709
+                                 |                        | BD C1-C4         0.147 | BD C1-C4         0.148 | BD C1-C4         0.145
+                                 | C1               1.128 | BD O0-C1         0.125 | BD O0-C1         0.125 | BD O0-C1         0.127
+                                 | H2               1.032 | BD C1-H3         0.105 | BD C1-H3         0.105 | BD C1-H3         0.105
+                                 | (rest)           0.002 | (rest)           0.074 | (rest)           0.068 | (rest)           0.076
+  ----------------------------------------------------------------------------------------------------------------------------------
+     5 C1-H3 bond          2.166 |                        | BD C1-H3         1.712 | BD C1-H3         1.717 | BD C1-H3         1.711
+                                 |                        | BD C1-C4         0.149 | BD C1-C4         0.151 | BD C1-C4         0.147
+                                 | C1               1.122 | BD O0-C1         0.126 | BD O0-C1         0.125 | BD O0-C1         0.127
+                                 | H3               1.042 | BD C1-H2         0.105 | BD C1-H2         0.106 | BD C1-H2         0.105
+                                 | (rest)           0.002 | (rest)           0.073 | (rest)           0.067 | (rest)           0.075
+  ----------------------------------------------------------------------------------------------------------------------------------
+     6 C4-H6 bond          2.171 |                        | BD C4-H6         1.711 | BD C4-H6         1.716 | BD C4-H6         1.710
+                                 |                        | BD C1-C4         0.148 | BD C1-C4         0.150 | BD C1-C4         0.145
+                                 | C4               1.106 | BD O0-C4         0.131 | BD O0-C4         0.130 | BD O0-C4         0.134
+                                 | H6               1.062 | BD C4-H5         0.108 | BD C4-H5         0.108 | BD C4-H5         0.107
+                                 | (rest)           0.003 | (rest)           0.074 | (rest)           0.068 | (rest)           0.075
+  ----------------------------------------------------------------------------------------------------------------------------------
+     7 C4-H5 bond          2.170 |                        | BD C4-H5         1.712 | BD C4-H5         1.717 | BD C4-H5         1.711
+                                 |                        | BD C1-C4         0.146 | BD C1-C4         0.148 | BD C1-C4         0.143
+                                 | C4               1.102 | BD O0-C4         0.131 | BD O0-C4         0.130 | BD O0-C4         0.134
+                                 | H5               1.066 | BD C4-H6         0.108 | BD C4-H6         0.108 | BD C4-H6         0.108
+                                 | (rest)           0.002 | (rest)           0.073 | (rest)           0.067 | (rest)           0.075
+  ----------------------------------------------------------------------------------------------------------------------------------
+     8 C4-C1 bond          1.775 |                        | BD C1-C4         1.223 | BD C1-C4         1.218 | BD C1-C4         1.218
+                                 |                        | BD O0-C4         0.100 | BD O0-C4         0.102 | BD O0-C4         0.097
+                                 |                        | BD O0-C1         0.095 | BD O0-C1         0.095 | BD O0-C1         0.091
+                                 |                        | BD C1-H2         0.071 | BD C1-H2         0.071 | BD C1-H2         0.071
+                                 |                        | BD C4-H5         0.071 | BD C1-H3         0.070 | BD C1-H3         0.070
+                                 | C4               0.898 | BD C4-H6         0.071 | BD C4-H5         0.070 | BD C4-H5         0.070
+                                 | C1               0.851 | BD C1-H3         0.070 | BD C4-H6         0.070 | BD C4-H6         0.070
+                                 | (rest)           0.027 | (rest)           0.074 | (rest)           0.078 | (rest)           0.086
+  ----------------------------------------------------------------------------------------------------------------------------------
+     9 O0 LP(1)            2.688 |                        | LP(1) O0         0.920 | LP(1) O0         1.564 | LP(1) O0         0.915
+                                 |                        | LP(2) O0         0.872 | BD O0-C4         0.401 | LP(2) O0         0.873
+                                 |                        | BD O0-C4         0.405 | BD O0-C1         0.395 | BD O0-C4         0.402
+                                 |                        | BD O0-C1         0.397 | LP(2) O0         0.235 | BD O0-C1         0.396
+                                 | O0               2.688 | CR O0            0.054 | CR O0            0.051 | CR O0            0.062
+                                 | (rest)           0.000 | (rest)           0.041 | (rest)           0.042 | (rest)           0.039
+  ----------------------------------------------------------------------------------------------------------------------------------
+    10 O0 LP(2)            2.687 |                        | LP(1) O0         0.924 | LP(2) O0         1.564 | LP(1) O0         0.918
+                                 |                        | LP(2) O0         0.867 | BD O0-C4         0.399 | LP(2) O0         0.870
+                                 |                        | BD O0-C4         0.403 | BD O0-C1         0.397 | BD O0-C4         0.401
+                                 |                        | BD O0-C1         0.399 | LP(1) O0         0.235 | BD O0-C1         0.398
+                                 | O0               2.686 | CR O0            0.054 | CR O0            0.051 | CR O0            0.062
+                                 | (rest)           0.001 | (rest)           0.040 | (rest)           0.041 | (rest)           0.039
+  ----------------------------------------------------------------------------------------------------------------------------------
+    11 O0-C1 bond          0.950 | O0               0.683 | BD O0-C1         0.705 | BD O0-C1         0.711 | BD O0-C1         0.704
+                                 | C1               0.268 | BD O0-C4         0.056 | BD O0-C4         0.058 | BD O0-C4         0.054
+                                 | (rest)           0.000 | (rest)           0.190 | (rest)           0.182 | (rest)           0.192
+  ----------------------------------------------------------------------------------------------------------------------------------
+    12 O0-C4 bond          0.908 | O0               0.665 | BD O0-C4         0.677 | BD O0-C4         0.684 | BD O0-C4         0.676
+                                 | C4               0.243 | BD O0-C1         0.056 | BD O0-C1         0.056 | BD O0-C1         0.054
+                                 | (rest)           0.000 | (rest)           0.176 | (rest)           0.168 | (rest)           0.179
+  ----------------------------------------------------------------------------------------------------------------------------------
+
+Spin-resolved ELI-D: off (-no_spin_eli).

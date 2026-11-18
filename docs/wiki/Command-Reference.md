@@ -251,6 +251,7 @@ is a separate flag and several can be written in one run.
 | `-polarizabilities <7 wfn files>` | 7 | | Polarisability from seven finite-field wavefunctions. |
 | `-e_field <F>` | 1 | `0.005` | Field strength used by the finite-field jobs. |
 | `-laplacian_bonds <wfn>` | 1 | | Laplacian profiles along each bond. One-shot. |
+| `-laplacian_bond_paths <wfn>` | 1 | | rho and Laplacian along the traced QTAIM bond paths (bond critical point uphill to both nuclei), one `<wfn>_bond_path_<a>_<b>.dat` per bond point; logs BPL and GPL. One-shot. |
 | `-fukui_analysis [wfn]` | 0-1 | | Condensed Fukui indices, printed to the console. |
 | `-promol_nci <f1.xyz> <f2.xyz> [f3.xyz ...] [rcut1] [rcut2] [rho_max] [rdg_max] [colour_max]` | 2+ | `0.95 0.75 0.5 1.0 0.015` | Intermolecular NCI from promolecular densities of two or more fragments. |
 | `-promol_nci_single_thread` | 0 | off | Serialise the promolecular NCI loop. |
@@ -272,8 +273,9 @@ delocalisation indices (LI/DI).
 | --- | --- | --- | --- |
 | `-topology <wfn>` | 1 | | Every critical point of rho — nuclear, bond, ring, cage — with the Poincare-Hopf check. Console output. One-shot. |
 | `-eli_analysis <wfn> <resolution> <radius>` | 3 | | QTAIM + ELI-D basins, populations, LI/DI. |
+| `-eli_contributions` | 0 | off (on in `-fba`) | With `-eli_analysis`, always in `-fba`: split every ELI-D basin population into its contributors, as a table with one column each for QTAIM atoms (Raub-Jansen: each ELI-D integration point goes to the QTAIM basin it lies in), Pipek-Mezey IBOs, Boys IBOs and NLMOs. For a single determinant an orbital's share is n_i ∫_Ω \|φ_i\|², so each column sums to the basin population. The orbital columns need a closed-shell wavefunction with occupations 0/2 (an open shell prints QTAIM only); the IBO columns need ORCA phases and MINAO for every element, the NLMO column a spherical basis on every atom. A skipped column says why. All columns number atoms from 0, as the QTAIM and ELI-D tables do; repeated LP/BD labels carry (1), (2), ... |
 | `-eli_family <wfn> [points]` | 1-2 | | ELI-D alpha/beta/triplet and ELI-q as point values. Console output. One-shot. ELIA and ELI-q_s,2 need the 2-RDM: an ORCA CAS/CI `.gbw` with its `PrintWF det` output as `<stem>.out` beside it; see [Correlated wavefunctions](Correlated-Wavefunctions.md#6-what-is-exact-what-is-approximate-what-is-refused). |
-| `-fba <wfn>` | 1 | | Full bonding analysis in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; the exact DI/λ needs an ORCA CAS/CI `PrintWF det` output as `<stem>.out` beside the `.gbw`. See [Correlated wavefunctions](Correlated-Wavefunctions.md). |
+| `-fba <wfn>` | 1 | | Full bonding analysis in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT, plus the `-eli_contributions` table. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; the exact DI/λ needs an ORCA CAS/CI `PrintWF det` output as `<stem>.out` beside the `.gbw`. See [Correlated wavefunctions](Correlated-Wavefunctions.md). |
 | `-qtaim_eli <rho.cube> <eli.cube> <atoms> [bg]` | 3-4 | `bg 0` | Mask an ELI-D cube to the QTAIM basins of the listed atoms. `<atoms>` is comma-separated, **0-based**. One-shot. |
 | `-qtaim_eli <wfn> <atoms> [res] [radius] [bg]` | 2-5 | | The same, computing both fields from a wavefunction. One-shot. |
 | `-basin_grid <n>` | 1 | `1` | Basin-integration grid level. |

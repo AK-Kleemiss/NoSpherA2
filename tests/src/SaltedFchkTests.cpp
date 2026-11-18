@@ -10,11 +10,13 @@
 #include "core/basis_set.h"
 #include "core/cube.h"
 #include "core/npy.h"
+#include "core/nos_math.h"
 #include "core/NoSpherA2.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
 #include <random>
+#include <regex>
 #undef I
 
 namespace
@@ -575,6 +577,34 @@ TEST(SaltedFchkIoTests, SyntheticModelIndexAndLoadBlock)
 	std::filesystem::remove(p);
 }
 
+// load_blocks reads every block of the shipped model as load_block does, byte for byte, with one reader and with several
+// whose pieces (an odd size, so they cut doubles) cross the blocks, more of them than blocks; a block past the end of the file still stops the run
+TEST(SaltedFchkIoTests, ParallelReadMatchesLoadBlock)
+{
+	const auto p = nos_test_repo_root() / "tests" / "SALTED" / "Model" / "model.salted";
+	SALTED_BINARY_FILE f(p);
+	std::vector<SALTED_BINARY_FILE::block_ref> refs;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key)) refs.push_back(r);
+	refs.insert(refs.begin() + 3, SALTED_BINARY_FILE::block_ref{});
+	for (const std::size_t readers : { 1, 2, 7, 64 })
+		for (const std::size_t piece : { std::size_t(4u << 20), std::size_t(1001) })
+		{
+			f.readers = readers;
+			f.piece = piece;
+			const std::vector<dMatrix2> got = f.load_blocks(refs);
+			ASSERT_EQ(got.size(), refs.size());
+			for (size_t i = 0; i < refs.size(); i++)
+			{
+				const dMatrix2 want = f.load_block(refs[i]);
+				ASSERT_EQ(got[i].size(), want.size()) << i;
+				EXPECT_EQ(std::memcmp(got[i].data(), want.data(), want.size() * sizeof(double)), 0) << i << " readers " << readers << " piece " << piece;
+			}
+		}
+	const SALTED_BINARY_FILE::block_ref past{ static_cast<std::streamoff>(std::filesystem::file_size(p)) - 800, 10, 20 };
+	EXPECT_EXIT({ f.readers = 4; f.piece = 1001; f.load_blocks({ refs[0], past }); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+}
+
 // -salted_fold's writer: PROJ becomes PROJW, the blocks behind it move and still read back; a block
 // dropped without a replacement is gone
 TEST(SaltedFchkIoTests, BlockReplacedCopy)
@@ -925,6 +955,48 @@ TEST(SaltedFchkUtilTests, CubeMLIntegratesToPopulation)
 
 // ------------------------------------------------------------- equicomb
 
+namespace
+{
+	// the expansion of a real density, as featomic's are: v[n,l,-m] = (-1)^m conj(v[n,l,m]), so v[n,l,0] is real
+	void make_real_density(SALTEDDescriptors& v, const int natoms)
+	{
+		for (int l = 0; l < static_cast<int>(v.offsets().size()); l++)
+			for (int a = 0; a < natoms; a++)
+				for (int n = 0; n < v.nchannels(); n++)
+				{
+					cdouble* x = v.block(a, n, l);
+					x[l] = x[l].real();
+					for (int m = 1; m <= l; m++)
+						x[l + m] = (m % 2 ? -1.0 : 1.0) * std::conj(x[l - m]);
+				}
+	}
+
+	// Racah's formula for (j1 j2 j3; m1 m2 m3) at integer arguments
+	double wigner_3j(const int j1, const int j2, const int j3, const int m1, const int m2, const int m3)
+	{
+		if (m1 + m2 + m3 != 0 || j3 < std::abs(j1 - j2) || j3 > j1 + j2 || std::abs(m1) > j1 || std::abs(m2) > j2 || std::abs(m3) > j3)
+			return 0.0;
+		auto f = [](const int n) { return std::tgamma(n + 1.0); };
+		double s = 0.0;
+		for (int k = std::max({ 0, j2 - j3 - m1, j1 - j3 + m2 }); k <= std::min({ j1 + j2 - j3, j1 - m1, j2 + m2 }); k++)
+			s += (k % 2 ? -1.0 : 1.0) / (f(k) * f(j3 - j2 + k + m1) * f(j3 - j1 + k - m2) * f(j1 + j2 - j3 - k) * f(j1 - k - m1) * f(j2 - k + m2));
+		return ((j1 - j2 - m3) % 2 ? -1.0 : 1.0) * s * std::sqrt(f(j1 + j2 - j3) * f(j1 - j2 + j3) * f(j2 + j3 - j1) / f(j1 + j2 + j3 + 1)
+			* f(j1 + m1) * f(j1 - m1) * f(j2 + m2) * f(j2 - m2) * f(j3 + m3) * f(j3 - m3));
+	}
+
+	// SALTED's coupling list: per (l1, l2), mu, m1 with m2 = m1 - mu, (lam l2 l1; mu m2 -m1) (-1)^m1
+	vec salted_w3j(const int lam, const ivec2& llvec)
+	{
+		vec w;
+		for (size_t il = 0; il < llvec[0].size(); il++)
+			for (int mu = -lam; mu <= lam; mu++)
+				for (int m1 = -llvec[0][il]; m1 <= llvec[0][il]; m1++)
+					if (std::abs(m1 - mu) <= llvec[1][il])
+						w.push_back(wigner_3j(lam, llvec[1][il], llvec[0][il], mu, m1 - mu, -m1) * (m1 % 2 ? -1.0 : 1.0));
+		return w;
+	}
+}
+
 // the gpu switch is a plain flag; the sparse path checks dimensions before touching any buffer
 TEST(SaltedFchkEquicombTests, GpuSwitchAndArgumentChecks)
 {
@@ -980,18 +1052,16 @@ TEST(SaltedFchkEquicombTests, Lam0AnalyticNormalisation)
 	equicomb(1, 2, 1, v1, v2, w3j, llvec, 0, c2r, 2, 2, std::vector<int64_t>{ 1, 0 }, sparse);
 	EXPECT_NEAR(sparse[0], 0.8, 1e-14);
 	EXPECT_NEAR(sparse[1], 0.6, 1e-14);
-	// complex a: with conjugation a conj(a) is real and b conj(a) imaginary, without it a a is real and negative
-	v1.block(0, 0, 0)[0] = cdouble(0.0, 3.0);
-	vec conj_p(2, 0.0), plain(2, 0.0);
+	vec conj_p(2, 0.0);
 	equicomb(1, 2, 1, v1, v1, w3j, llvec, 0, c2r, 2, 2, std::vector<int64_t>{ 0, 1 }, conj_p, true);
-	EXPECT_NEAR(conj_p[0], 1.0, 1e-14);
-	EXPECT_NEAR(conj_p[1], 0.0, 1e-14);
+	EXPECT_NEAR(conj_p[0], 0.6, 1e-14);
+	EXPECT_NEAR(conj_p[1], 0.8, 1e-14);
+	// complex a, which no real density has, in the dense path only: without conjugation a a is real and negative
+	v1.block(0, 0, 0)[0] = cdouble(0.0, 3.0);
+	vec plain(2, 0.0);
 	equicomb(1, 2, 1, v1, v1, w3j, 1, llvec, 0, c2r, 2, plain, false);
 	EXPECT_NEAR(plain[0], -1.0, 1e-14);
 	EXPECT_NEAR(plain[1], 0.0, 1e-14);
-	vec plain_sparse(2, 0.0);
-	equicomb(1, 2, 1, v1, v1, w3j, llvec, 0, c2r, 2, 2, std::vector<int64_t>{ 0, 1 }, plain_sparse, false);
-	EXPECT_NEAR(plain_sparse[0], -1.0, 1e-14);
 }
 
 // lam = 1 over (l1, l2) = (1, 0) and (0, 1) with complex descriptors: the run-based sparse loop must reproduce
@@ -1011,8 +1081,10 @@ TEST(SaltedFchkEquicombTests, SparseMatchesDenseLam1)
 		x = cdouble(next(), next());
 	for (auto& x : v2.values())
 		x = cdouble(next(), next());
-	vec w3j{ 0.3, -0.5, 0.7, 0.2, 0.9, -0.4 };
+	make_real_density(v1, natoms);
+	make_real_density(v2, natoms);
 	ivec2 llvec{ { 1, 0 }, { 0, 1 } };
+	vec w3j = salted_w3j(1, llvec);
 	cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ 3 })[0];
 	const int llmax = 2, featsize = nrad1 * nrad2 * llmax, l21 = 3;
 	vec dense(static_cast<size_t>(natoms) * l21 * featsize, 0.0);
@@ -1059,13 +1131,14 @@ TEST(SaltedFchkEquicombTests, Lam1HandDerived)
 {
 	equicomb_set_gpu(false);
 	SALTEDDescriptors v(1, 1, 1);
-	const cdouble a(0.3, -0.7), b(-0.4, 0.2), c(0.9, 0.5), d(0.6, -0.8);
+	// a real density: c = -conj(a), b and d real
+	const cdouble a(0.3, -0.7), b(-0.4, 0.0), c(-0.3, -0.7), d(0.6, 0.0);
 	v.block(0, 0, 1)[0] = a;
 	v.block(0, 0, 1)[1] = b;
 	v.block(0, 0, 1)[2] = c;
 	v.block(0, 0, 0)[0] = d;
-	vec w3j{ 0.5, -0.25, 0.75 };
 	ivec2 llvec{ { 1 }, { 0 } };
+	vec w3j = salted_w3j(1, llvec);
 	cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ 3 })[0];
 	const cdouble p0 = w3j[0] * a * std::conj(d), p1 = w3j[1] * b * std::conj(d), p2 = w3j[2] * c * std::conj(d);
 	const double r = 1.0 / std::sqrt(2.0);
@@ -1097,9 +1170,15 @@ TEST(SaltedFchkEquicombTests, EmptyEnvironmentGivesZeros)
 	EXPECT_NEAR(sparse[0], 0.0, 1e-300);
 	EXPECT_NEAR(dense[0], 0.0, 1e-300);
 	EXPECT_FALSE(std::isnan(sparse[0]));
+	++constants::run_id;
+	testing::internal::CaptureStdout();
+	const vec2 norms = equicomb_norms(1, 1, 1, v, v, { &w3j }, { llvec }, { c2r }, true);
+	EXPECT_NE(testing::internal::GetCapturedStdout().find("1 atom(s) have no neighbour"), std::string::npos);
+	EXPECT_EQ(norms[0][0], 0.0);
+	EXPECT_TRUE(equicomb_norms(0, 1, 1, v, v, { &w3j }, { llvec }, { c2r }, true)[0].empty());
 }
 
-// lam = 2 over every (l1, l2) up to 3 that couples to it, unequal channel counts: the sparse path builds only the
+// lam = 2 over every (l1, l2) up to 3 that couples to it with l1 + l2 + lam even, real densities, unequal channel counts: the sparse path builds only the
 // selected features and takes the norm from per-l density matrices, so a subset in shuffled order, with slots past
 // nrad1*nrad2*llmax, must still equal the dense path that builds and normalises all of them. Both conj forms, and
 // the device when one is present (it falls back to the CPU otherwise)
@@ -1117,24 +1196,29 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 		x = cdouble(next(), next());
 	for (auto& x : v2.values())
 		x = cdouble(next(), next());
+	make_real_density(v1, natoms);
+	make_real_density(v2, natoms);
 	// every lambda up to lam, for equicomb_norms' one pass over all of them
 	std::vector<ivec2> llvec_all(lam + 1, ivec2(2));
+	std::vector<vec> w3j_k(lam + 1);
+	std::vector<const vec*> w3j_all(lam + 1);
 	for (int k = 0; k <= lam; k++)
+	{
 		for (int l1 = 0; l1 <= lmax; l1++)
 			for (int l2 = 0; l2 <= lmax; l2++)
-				if (std::abs(l1 - l2) <= k && k <= l1 + l2)
+				if (std::abs(l1 - l2) <= k && k <= l1 + l2 && (l1 + l2 + k) % 2 == 0)
 				{
 					llvec_all[k][0].push_back(l1);
 					llvec_all[k][1].push_back(l2);
 				}
+		w3j_k[k] = salted_w3j(k, llvec_all[k]);
+		w3j_all[k] = &w3j_k[k];
+	}
 	ivec2& llvec = llvec_all[lam];
 	const int llmax = static_cast<int>(llvec[0].size());
-	vec w3j(4000);
-	for (double& w : w3j)
-		w = next();
+	vec& w3j = w3j_k[lam];
 	const std::vector<cvec2> c2r_all = SALTED_Utils::complex_to_real_transformation({ 1, 3, l21 });
 	cvec2 c2r = c2r_all[lam];
-	const std::vector<const vec*> w3j_all(lam + 1, &w3j);
 	const bool gpu_before = equicomb_gpu_enabled();
 	for (const bool conj : { false, true })
 	{
@@ -1167,6 +1251,265 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 		}
 	}
 	equicomb_set_gpu(gpu_before);
+}
+
+// NaCl rocksalt atoms sit on cubic inversion centres, where the lam = 1, 2, 3 features vanish. Displaced by d their
+// squared norm is a small fraction of the bound sum_il tr A1[l1] tr A2[l2] / (2 lam + 1), while the density-matrix norm
+// is a sum of terms of the size of the bound, so it cancels. For every d > 0 the norm from equicomb_norms must be the
+// sum of the squared features to 1e-12, and the sparse features, norm made inside or by equicomb_norms, must stay on the
+// dense path to the rounding of features that small
+TEST(SaltedFchkEquicombTests, NearSymmetricSitesKeepTheNorm)
+{
+	EXPECT_NEAR(wigner_3j(1, 1, 0, 0, 0, 0), -1.0 / std::sqrt(3.0), 1e-15);
+	EXPECT_NEAR(wigner_3j(2, 2, 0, 0, 0, 0), 1.0 / std::sqrt(5.0), 1e-15);
+	EXPECT_NEAR(wigner_3j(1, 1, 2, 0, 0, 0), std::sqrt(2.0 / 15.0), 1e-15);
+	EXPECT_NEAR(wigner_3j(1, 1, 1, 1, -1, 0), 1.0 / std::sqrt(6.0), 1e-15);
+	const bool gpu_before = equicomb_gpu_enabled();
+	equicomb_set_gpu(false);
+	const double a = 5.64;
+	const int natoms = 8, nrad = 4, nang = 6, nchan = 2 * nrad, lam_max = 4;
+	const double frac[natoms][3] = { { 0, 0, 0 }, { 0, 0.5, 0.5 }, { 0.5, 0, 0.5 }, { 0.5, 0.5, 0 },
+		{ 0.5, 0.5, 0.5 }, { 0.5, 0, 0 }, { 0, 0.5, 0 }, { 0, 0, 0.5 } };
+	// unit rms per component, as ase's rattle(stdev = d)
+	std::mt19937 gen(5);
+	double u[natoms][3];
+	for (int i = 0; i < natoms; i++)
+		for (int x = 0; x < 3; x++)
+			u[i][x] = (gen() / 4294967296.0 - 0.5) * std::sqrt(12.0);
+	SALTED_Utils::FeatomicHyperParameters hp;
+	hp.cutoff_radius = 4.0;
+	hp.max_radial = nrad;
+	hp.max_angular = nang;
+	hp.atomic_gaussian_width = 0.3;
+	hp.species = { "Na", "Cl" };
+	hp.neighspe = { "Na", "Cl" };
+	std::vector<ivec2> llvec_all(lam_max + 1);
+	std::vector<cvec2> c2r_all(lam_max + 1);
+	std::vector<vec> w3j_all(lam_max + 1);
+	std::vector<const vec*> w3j_ptr(lam_max + 1);
+	for (int lam = 0; lam <= lam_max; lam++)
+	{
+		ivec2 llvec;
+		for (int l1 = 0; l1 <= nang; l1++)
+			for (int l2 = 0; l2 <= nang; l2++)
+				if ((lam + l1 + l2) % 2 == 0 && std::abs(l2 - lam) <= l1 && l1 <= l2 + lam)
+					llvec.push_back({ l1, l2 });
+		llvec_all[lam] = transpose<int>(llvec);
+		c2r_all[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+		w3j_all[lam] = salted_w3j(lam, llvec_all[lam]);
+		w3j_ptr[lam] = &w3j_all[lam];
+	}
+	std::printf("     d/A  lam  dev(norm inside)  dev(equicomb_norms)  |norm2 err|/norm2  min norm2/bound\n");
+	for (const double d : { 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0.0 })
+	{
+		featomic::SimpleSystem sys({ { { a, 0, 0 }, { 0, a, 0 }, { 0, 0, a } } });
+		for (int i = 0; i < natoms; i++)
+			sys.add_atom(i < 4 ? 11 : 17, { (frac[i][0] + 0.125) * a + d * u[i][0], (frac[i][1] + 0.125) * a + d * u[i][1], (frac[i][2] + 0.125) * a + d * u[i][2] });
+		const SALTEDDescriptors v = SALTED_Utils::calculate_SALTED_descriptors(sys, hp);
+		ASSERT_EQ(v.nchannels(), nchan);
+		ASSERT_EQ(v.values().size(), static_cast<size_t>(natoms) * nchan * (nang + 1) * (nang + 1));
+		vec2 tr(natoms, vec(nang + 1, 0.0));
+		for (int i = 0; i < natoms; i++)
+			for (int l = 0; l <= nang; l++)
+				for (int n = 0; n < nchan; n++)
+					for (int m = 0; m < 2 * l + 1; m++)
+						tr[i][l] += std::norm(v.block(i, n, l)[m]);
+		const vec2 norms = equicomb_norms(natoms, nchan, nchan, v, v, w3j_ptr, llvec_all, c2r_all, true);
+		const vec ones(natoms, 1.0);
+		for (int lam = 0; lam <= lam_max; lam++)
+		{
+			const int l21 = 2 * lam + 1, llmax = static_cast<int>(llvec_all[lam][0].size()), featsize = nchan * nchan * llmax, block = l21 * featsize;
+			std::vector<int64_t> identity(featsize);
+			for (int f = 0; f < featsize; f++)
+				identity[f] = f;
+			const size_t size = static_cast<size_t>(natoms) * block;
+			vec dense(size, 0.0), inside(size, 0.0), given(size, 0.0), raw(size, 0.0);
+			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llmax, llvec_all[lam], lam, c2r_all[lam], featsize, dense, true);
+			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, inside, true);
+			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, given, true, norms[lam].data());
+			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, raw, true, ones.data());
+			// the device when one is present, the CPU otherwise
+			vec device(size, 0.0);
+			equicomb_set_gpu(true);
+			equicomb(natoms, nchan, nchan, v, v, w3j_all[lam], llvec_all[lam], lam, c2r_all[lam], featsize, featsize, identity, device, true, norms[lam].data());
+			equicomb_set_gpu(false);
+			double dev_inside = 0.0, dev_given = 0.0, norm_err = 0.0, ratio = 1e300;
+			for (int i = 0; i < natoms; i++)
+			{
+				double top = 0.0, di = 0.0, dg = 0.0, dd = 0.0, direct = 0.0, bound = 0.0;
+				for (int f = i * block; f < (i + 1) * block; f++)
+				{
+					top = std::max(top, std::abs(dense[f]));
+					di = std::max(di, std::abs(inside[f] - dense[f]));
+					dg = std::max(dg, std::abs(given[f] - dense[f]));
+					dd = std::max(dd, std::abs(device[f] - dense[f]));
+					direct += raw[f] * raw[f];
+				}
+				for (int il = 0; il < llmax; il++)
+					bound += tr[i][llvec_all[lam][0][il]] * tr[i][llvec_all[lam][1][il]] / l21;
+				dev_inside = std::max(dev_inside, di / top);
+				dev_given = std::max(dev_given, dg / top);
+				const double nf = norms[lam][i];
+				const double err = nf > 0.0 ? std::abs(1.0 / (nf * nf) - direct) / direct : 1.0;
+				norm_err = std::max(norm_err, err);
+				ratio = std::min(ratio, direct / bound);
+				// features a fraction r of the size of their terms carry rounding of about 1e-16 / sqrt(r) in either path
+				if (d > 0.0)
+				{
+					EXPECT_LE(err, 1e-12) << "d " << d << " lam " << lam << " atom " << i;
+					EXPECT_LE(di / top, 1e-14 / std::sqrt(direct / bound)) << "d " << d << " lam " << lam << " atom " << i;
+					EXPECT_LE(dg / top, 1e-14 / std::sqrt(direct / bound)) << "d " << d << " lam " << lam << " atom " << i;
+					EXPECT_LE(dd / top, 1e-14 / std::sqrt(direct / bound)) << "device, d " << d << " lam " << lam << " atom " << i;
+				}
+			}
+			std::printf("%8.0e  %3d  %16.2e  %19.2e  %17.2e  %15.2e\n", d, lam, dev_inside, dev_given, norm_err, ratio);
+		}
+	}
+	equicomb_set_gpu(gpu_before);
+}
+
+// CH4 (Td) and SF6 (Oh) at exact symmetry, at the origin and shifted by 100 A: the central atom's lambda 1, 2, 5 (Td) and
+// 1, 2, 3, 5 (Oh) features vanish, and what is computed for them is rounding noise of the positions, which equicomb_norms
+// with noise2 = (100 eps L)^2 zeroes. Every other atom and lambda keeps its norm, and so does the centre when one ligand moves
+// by 1e-8 A (moving the centre alone changes its even-l coefficients only at second order, the shift adding u.grad rho)
+TEST(SaltedFchkEquicombTests, ExactSymmetryZeroesTheVanishingFeatures)
+{
+	equicomb_set_gpu(false);
+	const int nrad = 7, nang = 7, lam_max = 5;
+	const double a = 1.09 / std::sqrt(3.0), s = 1.56;
+	struct molecule { std::vector<std::string> el; std::vector<d3> xyz; std::vector<int> vanish; };
+	const std::vector<molecule> mols{
+		{ { "C", "H", "H", "H", "H" }, { { 0, 0, 0 }, { a, a, a }, { a, -a, -a }, { -a, a, -a }, { -a, -a, a } }, { 1, 2, 5 } },
+		{ { "S", "F", "F", "F", "F", "F", "F" }, { { 0, 0, 0 }, { s, 0, 0 }, { -s, 0, 0 }, { 0, s, 0 }, { 0, -s, 0 }, { 0, 0, s }, { 0, 0, -s } }, { 1, 2, 3, 5 } } };
+	for (const molecule& m : mols)
+		for (const double shift : { 0.0, 100.0 })
+			for (const double d : { 0.0, 1e-8 })
+			{
+				const int n = static_cast<int>(m.el.size());
+				std::vector<std::string> species(m.el.begin(), m.el.begin() + 2);
+				SALTED_Utils::FeatomicHyperParameters hp;
+				hp.cutoff_radius = 4.0;
+				hp.max_radial = nrad;
+				hp.max_angular = nang;
+				hp.atomic_gaussian_width = 0.3;
+				hp.species = species;
+				hp.neighspe = species;
+				featomic::SimpleSystem sys;
+				double L = 1.0;
+				for (int i = 0; i < n; i++)
+				{
+					const double di = i == 1 ? d : 0.0;
+					const d3 r{ m.xyz[i][0] + (shift + 0.8 * di) * 0.6, m.xyz[i][1] - (shift - 0.3 * di) * 0.45, m.xyz[i][2] + (shift + 0.5 * di) * 0.8 };
+					sys.add_atom(constants::get_Z_from_label(m.el[i].c_str()) + 1, r);
+					for (const double x : r)
+						L = std::max(L, std::abs(x));
+				}
+				const SALTEDDescriptors v = SALTED_Utils::calculate_SALTED_descriptors(sys, hp);
+				const int nchan = v.nchannels();
+				std::vector<ivec2> llvec(lam_max + 1);
+				std::vector<cvec2> c2r(lam_max + 1);
+				std::vector<vec> w3j(lam_max + 1);
+				std::vector<const vec*> w3j_ptr(lam_max + 1);
+				for (int lam = 0; lam <= lam_max; lam++)
+				{
+					ivec2 ll;
+					for (int l1 = 0; l1 <= nang; l1++)
+						for (int l2 = 0; l2 <= nang; l2++)
+							if ((lam + l1 + l2) % 2 == 0 && std::abs(l2 - lam) <= l1 && l1 <= l2 + lam)
+								ll.push_back({ l1, l2 });
+					llvec[lam] = transpose<int>(ll);
+					c2r[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+					w3j[lam] = salted_w3j(lam, llvec[lam]);
+					w3j_ptr[lam] = &w3j[lam];
+				}
+				const double noise = 100.0 * std::numeric_limits<double>::epsilon() * L;
+				++constants::run_id;
+				testing::internal::CaptureStdout();
+				const vec2 norms = equicomb_norms(n, nchan, nchan, v, v, w3j_ptr, llvec, c2r, true, noise * noise);
+				EXPECT_EQ(testing::internal::GetCapturedStdout().find("no neighbour"), std::string::npos) << m.el[0] << " shift " << shift << " d " << d;
+				for (int lam = 0; lam <= lam_max; lam++)
+					for (int i = 0; i < n; i++)
+					{
+						const bool zero = i == 0 && d == 0.0 && std::find(m.vanish.begin(), m.vanish.end(), lam) != m.vanish.end();
+						EXPECT_EQ(norms[lam][i] == 0.0, zero) << m.el[0] << " shift " << shift << " d " << d << " lam " << lam << " atom " << i;
+					}
+				// with the centre's norm factor 0 its features are zero, so the kernel gives no coefficient for that lambda
+				const int lam = 2, llmax = static_cast<int>(llvec[lam][0].size()), featsize = nchan * nchan * llmax;
+				std::vector<int64_t> identity(featsize);
+				for (int f = 0; f < featsize; f++)
+					identity[f] = f;
+				vec p(static_cast<size_t>(n) * 5 * featsize, 1.0);
+				equicomb(n, nchan, nchan, v, v, w3j[lam], llvec[lam], lam, c2r[lam], featsize, featsize, identity, p, true, norms[lam].data());
+				double centre = 0.0;
+				for (int f = 0; f < 5 * featsize; f++)
+					centre = std::max(centre, std::abs(p[f]));
+				if (d == 0.0)
+					EXPECT_EQ(centre, 0.0) << m.el[0] << " shift " << shift;
+				else
+					EXPECT_GT(centre, 1e-3) << m.el[0] << " shift " << shift;
+			}
+}
+
+// rel_power against SALTED's own kernels (branch soap-norm-symmetric-sites, 61df639): CH4 with H1 moved 0.01 A along x,
+// rcut 4, sigma 0.3, nrad 4, nang 4, no sparsification; carbon lambda 0-2 divided by its lambda = 0 length
+TEST(SaltedFchkEquicombTests, RelPowerMatchesSalted)
+{
+	equicomb_set_gpu(false);
+	const auto ref = nos_test_repo_root() / "tests" / "SALTED" / "relpower_ch4";
+	const int nrad = 4, nang = 4;
+	SALTED_Utils::FeatomicHyperParameters hp;
+	hp.cutoff_radius = 4.0;
+	hp.max_radial = nrad;
+	hp.max_angular = nang;
+	hp.atomic_gaussian_width = 0.3;
+	hp.species = { "C", "H" };
+	hp.neighspe = { "C", "H" };
+	featomic::SimpleSystem sys;
+	const double a = 0.629118;
+	const std::vector<d3> xyz{ { 0, 0, 0 }, { a + 0.01, a, a }, { -a, -a, a }, { a, -a, -a }, { -a, a, -a } };
+	for (int i = 0; i < 5; i++)
+		sys.add_atom(constants::get_Z_from_label(i == 0 ? "C" : "H") + 1, xyz[i]);
+	const SALTEDDescriptors v = SALTED_Utils::calculate_SALTED_descriptors(sys, hp);
+	const int nchan = v.nchannels();
+	ASSERT_EQ(nchan, 8);
+	std::vector<ivec2> llvec(3);
+	std::vector<cvec2> c2r(3);
+	std::vector<vec> w3j(3);
+	for (int lam = 0; lam <= 2; lam++)
+	{
+		ivec2 ll;
+		for (int l1 = 0; l1 <= nang; l1++)
+			for (int l2 = 0; l2 <= nang; l2++)
+				if ((lam + l1 + l2) % 2 == 0 && std::abs(l2 - lam) <= l1 && l1 <= l2 + lam)
+					ll.push_back({ l1, l2 });
+		llvec[lam] = transpose<int>(ll);
+		c2r[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+		w3j[lam] = salted_w3j(lam, llvec[lam]);
+	}
+	const vec norm0 = equicomb_norms(5, nchan, nchan, v, v, { &w3j[0] }, { llvec[0] }, { c2r[0] }, true)[0];
+	vec raw0;
+	std::filesystem::path rp = ref / "C_raw_lam0.npy";
+	read_npy<double>(rp, raw0);
+	double q0 = 0.0;
+	for (const double x : raw0) q0 += x * x;
+	EXPECT_NEAR(norm0[0] * std::sqrt(q0), 1.0, 1e-13);
+	for (int lam = 0; lam <= 2; lam++)
+	{
+		const int llmax = static_cast<int>(llvec[lam][0].size()), featsize = nchan * nchan * llmax, l21 = 2 * lam + 1;
+		vec p(5 * static_cast<size_t>(l21) * featsize);
+		equicomb(5, nchan, nchan, v, v, w3j[lam], llmax, llvec[lam], lam, c2r[lam], featsize, p, true, norm0.data());
+		vec want;
+		std::filesystem::path wp = ref / ("C_relpower_lam" + std::to_string(lam) + ".npy");
+		read_npy<double>(wp, want);
+		ASSERT_EQ(want.size(), static_cast<size_t>(l21) * featsize);
+		double top = 0.0, dev = 0.0;
+		for (size_t i = 0; i < want.size(); i++)
+		{
+			top = std::max(top, std::abs(want[i]));
+			dev = std::max(dev, std::abs(p[i] - want[i]));
+		}
+		EXPECT_LT(dev, 1e-12 * top) << "lambda " << lam;
+	}
 }
 
 // --------------------------------------------------------- SALTED_predictor
@@ -1281,6 +1624,246 @@ TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 	// each H gets 0.460 e against 0.807 e in the reference fit of this geometry (reading_SALTED/coefficients_conf0.npy,
 	// same basis, 10.000 e); the Aug and Sep 2026 builds predict the same coefficients to 1e-16
 	EXPECT_NEAR(e[0] + e[1] + e[2], 9.1937, 1e-3);
+}
+
+// -v accounts for the prediction: the payload line names exactly the bytes of the H and O blocks of the shipped model
+// and the eager line those of the datasets read whole; without -v none of the stage lines is written
+TEST(SaltedFchkPredictorTests, VerboseStagesCountThePayload)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto run = [&root](const bool verbose) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = verbose;
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		SP.gen_SALTED_densities();
+		const std::string out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return out;
+	};
+	SALTED_BINARY_FILE f(root / "SALTED" / "Model" / "model.salted");
+	SALTEDConfig c{};
+	f.populate_config(c);
+	ASSERT_FALSE(f.has_block("FEATL") || f.has_block("ENVW") || f.has_block("GENV"));
+	size_t bytes = 0, blocks = 0;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key))
+		{
+			const std::string spe = k.substr(0, k.size() - 1);
+			if (spe != "H" && spe != "O") continue;
+			bytes += r.rows * r.cols * sizeof(double);
+			blocks += r.rows * r.cols != 0;
+		}
+	f.read_weights();
+	f.read_wigners();
+	if (c.average) f.read_averages();
+	if (c.sparsify) f.read_fps();
+	const std::string out = run(true);
+	for (const char* line : { "[stages] featomic calculator ", "[stages] featomic descriptors ", "[stages] predict ", " + model install ", " + assemble " })
+		EXPECT_NE(out.find(line), std::string::npos) << line << " missing in\n" << out;
+	std::smatch m;
+	ASSERT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s, (\\d+) bytes in (\\d+) blocks; eager blocks \\S+ s, (\\d+) bytes"))) << out;
+	EXPECT_EQ(std::stoull(m[1]), bytes);
+	EXPECT_EQ(std::stoull(m[2]), blocks);
+	EXPECT_EQ(std::stoull(m[3]), f.dataset_bytes);
+	const std::string quiet = run(false);
+	EXPECT_EQ(quiet.find("[stages]"), std::string::npos) << quiet;
+	EXPECT_EQ(quiet.find("[model]"), std::string::npos) << quiet;
+}
+
+// Two parts sharing one model store (as -mtc does): water, then cysteine. The second reads only the blocks of the species
+// water lacks, each block of the run comes from the file once, and both predict what a predictor of their own predicts
+TEST(SaltedFchkPredictorTests, PartsShareOneModelLoad)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const std::filesystem::path xyz[2] = { root / "reading_SALTED" / "water_monomer.xyz", root / "SALTED" / "test_cysteine.xyz" };
+	auto predict = [&root](const std::filesystem::path& p, const std::shared_ptr<SALTED_model_store>& s, std::string& out) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		WFN w(p, false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		SP.share_model(s);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		const vec c = SP.gen_SALTED_densities();
+		out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return c;
+	};
+	auto payload = [](const std::string& out) {
+		std::smatch m;
+		EXPECT_TRUE(std::regex_search(out, m, std::regex("\\[model\\] payload read \\S+ s, (\\d+) bytes in (\\d+) blocks"))) << out;
+		return m.empty() ? std::array<size_t, 2>{} : std::array<size_t, 2>{ std::stoull(m[1]), std::stoull(m[2]) };
+	};
+	SALTED_BINARY_FILE f(root / "SALTED" / "Model" / "model.salted");
+	std::map<std::string, std::array<size_t, 2>> per_species;
+	for (const std::string key : { "FEATS", "PROJ" })
+		for (const auto& [k, r] : f.index_lambda_based_data(key))
+		{
+			auto& b = per_species[k.substr(0, k.size() - 1)];
+			b[0] += r.rows * r.cols * sizeof(double);
+			b[1] += r.rows * r.cols != 0;
+		}
+	ASSERT_TRUE(per_species.count("C") && per_species.count("N"));
+	const std::array<size_t, 2> water = { per_species["H"][0] + per_species["O"][0], per_species["H"][1] + per_species["O"][1] };
+	std::array<size_t, 2> new_in_cys{};
+	for (const std::string spe : { "C", "N", "S" })
+		if (per_species.count(spe)) new_in_cys[0] += per_species[spe][0], new_in_cys[1] += per_species[spe][1];
+	std::string out;
+	const vec alone0 = predict(xyz[0], nullptr, out), alone1 = predict(xyz[1], nullptr, out);
+	auto store = std::make_shared<SALTED_model_store>();
+	const vec shared0 = predict(xyz[0], store, out);
+	EXPECT_EQ(payload(out), water);
+	const vec shared1 = predict(xyz[1], store, out);
+	EXPECT_EQ(payload(out), new_in_cys);
+	EXPECT_EQ(store->files.size(), 1u);
+	EXPECT_EQ(store->files.begin()->second->lazy_blocks, water[1] + new_in_cys[1]);
+	ASSERT_EQ(shared0.size(), alone0.size());
+	ASSERT_EQ(shared1.size(), alone1.size());
+	for (size_t i = 0; i < alone0.size(); i++) ASSERT_EQ(shared0[i], alone0[i]) << i;
+	for (size_t i = 0; i < alone1.size(); i++) ASSERT_EQ(shared1[i], alone1[i]) << i;
+}
+
+// Every lambda's blocks are read by an OpenMP team of at most -cpus threads: reader threads of their own (a team of one
+// each) run while the team's workers still spin, beyond -cpus
+TEST(SaltedFchkPredictorTests, ModelIsReadInLineWithCpusReaders)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const int before = omp_get_max_threads();
+	for (const int n : { 1, 4 })
+	{
+		omp_set_num_threads(n);
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		++constants::run_id;
+		auto store = std::make_shared<SALTED_model_store>();
+		SALTEDPredictor SP(w, opt);
+		SP.share_model(store);
+		EXPECT_FALSE(SP.gen_SALTED_densities().empty());
+		ASSERT_EQ(store->files.size(), 1u);
+		const SALTED_BINARY_FILE& f = *store->files.begin()->second;
+		EXPECT_GT(f.lazy_blocks, 0u);
+		EXPECT_EQ(f.readers, (size_t)n);
+		if (n == 1) EXPECT_EQ(f.team, 1);
+		else EXPECT_TRUE(f.team > 1 && f.team <= n) << f.team;
+	}
+	omp_set_num_threads(before);
+}
+
+// A merged folder (the model and a copy of it as an alternative in a subfolder): the l = 0 blocks the SOAP score reads
+// are kept for the prediction, so in a run without a store the predictions read no more blocks than in a run whose
+// store holds every block (the score passes print no payload line), and predict the same
+TEST(SaltedFchkPredictorTests, MergedScoreReadsLambda0Once)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("merged");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "alt");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "model.salted");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "alt" / "model.salted");
+	auto predict = [&](const std::shared_ptr<SALTED_model_store>& s, size_t& blocks) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = dir;
+		++constants::run_id;
+		testing::internal::CaptureStdout();
+		SALTEDPredictor SP(w, opt);
+		if (s) SP.share_model(s);
+		const vec c = SP.gen_SALTED_densities();
+		const std::string out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		EXPECT_NE(out.find("Combining 2 SALTED models"), std::string::npos) << out;
+		blocks = 0;
+		const std::regex re("\\[model\\] payload read \\S+ s, \\d+ bytes in (\\d+) blocks");
+		for (std::sregex_iterator m(out.begin(), out.end(), re), e; m != e; ++m) blocks += std::stoull((*m)[1]);
+		return c;
+	};
+	size_t alone_blocks = 0, held_blocks = 0;
+	const vec alone = predict(nullptr, alone_blocks);
+	auto store = std::make_shared<SALTED_model_store>();
+	const vec held = predict(store, held_blocks);
+	EXPECT_EQ(store->files.size(), 2u);
+	EXPECT_GT(alone_blocks, 0u);
+	EXPECT_EQ(alone_blocks, held_blocks);
+	ASSERT_EQ(alone.size(), held.size());
+	for (size_t i = 0; i < alone.size(); i++) ASSERT_EQ(alone[i], held[i]) << i;
+	store.reset();   // the store keeps both files open, and Windows deletes no open file
+	std::filesystem::remove_all(dir);
+}
+
+// rel_power (NORM block): the lambda > 0 features are divided by the lambda = 0 length, so the coefficients of the
+// carbon of CH4 move with one H by about as much at 1e-10 A as the displacement; unit-normalised its lambda 1 and 2
+// blocks jump to full size at any displacement
+TEST(SaltedFchkPredictorTests, RelPowerIsContinuousAtASymmetricSite)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("relpower");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "unit");
+	std::filesystem::create_directories(dir / "rel");
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "unit" / "model.salted");
+	{
+		const int32_t head[2] = { 4, 9 };
+		std::string block(reinterpret_cast<const char*>(head), sizeof(head));
+		block += "rel_power";
+		SALTED_BINARY_FILE f(dir / "unit" / "model.salted");
+		f.write_with_blocks(dir / "rel" / "model.salted", 7, {}, { { "NORM", block } });
+	}
+	{
+		SALTEDConfig c{}, u{};
+		SALTED_BINARY_FILE f(dir / "rel" / "model.salted"), g(dir / "unit" / "model.salted");
+		f.populate_config(c);
+		g.populate_config(u);
+		EXPECT_EQ(c.normalisation, "rel_power");
+		EXPECT_EQ(u.normalisation, "unit");
+	}
+	const double a = 1.09 / std::sqrt(3.0);
+	auto predict = [&](const std::string& model, const double d) {
+		const auto xyz = dir / "ch4.xyz";
+		{
+			std::ofstream o(xyz);
+			o << std::setprecision(17) << "5\nCH4\nC 0 0 0\nH " << a + 0.3 * d << " " << a - 0.5 * d << " " << a + 0.8 * d
+			  << "\nH " << a << " " << -a << " " << -a << "\nH " << -a << " " << a << " " << -a << "\nH " << -a << " " << -a << " " << a << "\n";
+		}
+		WFN w(xyz, false);
+		options opt;
+		opt.salted_model_dir = dir / model;
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		return SP.gen_SALTED_densities();
+	};
+	auto dist = [](const vec& x, const vec& y) {
+		double s = 0.0;
+		for (size_t i = 0; i < x.size(); i++) s += (x[i] - y[i]) * (x[i] - y[i]);
+		return std::sqrt(s);
+	};
+	for (const std::string model : { "unit", "rel" })
+	{
+		const vec c0 = predict(model, 0.0), c1 = predict(model, 1e-10), c2 = predict(model, 0.05);
+		ASSERT_EQ(c0.size(), c2.size());
+		const double step = dist(c1, c0) / dist(c2, c0);
+		if (model == "unit")
+			EXPECT_GT(step, 0.1);
+		else
+			EXPECT_LT(step, 1e-6);
+	}
+	std::filesystem::remove_all(dir);
 }
 
 // a .wfx names its atoms "C1", "H2": the species come from the nuclear charge, so it predicts what the same atoms

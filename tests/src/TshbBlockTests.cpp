@@ -398,8 +398,9 @@ TEST(TshbBlockTests, FillRecordsReproduceTheSphericalFormFactor)
 	}
 }
 
-//the joint .tshb of a -mtc run against the table of the same run without -tshb: every atom once, f(h) to round-off
-static void joint_against_table(const std::string& name, const std::vector<std::string>& args, const std::string& cif)
+//the joint .tshb of a -mtc run against the table of the same run without -tshb: every atom once, f(h) to round-off;
+//logs, if given, receives the log of the -tshb run and of the table run
+static void joint_against_table(const std::string& name, const std::vector<std::string>& args, const std::string& cif, std::string* logs = nullptr)
 {
 	std::vector<std::string> with = args;
 	with.push_back("-tshb");
@@ -409,8 +410,10 @@ static void joint_against_table(const std::string& name, const std::vector<std::
 	EXPECT_NE(run.log().find("Writing tsc file...  ... done!"), std::string::npos);
 	EXPECT_FALSE(fs::exists(run.dir / "experimental.tscb"));
 	const tshb_block tshb(run.dir / "experimental.tshb");
+	if (logs) logs[0] = run.log();
 	fs::rename(run.dir / "NoSpherA2.log", run.dir / "tshb.log");
 	ASSERT_EQ(run.run(args), 0);
+	if (logs) logs[1] = run.log();
 	EXPECT_FALSE(fs::exists(run.dir / "experimental.tshb.tmp"));
 	const itsc_block table(run.dir / "experimental.tscb");
 	const cell unit_cell(cif, std::cout, false);
@@ -752,6 +755,54 @@ TEST(TshbJointTests, SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile)
 	ASSERT_EQ(run.run({ "-merge", "p1.tshb", "p2.tshb", "-cif", cif }), 0);
 	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
 	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
+}
+
+//THPP's 20 PART 0 atoms, the two F the model lacks among them, are in both parts' wavefunctions: the second part's fill
+//skips what the first part wrote, so the fill writes its records once, and the file still matches the table.
+//Under -v the second part reads no model block, on the -tshb loop, the streamed table and the -old_tsc loop alike
+TEST(TshbJointTests, SaltedSharedPart0AtomsAreFilledOnce)
+{
+	const std::string cif = fs::absolute(fixture("disorder/thpp.cif")).string();
+	std::vector<std::string> a{ "-SALTED", fixture("SALTED/Model"), "-cif", cif, "-dmin", "0.9", "-no_date", "-mtc",
+		fixture("disorder/olex2/Wfn_job/Part_1/thpp.wfx"), "0.1", fixture("disorder/olex2/Wfn_job/Part_2/thpp.wfx"), "0.2",
+		"-mtc_mult", "1", "1", "-mtc_charge", "0", "0", "-mtc_ECP", "0", "0", "-v" };
+	auto payload = [](const std::string& log) {
+		std::vector<size_t> b;
+		const std::regex re("\\[model\\] payload read \\S+ s, (\\d+) bytes");
+		for (std::sregex_iterator m(log.begin(), log.end(), re), e; m != e; ++m) b.push_back(std::stoull((*m)[1]));
+		return b;
+	};
+	std::string logs[3];
+	joint_against_table("salted_thpp", a, cif, logs);
+	a.push_back("-old_tsc");
+	{
+		app_dir run("salted_thpp_old_tsc");
+		ASSERT_EQ(run.run(a), 0);
+		logs[2] = run.log();
+	}
+	const std::string& log = logs[0];
+	int n = 0;
+	for (size_t p = log.find("as Slater records"); p != std::string::npos; p = log.find("as Slater records", p + 1))
+		n++;
+	EXPECT_EQ(n, 1) << log;
+	EXPECT_NE(log.find("Spherical fill: 2 atom(s) go into the .tshb as Slater records"), std::string::npos) << log;
+	EXPECT_NE(log.find("Wrote experimental.tshb: 32 atom(s)"), std::string::npos) << log;
+	for (int i = 0; i < 3; i++)
+	{
+		const std::vector<size_t> b = payload(logs[i]);
+		ASSERT_EQ(b.size(), 2u) << logs[i];
+		EXPECT_GT(b[0], 0u) << i;
+		EXPECT_EQ(b[1], 0u) << i;
+	}
+#ifdef __APPLE__
+	const char* age = "[stages] run_app ";
+#else
+	const char* age = "[stages] process age at run_app ";
+#endif
+	for (const char* line : { "[stages] tshb records ", "[stages] fill: wavefunctions ", "[stages] part 1: predictor ", "[stages] part 2: predictor ", " s (aux basis ", age })
+		EXPECT_NE(log.find(line), std::string::npos) << line << " missing in\n" << log;
+	EXPECT_NE(logs[1].find("[stages] part 2: prediction and setup "), std::string::npos) << logs[1];
+	EXPECT_NE(logs[2].find("[stages] write table "), std::string::npos) << logs[2];
 }
 
 //a part without orbitals (an .xyz) in a -ri_fit -tshb run: its atoms go in as the fill's spherical records, neutral and at

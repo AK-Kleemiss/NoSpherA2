@@ -704,4 +704,17 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(-1, v[0]);
 	}
 
+	//-v's process age: a /proc/self/stat that cannot be read (no /proc) or is not a stat line is "not known", never an exception
+	TEST(ProcessAgeTests, StatStartTicksOfAnUnreadableLineIsNotKnown)
+	{
+		std::string line = "42 (a) b) S";
+		for (int i = 4; i < 22; i++) line += " " + std::to_string(i);
+		EXPECT_EQ(stat_start_ticks(line + " 98765 1 2"), 98765.0);
+		EXPECT_EQ(stat_start_ticks(""), -1.0);
+		EXPECT_EQ(stat_start_ticks("garbage"), -1.0);
+		EXPECT_EQ(stat_start_ticks("1 (x)"), -1.0);
+		EXPECT_EQ(stat_start_ticks(line), -1.0);
+		EXPECT_EQ(stat_start_ticks(line + " start"), -1.0);
+	}
+
 } // namespace NoSpherA2UnitTests
