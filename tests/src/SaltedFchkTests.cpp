@@ -2552,8 +2552,8 @@ TEST(SaltedFchkPredictorTests, KernelNoveltySplitIsTheLinearResidualAtZeta1)
 	}
 }
 
-// salted_distance writes <xyz stem>_salted_distance.json with every row and its channel and element shares, and prints a line of
-// the largest per atom
+// salted_distance writes <xyz stem>_salted_distance.json with every row and its channel and element shares, excesses (summing to 0)
+// and enrichments, and prints a line of the ranked ones per atom
 TEST(SaltedFchkPredictorTests, SaltedDistanceWritesTheChannelSplitAsJson)
 {
 	equicomb_set_gpu(false);
@@ -2593,17 +2593,42 @@ TEST(SaltedFchkPredictorTests, SaltedDistanceWritesTheChannelSplitAsJson)
 		EXPECT_EQ(x["nearest"].get<int>(), r.nearest);
 		EXPECT_TRUE(x["absent"].empty());
 		ASSERT_EQ(x["channels"].size(), r.split.size());
-		std::map<std::string, double> el;
+		std::map<std::string, std::pair<double, double>> el;
+		double fs = 0.0, es = 0.0, xs = 0.0, ys = 0.0;
 		for (const auto& [c, v] : r.split)
 		{
-			EXPECT_EQ(x["channels"][c]["share"].get<double>(), v.second) << c;
-			EXPECT_EQ(x["channels"][c]["environment"].get<double>(), v.first) << c;
-			EXPECT_NEAR(x["channels"][c]["fraction"].get<double>(), v.second / r.nov0, 1e-15) << c;
-			EXPECT_FALSE(x["channels"][c]["absent"].get<bool>()) << c;
-			el[c.substr(0, c.find('-'))] += 0.5 * v.second;
-			el[c.substr(c.find('-') + 1)] += 0.5 * v.second;
+			const auto& y = x["channels"][c];
+			EXPECT_EQ(y["share"].get<double>(), v.second) << c;
+			EXPECT_EQ(y["environment"].get<double>(), v.first) << c;
+			EXPECT_NEAR(y["fraction"].get<double>(), v.second / r.nov0, 1e-15) << c;
+			EXPECT_DOUBLE_EQ(y["excess"].get<double>(), v.second / r.nov0 - v.first) << c;
+			if (v.first > 0.0) EXPECT_DOUBLE_EQ(y["enrichment"].get<double>(), v.second / r.nov0 / v.first) << c;
+			else EXPECT_TRUE(y["enrichment"].is_null()) << c;
+			EXPECT_FALSE(y["absent"].get<bool>()) << c;
+			fs += y["fraction"].get<double>();
+			es += y["environment"].get<double>();
+			xs += y["excess"].get<double>();
+			for (const std::string& e : { c.substr(0, c.find('-')), c.substr(c.find('-') + 1) })
+			{
+				el[e].first += 0.5 * v.first;
+				el[e].second += 0.5 * v.second;
+			}
 		}
-		for (const auto& [e, v] : el) EXPECT_NEAR(x["elements"][e]["share"].get<double>(), v, 1e-15) << e;
+		EXPECT_NEAR(fs, 1.0, 1e-10) << a;
+		EXPECT_NEAR(es, 1.0, 1e-10) << a;
+		EXPECT_NEAR(xs, 0.0, 1e-10) << a;
+		ASSERT_EQ(x["elements"].size(), el.size());
+		for (const auto& [e, v] : el)
+		{
+			const auto& y = x["elements"][e];
+			EXPECT_NEAR(y["share"].get<double>(), v.second, 1e-15) << e;
+			EXPECT_NEAR(y["environment"].get<double>(), v.first, 1e-15) << e;
+			EXPECT_NEAR(y["excess"].get<double>(), v.second / r.nov0 - v.first, 1e-12) << e;
+			if (v.first > 0.0) EXPECT_NEAR(y["enrichment"].get<double>(), v.second / r.nov0 / v.first, 1e-12 * v.second / r.nov0 / v.first) << e;
+			else EXPECT_TRUE(y["enrichment"].is_null()) << e;
+			ys += y["excess"].get<double>();
+		}
+		EXPECT_NEAR(ys, 0.0, 1e-10) << a;
 	}
 	size_t from = 0;
 	for (size_t at = log.find("\n      from: "); at != std::string::npos; at = log.find("\n      from: ", at + 1)) from++;
@@ -2612,8 +2637,97 @@ TEST(SaltedFchkPredictorTests, SaltedDistanceWritesTheChannelSplitAsJson)
 	std::filesystem::remove_all(dir);
 }
 
+// the from and elements lines of cysteine name, in order, the (at most two) channels and elements the atom has whose fraction of nov0
+// exceeds their share of its descriptor most, and as missing the two largest by fraction of those it has nothing of; in H 9, 13 and
+// 14 the self channel H-H has the largest fraction but less than its weight in the descriptor, and H-C is named first
+TEST(SaltedFchkPredictorTests, SaltedDistanceRanksChannelsByTheirExcessShare)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests", model = root / "SALTED" / "Model" / "model.salted";
+	const auto dir = tmp_path("novelty_excess"), old = std::filesystem::current_path();
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::filesystem::current_path(dir);
+	options opt;
+	testing::internal::CaptureStdout();
+	const auto rows = salted_distance(model, root / "SALTED" / "test_cysteine.xyz", 1e-10, opt);
+	const std::string log = testing::internal::GetCapturedStdout();
+	std::filesystem::current_path(old);
+	svec from, els;
+	{
+		std::istringstream in(log);
+		for (std::string l; std::getline(in, l);)
+			if (l.rfind("      from: ", 0) == 0) from.push_back(l.substr(12));
+			else if (l.rfind("      elements: ", 0) == 0) els.push_back(l.substr(16));
+	}
+	ASSERT_EQ(rows.size(), 14u);
+	ASSERT_EQ(from.size(), 14u) << log;
+	ASSERT_EQ(els.size(), 14u) << log;
+	auto names = [](const std::string& s, const std::string& re) {
+		svec v;
+		const std::regex r(re);
+		for (std::sregex_iterator m(s.begin(), s.end(), r), e; m != e; ++m) v.push_back((*m)[1]);
+		return v;
+	};
+	//expected: the two the atom has with the largest positive excess, then the two largest by fraction it has nothing of
+	auto expect = [](const std::map<std::string, std::pair<double, double>>& v, const double nov) {
+		std::vector<std::pair<double, std::string>> h, m;
+		for (const auto& [c, x] : v)
+			if (x.first > 0.0) h.push_back({ x.second / nov - x.first, c });
+			else if (x.second > 0.0) m.push_back({ x.second / nov, c });
+		std::sort(h.rbegin(), h.rend());
+		std::sort(m.rbegin(), m.rend());
+		svec a, b;
+		for (int i = 0; i < 2 && i < (int)h.size() && h[i].first > 0.0; i++) a.push_back(h[i].second);
+		for (int i = 0; i < 2 && i < (int)m.size(); i++) b.push_back(m[i].second);
+		return std::make_pair(a, b);
+	};
+	int missing = 0;
+	for (int a = 0; a < 14; a++)
+	{
+		const salted_novelty& r = rows[a];
+		std::map<std::string, std::pair<double, double>> el;
+		for (const auto& [c, v] : r.split)
+		{
+			el[c.substr(0, c.find('-'))].first += 0.5 * v.first;
+			el[c.substr(0, c.find('-'))].second += 0.5 * v.second;
+			el[c.substr(c.find('-') + 1)].first += 0.5 * v.first;
+			el[c.substr(c.find('-') + 1)].second += 0.5 * v.second;
+		}
+		const size_t cm = from[a].find("; missing neighbours: "), em = els[a].find("; missing: ");
+		const svec fh = names(from[a].substr(0, cm), "([A-Z][a-z]?-[A-Z][a-z]?) [0-9<]"),
+			fm = cm == std::string::npos ? svec{} : names(from[a].substr(cm), "([A-Z][a-z]?-[A-Z][a-z]?) [0-9<]"),
+			eh = names(els[a].substr(0, em), "\\b([A-Z][a-z]?) [0-9<]"), emi = em == std::string::npos ? svec{} : names(els[a].substr(em), "\\b([A-Z][a-z]?) [0-9<]");
+		const auto ce = expect(r.split, r.nov0), ee = expect(el, r.nov0);
+		EXPECT_EQ(fh, ce.first) << a << ": " << from[a];
+		EXPECT_EQ(fm, ce.second) << a << ": " << from[a];
+		EXPECT_EQ(eh, ee.first) << a << ": " << els[a];
+		EXPECT_EQ(emi, ee.second) << a << ": " << els[a];
+		for (const auto& c : fm)
+		{
+			EXPECT_EQ(r.split.at(c).first, 0.0) << a << " " << c;
+			EXPECT_GT(r.split.at(c).second, 0.0) << a << " " << c;
+		}
+		for (const auto& c : fh) EXPECT_GT(r.split.at(c).first, 0.0) << a << " " << c;
+		missing += (int)fm.size();
+		std::string top;
+		for (const auto& [c, v] : r.split)
+			if (top.empty() || v.second > r.split.at(top).second) top = c;
+		if (a == 8 || a == 12 || a == 13)
+		{
+			EXPECT_EQ(top, "H-H") << a;
+			EXPECT_LT(r.split.at(top).second / r.nov0 - r.split.at(top).first, 0.0) << a;
+			ASSERT_FALSE(fh.empty()) << a;
+			EXPECT_EQ(fh[0], "H-C") << a << ": " << from[a];
+		}
+	}
+	EXPECT_GE(missing, 2) << log;
+	std::filesystem::remove_all(dir);
+}
+
 // a model whose O references carry nothing on O-S (those features of its l = 0 block set to zero): water's O next to an S has
-// O-S in its environment, is told so in the log and the JSON, and that channel's share is all its own weight there
+// O-S in its environment, is told so in the log (its from line marks O-S absent) and the JSON, and that channel's share is all
+// its own weight there
 TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheReferencesLack)
 {
 	equicomb_set_gpu(false);
@@ -2638,6 +2752,11 @@ TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheReferencesLack)
 	EXPECT_GT(os.first, 1e-4);
 	EXPECT_NEAR(os.second, os.first, 1e-12);
 	EXPECT_NE(log.find("Channels absent from the kept features of the model's references: O: O-S (atom 1)\n"), std::string::npos) << log;
+	const size_t f = log.find("\n      from: ");
+	ASSERT_NE(f, std::string::npos) << log;
+	const std::string o = log.substr(f, log.find('\n', f + 1) - f);
+	EXPECT_NE(o.find("O-S "), std::string::npos) << o;
+	EXPECT_NE(o.find("x, absent)"), std::string::npos) << o;
 	nlohmann::json j;
 	{
 		std::ifstream in(dir / "water_s_salted_distance.json");
