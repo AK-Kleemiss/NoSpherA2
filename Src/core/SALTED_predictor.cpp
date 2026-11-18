@@ -685,26 +685,45 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 	log << "SALTED kernel novelty at lambda = 0, eigcut " << eigcut << ": nov0 is 0 inside the span of the model's reference environments and 1 outside it\n"
 		<< std::left << std::setw(6) << "Atom" << std::setw(8) << "Label" << std::setw(4) << "El" << std::setw(32) << "Model" << std::setw(12) << "Role"
 		<< std::right << std::setw(10) << "kmax0" << std::setw(10) << "cosine" << std::setw(10) << "nov0" << "  status\n";
-	//the two largest of v as percentages of nov0, the rest as others
-	auto largest = [](std::vector<std::pair<double, std::string>> v, const double nov) {
-		std::sort(v.rbegin(), v.rend());
+	//two significant digits below 10, integers above
+	auto sig = [](const double v) { std::ostringstream s; if (v >= 9.95) s << std::lround(v); else if (v < 0.01) s << "<0.01"; else s << std::setprecision(2) << v; return s.str(); };
+	//v: name -> (share of the descriptor, share of nov0). The two the atom has whose fraction of nov0 exceeds their share of the
+	//descriptor most, the rest of those it has, then the ones it has nothing of (missing), as percentages of nov0
+	auto ranked = [&sig](const std::map<std::string, std::pair<double, double>>& v, const double nov, const svec& absent, const std::string& rest, const std::string& missing) {
+		std::vector<std::pair<double, std::string>> h, m;
+		for (const auto& [c, x] : v)
+			if (x.first > 0.0) h.push_back({ x.second / nov - x.first, c });
+			else if (x.second > 0.0) m.push_back({ x.second / nov, c });
+		std::sort(h.rbegin(), h.rend());
+		std::sort(m.rbegin(), m.rend());
 		std::ostringstream s;
-		double rest = 0.0;
-		for (int i = 0; i < (int)v.size(); i++)
-			if (i < 2) s << (i ? ", " : "") << v[i].second << " " << std::lround(100.0 * v[i].first / nov) << " %";
-			else rest += v[i].first;
-		if (v.size() > 2) s << ", others " << std::lround(100.0 * rest / nov) << " %";
+		int k = 0;
+		double o = 0.0, q = 0.0;
+		while (k < 2 && k < (int)h.size() && h[k].first > 0.0) k++;
+		for (int i = 0; i < (int)h.size(); i++)
+		{
+			const auto& x = v.at(h[i].second);
+			if (i >= k) o += x.second / nov;
+			else s << (i ? ", " : "") << h[i].second << " " << sig(100.0 * x.second / nov) << (i ? " % (" : " % of nov0 (") << sig(100.0 * x.first)
+				<< (i ? " %, " : " % of the descriptor, ") << sig(x.second / nov / x.first) << "x"
+				<< (std::find(absent.begin(), absent.end(), h[i].second) != absent.end() ? ", absent)" : ")");
+		}
+		if (k < (int)h.size()) s << (k ? ", its other " : "its ") << rest << " " << sig(100.0 * o) << " %";
+		for (int i = 0; i < (int)m.size(); i++)
+			if (i < 2) s << (i ? ", " : "; " + missing + ": ") << m[i].second << " " << sig(100.0 * m[i].first) << " %";
+			else q += m[i].first;
+		if (m.size() > 2) s << ", others " << sig(100.0 * q) << " %";
 		return s.str();
 	};
-	//element shares: channel (e, e) counts to e, (e, f) half to each
+	//element shares of the descriptor and of nov0: channel (e, e) counts to e, (e, f) half to each
 	auto elements = [](const salted_novelty& r) {
-		std::map<std::string, double> s;
+		std::map<std::string, std::pair<double, double>> s;
 		for (const auto& [c, v] : r.split)
-		{
-			const size_t d = c.find('-');
-			s[c.substr(0, d)] += 0.5 * v.second;
-			s[c.substr(d + 1)] += 0.5 * v.second;
-		}
+			for (const std::string& e : { c.substr(0, c.find('-')), c.substr(c.find('-') + 1) })
+			{
+				s[e].first += 0.5 * v.first;
+				s[e].second += 0.5 * v.second;
+			}
 		return s;
 	};
 	std::set<std::string> no_split;
@@ -715,10 +734,8 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 			<< std::setw(10) << num(r.nov0) << "  " << r.status << "\n";
 		if (r.status == "ok" && !(r.zeta >= 1.0 && r.zeta == std::floor(r.zeta))) no_split.insert(name(r.model) + " (zeta " + std::to_string(r.zeta) + ")");
 		if (r.split.empty() || !(r.nov0 > 1e-6)) continue;
-		std::vector<std::pair<double, std::string>> c, e;
-		for (const auto& [k, v] : r.split) c.push_back({ v.second, k });
-		for (const auto& [k, v] : elements(r)) e.push_back({ v, k });
-		log << "      from: " << largest(c, r.nov0) << "; elements: " << largest(e, r.nov0) << "\n";
+		log << "      from: " << ranked(r.split, r.nov0, r.absent, "channels", "missing neighbours") << "\n"
+			<< "      elements: " << ranked(elements(r), r.nov0, {}, "elements", "missing") << "\n";
 	}
 	std::map<std::string, std::vector<std::pair<double, int>>> el;
 	for (int i = 0; i < (int)rows.size(); i++)
@@ -781,11 +798,16 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 			{ "nearest", r.nearest >= 0 ? nlohmann::ordered_json(r.nearest) : nlohmann::ordered_json() }, { "p0p0", r.self },
 			{ "channels", nlohmann::ordered_json::object() }, { "elements", nlohmann::ordered_json::object() }, { "absent", r.absent },
 			{ "unrepresented", r.unrepresented } };
-		//share: the channel's part of nov0 (the shares sum to nov0), fraction: share / nov0, environment: |p0_c|^2 / p0.p0
+		//share: the channel's part of nov0 (the shares sum to nov0), fraction: share / nov0, environment: |p0_c|^2 / p0.p0,
+		//excess: fraction - environment (summing to 0), enrichment: fraction / environment
+		auto enrich = [](const double f, const double e) { return e > 0.0 ? nlohmann::ordered_json(f / e) : nlohmann::ordered_json(); };
 		for (const auto& [c, v] : r.split)
 			a["channels"][c] = { { "share", v.second }, { "fraction", v.second / r.nov0 }, { "environment", v.first },
+				{ "excess", v.second / r.nov0 - v.first }, { "enrichment", enrich(v.second / r.nov0, v.first) },
 				{ "absent", std::find(r.absent.begin(), r.absent.end(), c) != r.absent.end() } };
-		for (const auto& [e, v] : elements(r)) a["elements"][e] = { { "share", v }, { "fraction", v / r.nov0 } };
+		for (const auto& [e, v] : elements(r))
+			a["elements"][e] = { { "share", v.second }, { "fraction", v.second / r.nov0 }, { "environment", v.first },
+				{ "excess", v.second / r.nov0 - v.first }, { "enrichment", enrich(v.second / r.nov0, v.first) } };
 		if (!r.model.empty())
 		{
 			nlohmann::ordered_json& m = j["models"][r.model];
