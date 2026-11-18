@@ -239,6 +239,12 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-18 (`-SALTED_distance`, branch `salted-distance` on master `747450e6`), the per-atom lambda = 0 kernel novelty
+matches `kernel_novelty_salted.py` to 5e-13 on cysteine and water; five tests are new (four `KernelNovelty*` and
+`TomlIntegrationTests.SaltedDistance`). `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1436 passed,
+0 failed, 12 skipped** (2 disabled) of 1450; on Linux (AKL006, Slurm job 1828588, GCC 11.5 `release-linux-tests`, CPU only,
+one process per test) **1421 passed, 0 failed, 23 skipped** (2 disabled) of 1446. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (merge of the equicomb branch at `814e9a9c` into `salted-relpower-norm`), the rel_power normalisation and the
 symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index of `plan_norms`. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1418 passed, 0 failed, 12 skipped** (2 disabled) of 1432; on Linux (AKL006,
