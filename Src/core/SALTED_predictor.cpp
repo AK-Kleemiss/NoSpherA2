@@ -686,7 +686,7 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 		<< std::left << std::setw(6) << "Atom" << std::setw(8) << "Label" << std::setw(4) << "El" << std::setw(32) << "Model" << std::setw(12) << "Role"
 		<< std::right << std::setw(10) << "kmax0" << std::setw(10) << "cosine" << std::setw(10) << "nov0" << "  status\n";
 	//two significant digits below 10, integers above
-	auto sig = [](const double v) { std::ostringstream s; if (v >= 9.95) s << std::lround(v); else if (v < 0.01) s << "<0.01"; else s << std::setprecision(2) << v; return s.str(); };
+	auto sig = [](const double v) { std::ostringstream s; if (v >= 9.95) s << std::llround(v); else if (v < 0.01) s << "<0.01"; else s << std::setprecision(2) << v; return s.str(); };
 	//v: name -> (share of the descriptor, share of nov0). The two the atom has whose fraction of nov0 exceeds their share of the
 	//descriptor most, the rest of those it has, then the ones it has nothing of (missing), as percentages of nov0
 	auto ranked = [&sig](const std::map<std::string, std::pair<double, double>>& v, const double nov, const svec& absent, const std::string& rest, const std::string& missing) {
