@@ -1120,8 +1120,11 @@ struct options
 		//takes its place; the DIIS error is still measured for the convergence check
 		bool use_diis = true, use_soscf = true, use_trah = true;
 		//`stability_check`: the lowest eigenvalue of the orbital Hessian at a converged run, followed downhill when
-		//negative; only under `notrah`, TRAH ends at a minimum
+		//negative. TRAH too: from a symmetric start (closed-shell UHF) it never leaves the symmetric subspace
 		bool stability_check = false;
+		//`broken_symmetry [angle]`: the alpha HOMO and LUMO of a closed-shell UHF guess rotated by angle degrees (45 without
+		//one), as ORCA's GuessMix; 0 is off
+		double broken_symmetry = 0;
 		bool apply_shift = true;
 		bool method_apply_shift = true;
 		double diis_stop_shift = 0;

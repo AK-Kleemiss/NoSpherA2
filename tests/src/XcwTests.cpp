@@ -1046,6 +1046,21 @@ namespace
 		EXPECT_EQ(parse_error("basis_set sto-3g diis_size x"), "Expected a positive integer after 'DIIS_size'");
 	}
 
+	// `broken_symmetry` takes 45 degrees, or the number after it; the keyword after it is read as usual
+	TEST(XcwSettingsTests, BrokenSymmetryAngleAndStabilityCheck)
+	{
+		const options::XCW_settings d = parsed("basis_set sto-3g");
+		EXPECT_EQ(d.broken_symmetry, 0.0);
+		EXPECT_FALSE(d.stability_check);
+		const options::XCW_settings s = parsed("basis_set sto-3g broken_symmetry uhf stability_check");
+		EXPECT_EQ(s.broken_symmetry, 45.0);
+		EXPECT_EQ(s.hf_type, occ::qm::SpinorbitalKind::Unrestricted);
+		EXPECT_TRUE(s.stability_check);
+		EXPECT_EQ(parsed("basis_set sto-3g uhf broken_symmetry 30").broken_symmetry, 30.0);
+		EXPECT_EQ(parse_error("basis_set sto-3g broken_symmetry 0"), "Expected an angle above 0 and at most 90 degrees after 'broken_symmetry'");
+		EXPECT_EQ(parse_error("basis_set sto-3g broken_symmetry x"), "Could not read 'x' after 'broken_symmetry'");
+	}
+
 	// the switches and the keywords that carry a path, a model or a number
 	TEST(XcwSettingsTests, SwitchesPathsAndModels)
 	{

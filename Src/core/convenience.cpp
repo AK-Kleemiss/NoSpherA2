@@ -4697,6 +4697,7 @@ void options::loadXCWsettings() {
 
 	std::string conv_preset = "normal";
 	bool check_hessian = false, use_diis = true, use_soscf = true, use_trah = true, stability_check = false;
+	double broken_symmetry = 0;
 	int diis_size = 8;
 	std::string speed_preset = "normal_conv";
 
@@ -4937,6 +4938,21 @@ void options::loadXCWsettings() {
 		handlers["nososcf"] = [&](std::istream&) { use_soscf = false; };
 		handlers["notrah"] = [&](std::istream&) { use_trah = false; };
 		handlers["stability_check"] = [&](std::istream&) { stability_check = true; };
+		//`broken_symmetry [angle]`: a number after it is the angle, the next settings keyword is read as usual
+		handlers["broken_symmetry"] = [&](std::istream& is) {
+			broken_symmetry = 45.0;
+			std::string token;
+			if (!(is >> token)) return;
+			const std::string low = lowercase(token);
+			if (handlers.count(low)) {
+				handlers.at(low)(is);
+				return;
+			}
+			try { broken_symmetry = std::stod(token); }
+			catch (const std::exception&) { throw std::runtime_error("Could not read '" + token + "' after 'broken_symmetry'"); }
+			if (!(broken_symmetry > 0 && broken_symmetry <= 90))
+				throw std::runtime_error("Expected an angle above 0 and at most 90 degrees after 'broken_symmetry'");
+			};
 		handlers["diis_size"] = [&](std::istream& is) {
 			if (!(is >> diis_size) || diis_size < 1)
 				throw std::runtime_error("Expected a positive integer after 'DIIS_size'");
@@ -5103,6 +5119,7 @@ void options::loadXCWsettings() {
 	xcw_settings.use_soscf = use_soscf;
 	xcw_settings.use_trah = use_trah;
 	xcw_settings.stability_check = stability_check;
+	xcw_settings.broken_symmetry = broken_symmetry;
 	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
 	xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
 }

@@ -130,7 +130,7 @@ private:
 	// NOSPHERA2_TRAH_FIRST_TRUST / NOSPHERA2_TRAH_FIRST_TOL: the trust radius and a factor on the micro-iteration
 	// tolerance of the first TRAH step of a run
 	double trah_tol_scale_ = 1.0;
-	// `stability_check` under `notrah`: the lowest eigenvalue of the orbital Hessian at a converged run, by Davidson on
+	// `stability_check`: the lowest eigenvalue of the orbital Hessian at a converged run, by Davidson on
 	// at most stability_products_ Hessian products. A saddle point is followed along its eigenvector and the run goes on
 	// from the lowest point found there, at most twice per run. True when it did
 	bool stability_analysis(scf_t& scf, const double quant);

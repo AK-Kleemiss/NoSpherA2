@@ -13,8 +13,8 @@
 
 XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
-	if (opt_in.xcw_settings.stability_check && opt_in.xcw_settings.use_trah)
-		std::cout << "Stability analysis was requested but will not be performed in the presence of TRAH steps." << std::endl;
+	if (opt_in.xcw_settings.broken_symmetry > 0 && (opt_in.xcw_settings.hf_type != occ::qm::SpinorbitalKind::Unrestricted || opt_in.xcw_settings.multiplicity != 1))
+		std::cout << "A broken-symmetry guess was requested but applies to closed-shell UHF only; the guess is left as it is." << std::endl;
 	writer.WAEmpiRe();
 	sf.weight_log_ = &writer.log;
 	writer.log << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;

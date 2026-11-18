@@ -239,6 +239,12 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-11-18 (broken symmetry), closed-shell UHF is known to start with alpha = beta, which no SCF method breaks, so it ends on
+the RHF solution even where that is a UHF saddle point (P1 sto-3g). `stability_check` now runs with TRAH too and `broken_symmetry
+[angle]` mixes the alpha HOMO and LUMO of the guess as ORCA's `GuessMix`; `XcwScfTests.ClosedShellUhfLeavesTheRhfSaddlePoint` and
+`XcwSettingsTests.BrokenSymmetryAngleAndStabilityCheck` are new. `ctest --preset release-windows -j 8` on a CPU-only build reports
+**1421 passed, 0 failed, 23 skipped** (2 disabled) of 1446. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-18 (stability check), a converged UHF step reports `<S^2>` (expected and found) in SCF.log, and the XCW keyword
 `stability_check` under `notrah` searches the lowest orbital Hessian eigenvalue and follows a saddle point (P1 sto-3g: the closed shell
 in UHF is the RHF saddle, followed 18 mEh lower); `XcwScfTests.ConvergedUhfDoubletReportsItsSpin` and `StabilityCheckRunsOnlyWithoutTrah`

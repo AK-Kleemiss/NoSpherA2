@@ -5,6 +5,7 @@
 #endif
 #include "basis_set.h"
 #include "citations.h"
+#include "constants.h"
 #include <limits>
 #include <random>
 
@@ -214,6 +215,18 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 		else
 			small_basis_guess(scf);
 		has_guess = true;
+		occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+		if (settings.broken_symmetry > 0 && mo.kind == occ::qm::SpinorbitalKind::Unrestricted && mo.n_alpha == mo.n_beta && mo.n_alpha > 0) {
+			//ORCA's GuessMix: the alpha HOMO and LUMO rotated by the angle, the beta orbitals left as they are
+			const double t = settings.broken_symmetry * constants::PI / 180.0;
+			const Eigen::Index n = mo.C.rows() / 2, h = static_cast<Eigen::Index>(mo.n_alpha) - 1;
+			const occ::Vec homo = mo.C.block(0, h, n, 1), lumo = mo.C.block(0, h + 1, n, 1);
+			mo.C.block(0, h, n, 1) = std::cos(t) * homo + std::sin(t) * lumo;
+			mo.C.block(0, h + 1, n, 1) = -std::sin(t) * homo + std::cos(t) * lumo;
+			mo.update_occupied_orbitals();
+			mo.update_density_matrix();
+			writer_->log << "Broken-symmetry guess: alpha HOMO and LUMO rotated by " << std::fixed << std::setprecision(1) << settings.broken_symmetry << " degrees" << std::endl;
+		}
 	}
 	scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
 	scf.update_scf_energy(false);
@@ -238,7 +251,7 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 		const bool confirmed = confirm_SCF(scf, dm_last, last_quant);
 		if (confirmed) {
 			const occ::Mat D_conv = scf.ctx.mo.D;
-			if (!settings.stability_check || settings.use_trah || !stability_analysis(scf, last_quant)) break;
+			if (!settings.stability_check || !stability_analysis(scf, last_quant)) break;
 			dm_last = D_conv;
 		}
 		converged = false;

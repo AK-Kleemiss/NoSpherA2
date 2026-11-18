@@ -449,30 +449,45 @@ TEST(XcwScfTests, ConvergedUhfDoubletReportsItsSpin)
 	std::filesystem::remove_all(dir);
 }
 
-//`stability_check` runs only under `notrah`. The closed shell in UHF converges to the RHF solution, a saddle point of
-//the UHF energy (lowest Hessian eigenvalue about -0.13): followed, it ends in a broken-symmetry minimum below the RHF
-//energy. With TRAH the output says it is not done and the log has no analysis, as without the keyword
-TEST(XcwScfTests, StabilityCheckRunsOnlyWithoutTrah)
+//The closed shell in UHF starts from the spin-averaged guess with alpha = beta, which nothing in the SCF breaks: it ends on
+//the RHF solution, here a saddle point of the UHF energy (lowest Hessian eigenvalue about -0.13), TRAH included.
+//`stability_check` finds it and follows it into a broken-symmetry minimum below the RHF energy, with TRAH and with SOSCF
+//alone; `broken_symmetry` starts from the alpha HOMO and LUMO rotated by 45 degrees and reaches that minimum directly.
+//Without either the run stays on the saddle point
+TEST(XcwScfTests, ClosedShellUhfLeavesTheRhfSaddlePoint)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const std::string skip = "Stability analysis was requested but will not be performed in the presence of TRAH steps.";
-	const p1_run run = run_on_p1(dir, common + "f2 uhf notrah stability_check start 0 step_size 0.01 end 0" + read_shared_eri(dir));
-	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
-	const size_t saddle = run.log.find("Hessian products): a saddle point"), followed = run.log.find("***Saddle point: on from the orbitals");
-	ASSERT_NE(saddle, std::string::npos) << run.log;
-	ASSERT_NE(followed, std::string::npos) << run.log;
-	EXPECT_NE(run.log.find("Hessian products): a minimum", followed), std::string::npos) << run.log;
-	EXPECT_EQ(run.out.find(skip), std::string::npos) << run.out;
-	const auto rows = lambda_rows(run.out);
-	ASSERT_EQ(rows.size(), 1u) << run.out;
-	EXPECT_LT(rows[0].d(rows[0].energy), golden_energy - 1e-3);
-	const p1_run trah = run_on_p1(dir, common + "f2 uhf stability_check start 0 step_size 0.01 end 0" + read_shared_eri(dir));
-	EXPECT_NE(trah.out.find(skip), std::string::npos) << trah.out;
-	EXPECT_EQ(trah.log.find("Stability analysis:"), std::string::npos) << trah.log;
-	const p1_run plain = run_on_p1(dir, common + "f2 uhf notrah start 0 step_size 0.01 end 0" + read_shared_eri(dir));
+	const std::string tail = " start 0 step_size 0.01 end 0" + read_shared_eri(dir);
+	double energy[3];
+	const std::string kinds[3] = { "f2 uhf stability_check", "f2 uhf notrah stability_check", "f2 uhf broken_symmetry" };
+	for (int k = 0; k < 3; k++) {
+		const p1_run run = run_on_p1(dir, common + kinds[k] + tail);
+		ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << kinds[k] << "\n" << run.log;
+		if (k < 2) {
+			const size_t followed = run.log.find("***Saddle point: on from the orbitals");
+			ASSERT_NE(run.log.find("Hessian products): a saddle point"), std::string::npos) << run.log;
+			ASSERT_NE(followed, std::string::npos) << run.log;
+			EXPECT_NE(run.log.find("Hessian products): a minimum", followed), std::string::npos) << run.log;
+		}
+		else EXPECT_NE(run.log.find("Broken-symmetry guess: alpha HOMO and LUMO rotated by 45.0 degrees"), std::string::npos) << run.log;
+		const size_t at = run.log.find("<S^2>: expected 0.0000, found ");
+		ASSERT_NE(at, std::string::npos) << run.log;
+		EXPECT_GT(std::stod(run.log.substr(at + 30)), 0.5) << kinds[k];
+		const auto rows = lambda_rows(run.out);
+		ASSERT_EQ(rows.size(), 1u) << run.out;
+		energy[k] = rows[0].d(rows[0].energy);
+		EXPECT_LT(energy[k], golden_energy - 1e-2) << kinds[k];
+	}
+	EXPECT_NEAR(energy[1], energy[0], 1e-6);
+	EXPECT_NEAR(energy[2], energy[0], 1e-6);
+	const p1_run plain = run_on_p1(dir, common + "f2 uhf" + tail);
 	EXPECT_EQ(plain.log.find("Stability analysis:"), std::string::npos) << plain.log;
-	EXPECT_EQ(plain.out.find(skip), std::string::npos) << plain.out;
+	EXPECT_EQ(plain.log.find("Broken-symmetry guess"), std::string::npos) << plain.log;
+	EXPECT_NE(plain.log.find("<S^2>: expected 0.0000, found 0.0000"), std::string::npos) << plain.log;
+	const p1_run rhf = run_on_p1(dir, common + "f2 rhf broken_symmetry" + tail);
+	EXPECT_NE(rhf.out.find("A broken-symmetry guess was requested but applies to closed-shell UHF only; the guess is left as it is."), std::string::npos) << rhf.out;
+	EXPECT_EQ(rhf.log.find("Broken-symmetry guess"), std::string::npos) << rhf.log;
 	std::filesystem::remove_all(dir);
 }
 
