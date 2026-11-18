@@ -46,5 +46,5 @@ nov0 per element, assigned models:
   N  n = 1, median 0.014097, max 0.014097 (atom 4, N)
   O  n = 2, median 0.006620, max 0.008702 (atom 3, O)
   S  n = 1, median 0.011780, max 0.011780 (atom 1, S)
-Channels absent from the model's references: none
+Channels absent from the kept features of the model's references: none
 Wrote test_cysteine_salted_distance.csv and test_cysteine_salted_distance.json

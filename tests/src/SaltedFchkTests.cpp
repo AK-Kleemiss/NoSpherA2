@@ -2123,12 +2123,33 @@ TEST(SaltedFchkPredictorTests, KernelNoveltyCholeskyMatchesTheEigendecomposition
 		ASSERT_EQ(e.size(), ref.kmax0.size());
 		for (int a = 0; a < (int)c.size(); a++)
 		{
-			EXPECT_NEAR(c[a].nov0, e[a].nov0, 1e-10) << ref.xyz << " atom " << a;			EXPECT_EQ(c[a].kmax0, e[a].kmax0) << ref.xyz << " atom " << a;
+			EXPECT_NEAR(c[a].nov0, e[a].nov0, 1e-10) << ref.xyz << " atom " << a;
+			EXPECT_EQ(c[a].kmax0, e[a].kmax0) << ref.xyz << " atom " << a;
 			EXPECT_EQ(c[a].nearest, e[a].nearest) << ref.xyz << " atom " << a;
 		}
 		run(root / ref.xyz, 1e-2, false, cut);
 		EXPECT_NE(cut.find("K_MM eigendecomposition"), std::string::npos) << cut;
 		EXPECT_EQ(cut.find("Cholesky"), std::string::npos) << cut;
+	}
+}
+
+// a pass with the eigendecomposition forced leaves the predictor as it was: the next pass of the same one takes the Cholesky path
+TEST(SaltedFchkPredictorTests, KernelNoveltyForcedEigendecompositionIsReset)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	WFN w(root / "SALTED" / "test_cysteine.xyz", false);
+	options opt;
+	opt.salted_model_dir = root / "SALTED" / "Model" / "model.salted";
+	SALTEDPredictor SP(w, opt);
+	const auto e = SP.kernel_novelty(w, 1e-10, true), c = SP.kernel_novelty(w, 1e-10);
+	ASSERT_EQ(e.size(), 14u);
+	ASSERT_EQ(c.size(), 14u);
+	for (int a = 0; a < 14; a++)
+	{
+		EXPECT_EQ(e[a].path, "eigendecomposition") << a;
+		EXPECT_EQ(c[a].path, "Cholesky") << a;
+		EXPECT_NEAR(c[a].nov0, e[a].nov0, 1e-10) << a;
 	}
 }
 
@@ -2362,6 +2383,60 @@ namespace
 		std::ofstream o(file);
 		o << "4\nwater and an S\nO 0.066334 0.0 0.003701\nH -0.526383 -0.769327 -0.029366\nH -0.526383 0.769327 -0.029366\nS " << x << " 0.0 0.0\n";
 	}
+	// the features of channel c in the l = 0 reference block of element e set to zero in place
+	void zero_lambda0_channel(const std::filesystem::path& model, const std::string& e, const svec& channel, const std::string& c)
+	{
+		SALTED_BINARY_FILE::block_ref b;
+		{
+			SALTED_BINARY_FILE f(model);
+			b = f.index_lambda_based_data("FEATS").at(e + "0");
+		}
+		std::fstream io(model, std::ios::in | std::ios::out | std::ios::binary);
+		const double zero = 0.0;
+		for (size_t m = 0; m < b.rows; m++)
+			for (size_t f = 0; f < b.cols; f++)
+				if (channel[f] == c)
+				{
+					io.seekp(b.offset + (std::streamoff)((m * b.cols + f) * sizeof(double)));
+					io.write(reinterpret_cast<const char*>(&zero), sizeof(zero));
+				}
+	}
+	// a copy of model whose l = 0 FPS selection and reference blocks keep no feature of channel c
+	void drop_lambda0_channel(const std::filesystem::path& model, const std::filesystem::path& out, const svec& channel, const std::string& c)
+	{
+		SALTED_BINARY_FILE f(model);
+		SALTEDConfig cfg;
+		f.populate_config(cfg);
+		const auto fps = f.read_fps();
+		const auto feats = f.read_features();
+		salted_writer p, w;
+		p.block_head((int)fps.size());
+		for (int l = 0; l < (int)fps.size(); l++)
+		{
+			std::vector<int64_t> v;
+			for (int i = 0; i < (int)fps.at(l).size(); i++)
+				if (l > 0 || channel[i] != c) v.push_back(fps.at(l)[i]);
+			p.dataset(v, { (uint32_t)v.size() });
+		}
+		w.block_head((int)cfg.species.size());
+		for (const auto& s : cfg.species)
+		{
+			int nl = 0;
+			while (feats.count(s + std::to_string(nl))) nl++;
+			w.tag(s);
+			w.raw(static_cast<int32_t>(nl));
+			for (int l = 0; l < nl; l++)
+			{
+				const dMatrix2& B = feats.at(s + std::to_string(l));
+				vec v;
+				for (int m = 0; m < (int)B.extent(0); m++)
+					for (int i = 0; i < (int)B.extent(1); i++)
+						if (l > 0 || channel[i] != c) v.push_back(B(m, i));
+				w.dataset(v, { (uint32_t)B.extent(0), (uint32_t)(v.size() / B.extent(0)) });
+			}
+		}
+		f.write_with_blocks(out, 2, { "FPS", "FEATS" }, { { "FPS", p.buf }, { "FEATS", w.buf } });
+	}
 }
 
 // a l = 0 feature multiplies two neighbour densities, the centre's own among them (featomic's centre weight 1): water's atoms
@@ -2533,7 +2608,7 @@ TEST(SaltedFchkPredictorTests, SaltedDistanceWritesTheChannelSplitAsJson)
 	size_t from = 0;
 	for (size_t at = log.find("\n      from: "); at != std::string::npos; at = log.find("\n      from: ", at + 1)) from++;
 	EXPECT_EQ(from, 3u) << log;
-	EXPECT_NE(log.find("Channels absent from the model's references: none"), std::string::npos) << log;
+	EXPECT_NE(log.find("Channels absent from the kept features of the model's references: none"), std::string::npos) << log;
 	std::filesystem::remove_all(dir);
 }
 
@@ -2548,23 +2623,7 @@ TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheReferencesLack)
 	std::filesystem::create_directories(dir);
 	const auto model = dir / "no_os.salted";
 	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", model);
-	const lambda0_data d = lambda0_of(root / "reading_SALTED" / "water_monomer.xyz", model);
-	SALTED_BINARY_FILE::block_ref b;
-	{
-		SALTED_BINARY_FILE f(model);
-		b = f.index_lambda_based_data("FEATS").at("O0");
-	}
-	{
-		std::fstream io(model, std::ios::in | std::ios::out | std::ios::binary);
-		const double zero = 0.0;
-		for (size_t m = 0; m < b.rows; m++)
-			for (size_t f = 0; f < b.cols; f++)
-				if (d.channel[f] == "O-S")
-				{
-					io.seekp(b.offset + (std::streamoff)((m * b.cols + f) * sizeof(double)));
-					io.write(reinterpret_cast<const char*>(&zero), sizeof(zero));
-				}
-	}
+	zero_lambda0_channel(model, "O", lambda0_of(root / "reading_SALTED" / "water_monomer.xyz", model).channel, "O-S");
 	write_water_with_s(dir / "water_s.xyz", 3.0);
 	std::filesystem::current_path(dir);
 	options opt;
@@ -2578,7 +2637,7 @@ TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheReferencesLack)
 	const auto& os = rows[0].split.at("O-S");
 	EXPECT_GT(os.first, 1e-4);
 	EXPECT_NEAR(os.second, os.first, 1e-12);
-	EXPECT_NE(log.find("Channels absent from the model's references: O: O-S (atom 1)\n"), std::string::npos) << log;
+	EXPECT_NE(log.find("Channels absent from the kept features of the model's references: O: O-S (atom 1)\n"), std::string::npos) << log;
 	nlohmann::json j;
 	{
 		std::ifstream in(dir / "water_s_salted_distance.json");
@@ -2587,6 +2646,84 @@ TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheReferencesLack)
 	EXPECT_EQ(j["atoms"][0]["absent"], nlohmann::json::array({ "O-S" }));
 	EXPECT_TRUE(j["atoms"][0]["channels"]["O-S"]["absent"].get<bool>());
 	EXPECT_FALSE(j["atoms"][0]["channels"]["H-S"]["absent"].get<bool>());
+	std::filesystem::remove_all(dir);
+}
+
+// the same model and an O of a second water far from the S: its features on O-S are zero, so it is not told the channel is absent,
+// though its references lack it and the first O makes O-S a channel of the species
+TEST(SaltedFchkPredictorTests, KernelNoveltyNamesNoChannelAnAtomDoesNotWeighOn)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_zero_weight");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	const auto model = dir / "no_os.salted";
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", model);
+	zero_lambda0_channel(model, "O", lambda0_of(root / "reading_SALTED" / "water_monomer.xyz", model).channel, "O-S");
+	{
+		std::ofstream o(dir / "two.xyz");
+		o << "7\nwater and an S, a far water\nO 0.066334 0.0 0.003701\nH -0.526383 -0.769327 -0.029366\nH -0.526383 0.769327 -0.029366\nS 3.0 0.0 0.0\n"
+		  << "O 20.066334 0.0 0.003701\nH 19.473617 -0.769327 -0.029366\nH 19.473617 0.769327 -0.029366\n";
+	}
+	const auto rows = novelty_of(dir / "two.xyz", model);
+	ASSERT_EQ(rows.size(), 7u);
+	EXPECT_EQ(rows[0].absent, svec{ "O-S" });
+	EXPECT_EQ(rows[4].split.at("O-S").first, 0.0);
+	EXPECT_TRUE(rows[4].absent.empty());
+	std::filesystem::remove_all(dir);
+}
+
+// a copy whose l = 0 FPS selection keeps no O-S feature: water's O and the S next to it have O-S by their neighbours (the O's
+// own element counts), an H as far as the S is within rcut; the channel is reported apart from the absent ones, in the log and
+// the JSON, and is no share: the others still sum to nov0. The model as shipped keeps every channel
+TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheModelKeepsNoFeaturesFor)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests", shipped = root / "SALTED" / "Model" / "model.salted";
+	const auto dir = tmp_path("novelty_unrepresented"), old = std::filesystem::current_path();
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	const auto model = dir / "no_os.salted";
+	const svec channel = lambda0_of(root / "reading_SALTED" / "water_monomer.xyz", shipped).channel;
+	drop_lambda0_channel(shipped, model, channel, "O-S");
+	SALTEDConfig c;
+	{
+		SALTED_BINARY_FILE f(model);
+		f.populate_config(c);
+		ASSERT_EQ(f.read_fps().at(0).size(), channel.size() - std::count(channel.begin(), channel.end(), "O-S"));
+		ASSERT_LT(f.read_fps().at(0).size(), channel.size());
+	}
+	write_water_with_s(dir / "water_s.xyz", 3.0);
+	std::filesystem::current_path(dir);
+	options opt;
+	testing::internal::CaptureStdout();
+	const auto rows = salted_distance(model, dir / "water_s.xyz", 1e-10, opt);
+	const std::string log = testing::internal::GetCapturedStdout();
+	std::filesystem::current_path(old);
+	ASSERT_EQ(rows.size(), 4u);
+	const bool h = std::hypot(3.0 + 0.526383, 0.769327, 0.029366) < c.rcut1;
+	for (int a = 0; a < 4; a++)
+	{
+		EXPECT_EQ(rows[a].unrepresented, a == 0 || a == 3 || h ? svec{ "O-S" } : svec{}) << a;
+		EXPECT_EQ(rows[a].split.count("O-S"), 0u) << a;
+		EXPECT_TRUE(rows[a].absent.empty()) << a;
+		double sum = 0.0;
+		for (const auto& [k, v] : rows[a].split) sum += v.second;
+		EXPECT_NEAR(sum, rows[a].nov0, 1e-10 * rows[a].nov0) << a;
+	}
+	EXPECT_EQ(rows[0].model_unrepresented, svec{ "O-S" });
+	EXPECT_NE(log.find(std::string("Channels the model keeps no features for: ") + (h ? "H: O-S (atoms 2, 3); " : "") + "O: O-S (atom 1); S: O-S (atom 4)\n"),
+		std::string::npos) << log;
+	nlohmann::json j;
+	{
+		std::ifstream in(dir / "water_s_salted_distance.json");
+		j = nlohmann::json::parse(in);
+	}
+	EXPECT_EQ(j["atoms"][0]["unrepresented"], nlohmann::json::array({ "O-S" }));
+	EXPECT_EQ(j["models"][rows[0].model]["unrepresented"], nlohmann::json::array({ "O-S" }));
+	const auto full = novelty_of(dir / "water_s.xyz", shipped);
+	for (const auto& r : full) EXPECT_TRUE(r.unrepresented.empty() && r.model_unrepresented.empty()) << r.atom;
 	std::filesystem::remove_all(dir);
 }
 
