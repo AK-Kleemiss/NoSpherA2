@@ -297,6 +297,12 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-18 (stability check), a converged UHF step reports `<S^2>` (expected and found) in SCF.log, and the XCW keyword
+`stability_check` under `notrah` searches the lowest orbital Hessian eigenvalue and follows a saddle point (P1 sto-3g: the closed shell
+in UHF is the RHF saddle, followed 18 mEh lower); `XcwScfTests.ConvergedUhfDoubletReportsItsSpin` and `StabilityCheckRunsOnlyWithoutTrah`
+are new. `ctest --preset release-windows -j 8` on a CPU-only build reports **1420 passed, 0 failed, 23 skipped** (2 disabled) of
+1445. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (SCF ladder), XCW's SCF runs Roothaan < DIIS < SOSCF < TRAH with `nodiis`/`nososcf`/`notrah` and `DIIS_size`,
 SOSCF and TRAH start from semicanonical natural orbitals of the best density, and the TRAH Hessian product carries the exact extinction
 response; `XcwSettingsTests.DiisSizeAndMethodSwitches` and `XcwScfTests.MethodSwitchesReachTheSameSteps` are new. `ctest --preset

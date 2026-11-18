@@ -4696,7 +4696,7 @@ void options::loadXCWsettings() {
 		};
 
 	std::string conv_preset = "normal";
-	bool check_hessian = false, use_diis = true, use_soscf = true, use_trah = true;
+	bool check_hessian = false, use_diis = true, use_soscf = true, use_trah = true, stability_check = false;
 	int diis_size = 8;
 	std::string speed_preset = "normal_conv";
 
@@ -4936,6 +4936,7 @@ void options::loadXCWsettings() {
 		handlers["nodiis"] = [&](std::istream&) { use_diis = false; };
 		handlers["nososcf"] = [&](std::istream&) { use_soscf = false; };
 		handlers["notrah"] = [&](std::istream&) { use_trah = false; };
+		handlers["stability_check"] = [&](std::istream&) { stability_check = true; };
 		handlers["diis_size"] = [&](std::istream& is) {
 			if (!(is >> diis_size) || diis_size < 1)
 				throw std::runtime_error("Expected a positive integer after 'DIIS_size'");
@@ -5101,6 +5102,7 @@ void options::loadXCWsettings() {
 	xcw_settings.use_diis = use_diis;
 	xcw_settings.use_soscf = use_soscf;
 	xcw_settings.use_trah = use_trah;
+	xcw_settings.stability_check = stability_check;
 	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
 	xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
 }

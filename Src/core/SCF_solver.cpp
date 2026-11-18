@@ -190,6 +190,7 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 	adiis_ = occ::qm::ADIIS(2, static_cast<size_t>(settings.diis_size));
 	soscf_active_ = soscf_left_ = false;
 	soscf_entries_ = 0;
+	stability_follows_ = 0;
 	soscf_s_.clear();
 	soscf_y_.clear();
 	soscf_kappa_.resize(0);
@@ -233,11 +234,17 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 			converged = SCF_iteration(scf, alpha_damp, quant_diff_mem, last_quant, dm_last);
 			throughput::record_time(iteration_timer.c_str(), false, get_msec(scf_t0, get_time()));
 		} while (!converged && !trah_stalled_ && scf.iter < scf.maxiter);
-		if (!converged || confirm_SCF(scf, dm_last, last_quant)) break;
+		if (!converged) break;
+		const bool confirmed = confirm_SCF(scf, dm_last, last_quant);
+		if (confirmed) {
+			const occ::Mat D_conv = scf.ctx.mo.D;
+			if (!settings.stability_check || settings.use_trah || !stability_analysis(scf, last_quant)) break;
+			dm_last = D_conv;
+		}
 		converged = false;
 		if (scf.iter >= scf.maxiter) break;
 		//on from the canonical orbitals as a warm start, which takes the next iteration to TRAH (SOSCF under `notrah`)
-		print_centered_message("***Confirmation iteration not converged: on from its canonical orbitals***", 100, writer_->log);
+		if (!confirmed) print_centered_message("***Confirmation iteration not converged: on from its canonical orbitals***", 100, writer_->log);
 		trah_reset();
 		soscf_active_ = false;
 		warm_start_ = true;
@@ -253,6 +260,17 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 		print_centered_message("***SCF did not converge***", 100, writer_->log);
 	writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
 		<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
+	if (converged && scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
+		//<S^2> = S_z^2 + (N_alpha + N_beta) / 2 - sum_ij |<phi_i^alpha|phi_j^beta>|^2 over the occupied orbitals; occ puts the majority spin in beta
+		const occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+		const Eigen::Index n = mo.C.rows() / 2, na = static_cast<Eigen::Index>(mo.n_alpha), nb = static_cast<Eigen::Index>(mo.n_beta);
+		const occ::Mat O = mo.C.topRows(n).leftCols(na).transpose() * scf.ctx.S.topRows(n) * mo.C.bottomRows(n).leftCols(nb);
+		const double sz = 0.5 * std::abs(static_cast<double>(na - nb)), exact = sz * (sz + 1.0);
+		std::ostringstream row;
+		row << "<S^2>: expected " << std::fixed << std::setprecision(4) << exact << ", found "
+			<< std::max(exact, sz * sz + 0.5 * static_cast<double>(na + nb) - O.squaredNorm()) << "\n";
+		writer_->log << row.str();
+	}
 	if (converged)
 		end_log(scf);
 	else {
@@ -1104,6 +1122,105 @@ void SCF_solver::check_hessian(scf_t& scf) {
 	const occ::Vec fd = (gradient_at(scf, C0, eps * v) - gradient_at(scf, C0, -eps * v)) / (2.0 * eps);
 	writer_->log << "\t\tHessian check: |Hv - FD| / |FD| = " << std::scientific << std::setprecision(2) << (Hv - fd).norm() / fd.norm()
 		<< " (|Hv| " << Hv.norm() << ", |FD| " << fd.norm() << ", v.Hv " << v.dot(Hv) << ", v.FD " << v.dot(fd) << ")" << std::endl;
+}
+
+//Davidson for the lowest eigenpair of the orbital Hessian H at the converged orbitals: Ritz pairs in the span of exact
+//Hessian products, grown by the residual r = H x - theta x preconditioned at theta, from the rotations of the three
+//smallest diagonal elements, each with seeded noise of norm 1e-2 so a symmetry of the start cannot hide the lowest mode.
+//theta, a Rayleigh quotient, bounds the lowest eigenvalue from above, so theta below -1e-4 (beyond the noise of the
+//products) proves a saddle point. Then the orbitals rotate along x by 0.1, 0.2, 0.4, 0.8 (the other sign if the first step rises) while the
+//functional falls, and the lowest point below quant beyond the noise is where the run goes on
+bool SCF_solver::stability_analysis(scf_t& scf, const double quant) {
+	occ::Vec hdiag;
+	orbital_rotation_gradient(scf, hdiag);
+	const Eigen::Index size = hdiag.size();
+	const int builds0 = builds_.hessian;
+	std::vector<occ::Vec> B, HB;
+	auto add = [&](occ::Vec b) {
+		for (int pass = 0; pass < 2; pass++)
+			for (const occ::Vec& Bk : B) b -= Bk.dot(b) * Bk;
+		const double nb = b.norm();
+		if (nb < 1e-10) return false;
+		b /= nb;
+		HB.push_back(hessian_vector(scf, b));
+		B.push_back(b);
+		return true;
+	};
+	std::mt19937 rng(11);
+	std::normal_distribution<double> gauss;
+	std::vector<Eigen::Index> order(size);
+	std::iota(order.begin(), order.end(), 0);
+	const int nstart = static_cast<int>(std::min<Eigen::Index>(3, size));
+	std::partial_sort(order.begin(), order.begin() + nstart, order.end(), [&](const Eigen::Index a, const Eigen::Index b) { return hdiag(a) < hdiag(b); });
+	for (int k = 0; k < nstart; k++) {
+		occ::Vec b(size);
+		for (Eigen::Index i = 0; i < size; i++) b(i) = 1e-2 * gauss(rng) / std::sqrt(static_cast<double>(size));
+		b(order[k]) += 1.0;
+		add(b);
+	}
+	//trah_precondition reads trah_hdiag_, which TRAH never filled under `notrah`
+	std::swap(hdiag, trah_hdiag_);
+	double theta = 0, rnorm = 0;
+	occ::Vec x;
+	for (;;) {
+		const Eigen::Index m = static_cast<Eigen::Index>(B.size());
+		occ::Mat Hs(m, m);
+		for (Eigen::Index i = 0; i < m; i++)
+			for (Eigen::Index j = 0; j <= i; j++) Hs(i, j) = Hs(j, i) = 0.5 * (B[i].dot(HB[j]) + B[j].dot(HB[i]));
+		const Eigen::SelfAdjointEigenSolver<occ::Mat> es(Hs);
+		theta = es.eigenvalues()(0);
+		x = occ::Vec::Zero(size);
+		occ::Vec Hx = occ::Vec::Zero(size);
+		for (Eigen::Index i = 0; i < m; i++) {
+			x += es.eigenvectors()(i, 0) * B[i];
+			Hx += es.eigenvectors()(i, 0) * HB[i];
+		}
+		rnorm = (Hx - theta * x).norm();
+		if (rnorm < 1e-3 || (theta < -1e-4 && rnorm < -0.25 * theta) || builds_.hessian - builds0 >= stability_products_
+			|| !add(trah_precondition(scf, theta * x - Hx, theta))) break;
+	}
+	std::swap(hdiag, trah_hdiag_);
+	const bool saddle = theta < -1e-4;
+	std::ostringstream row;
+	row << "Stability analysis: lowest orbital Hessian eigenvalue " << std::scientific << std::setprecision(3) << theta << " (residual "
+		<< std::setprecision(1) << rnorm << ", " << builds_.hessian - builds0 << " Hessian products): "
+		<< (saddle ? "a saddle point" : rnorm < 1e-3 ? "a minimum" : "no negative eigenvalue found") << '\n';
+	writer_->log << row.str();
+	if (!saddle) return false;
+	if (stability_follows_ >= 2) {
+		print_centered_message("***Saddle point found twice already in this " + step_name_ + ": not followed again***", 100, writer_->log);
+		return false;
+	}
+	const occ::qm::MolecularOrbitals mo_saved = scf.ctx.mo;
+	const occ::Mat F_saved = scf.ctx.F;
+	const auto energy_saved = scf.ctx.energy;
+	save_model_state();
+	const double noise = std::max(trah_.noise, 1e-10 * std::abs(quant));
+	double best = quant, s_best = 0;
+	for (double sign = 1; sign > -2 && s_best == 0; sign -= 2)
+		for (double s = 0.1; s < 1.0; s *= 2) {
+			const double q = rebuild_at(scf, mo_saved.C, sign * s * x);
+			writer_->log << "\t\tAlong the eigenvector by " << std::fixed << std::setprecision(1) << sign * s << ": " << functional_name() << " "
+				<< std::setprecision(10) << q << std::endl;
+			if (!(q < best - noise)) break;
+			best = q;
+			s_best = sign * s;
+		}
+	if (s_best == 0) {
+		scf.ctx.mo = mo_saved;
+		scf.ctx.F = F_saved;
+		scf.ctx.energy = energy_saved;
+		restore_model_state();
+		print_centered_message("***No lower point along the eigenvector: the run ends here***", 100, writer_->log);
+		return false;
+	}
+	stability_follows_++;
+	rotate_orbitals(scf, mo_saved.C, s_best * x);
+	std::ostringstream what;
+	what << "***Saddle point: on from the orbitals " << std::fixed << std::setprecision(1) << s_best << " along its eigenvector, "
+		<< std::scientific << std::setprecision(2) << quant - best << " Eh lower***";
+	print_centered_message(what.str(), 100, writer_->log);
+	return true;
 }
 
 //The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:

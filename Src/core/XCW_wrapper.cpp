@@ -13,6 +13,8 @@
 
 XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
+	if (opt_in.xcw_settings.stability_check && opt_in.xcw_settings.use_trah)
+		std::cout << "Stability analysis was requested but will not be performed in the presence of TRAH steps." << std::endl;
 	writer.WAEmpiRe();
 	sf.weight_log_ = &writer.log;
 	writer.log << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;

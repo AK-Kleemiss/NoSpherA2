@@ -418,6 +418,7 @@ TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 
 	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
 	EXPECT_EQ(occurrences(run.log, "***Turned off level shift***"), 1u);
+	EXPECT_NE(run.log.find("<S^2>: expected 0.0000, found 0.0000"), std::string::npos) << run.log;
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 1u) << run.out;
 	EXPECT_NEAR(rows[0].d(rows[0].criterion), rows[0].d(rows[0].goof2) * rows[0].d(rows[0].goof2), 1e-4 * rows[0].d(rows[0].goof2) + 1e-4);
@@ -431,6 +432,47 @@ TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 	ASSERT_EQ(rows_rhf.size(), 1u) << rhf.out;
 	EXPECT_EQ(rows_rhf[0].goof2, rows[0].goof2);
 	EXPECT_NEAR(rows_rhf[0].d(rows_rhf[0].energy), rows[0].d(rows[0].energy), 1e-6);
+	std::filesystem::remove_all(dir);
+}
+
+//<S^2> of a converged UHF doublet: S_z(S_z + 1) = 0.75 expected, the found value never below it
+TEST(XcwScfTests, ConvergedUhfDoubletReportsItsSpin)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 100 charge 1 mult 2 f2 uhf start 0 step_size 0.01 end 0" + read_shared_eri(dir));
+	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
+	const size_t at = run.log.find("<S^2>: expected 0.7500, found ");
+	ASSERT_NE(at, std::string::npos) << run.log;
+	const double s2 = std::stod(run.log.substr(at + 30));
+	EXPECT_GE(s2, 0.75);
+	std::filesystem::remove_all(dir);
+}
+
+//`stability_check` runs only under `notrah`. The closed shell in UHF converges to the RHF solution, a saddle point of
+//the UHF energy (lowest Hessian eigenvalue about -0.13): followed, it ends in a broken-symmetry minimum below the RHF
+//energy. With TRAH the output says it is not done and the log has no analysis, as without the keyword
+TEST(XcwScfTests, StabilityCheckRunsOnlyWithoutTrah)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const std::string skip = "Stability analysis was requested but will not be performed in the presence of TRAH steps.";
+	const p1_run run = run_on_p1(dir, common + "f2 uhf notrah stability_check start 0 step_size 0.01 end 0" + read_shared_eri(dir));
+	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
+	const size_t saddle = run.log.find("Hessian products): a saddle point"), followed = run.log.find("***Saddle point: on from the orbitals");
+	ASSERT_NE(saddle, std::string::npos) << run.log;
+	ASSERT_NE(followed, std::string::npos) << run.log;
+	EXPECT_NE(run.log.find("Hessian products): a minimum", followed), std::string::npos) << run.log;
+	EXPECT_EQ(run.out.find(skip), std::string::npos) << run.out;
+	const auto rows = lambda_rows(run.out);
+	ASSERT_EQ(rows.size(), 1u) << run.out;
+	EXPECT_LT(rows[0].d(rows[0].energy), golden_energy - 1e-3);
+	const p1_run trah = run_on_p1(dir, common + "f2 uhf stability_check start 0 step_size 0.01 end 0" + read_shared_eri(dir));
+	EXPECT_NE(trah.out.find(skip), std::string::npos) << trah.out;
+	EXPECT_EQ(trah.log.find("Stability analysis:"), std::string::npos) << trah.log;
+	const p1_run plain = run_on_p1(dir, common + "f2 uhf notrah start 0 step_size 0.01 end 0" + read_shared_eri(dir));
+	EXPECT_EQ(plain.log.find("Stability analysis:"), std::string::npos) << plain.log;
+	EXPECT_EQ(plain.out.find(skip), std::string::npos) << plain.out;
 	std::filesystem::remove_all(dir);
 }
 

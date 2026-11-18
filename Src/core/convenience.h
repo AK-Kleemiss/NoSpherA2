@@ -1119,6 +1119,9 @@ struct options
 		//`nodiis`, `nososcf`, `notrah`: the method never steers, the next lower one (Roothaan < DIIS < SOSCF < TRAH)
 		//takes its place; the DIIS error is still measured for the convergence check
 		bool use_diis = true, use_soscf = true, use_trah = true;
+		//`stability_check`: the lowest eigenvalue of the orbital Hessian at a converged run, followed downhill when
+		//negative; only under `notrah`, TRAH ends at a minimum
+		bool stability_check = false;
 		bool apply_shift = true;
 		bool method_apply_shift = true;
 		double diis_stop_shift = 0;
