@@ -1981,13 +1981,13 @@ namespace
 		f.seekp(at + 9);
 		f.write(reinterpret_cast<const char*>(&zeta), sizeof(zeta));
 	}
-	std::vector<salted_novelty> novelty_of(const std::filesystem::path& xyz, const std::filesystem::path& model, const double eigcut = 1e-10)
+	std::vector<salted_novelty> novelty_of(const std::filesystem::path& xyz, const std::filesystem::path& model, const double eigcut = 1e-10, const bool eig = false)
 	{
 		WFN w(xyz, false);
 		options opt;
 		opt.salted_model_dir = model;
 		SALTEDPredictor SP(w, opt);
-		return SP.kernel_novelty(w, eigcut);
+		return SP.kernel_novelty(w, eigcut, eig);
 	}
 	// kernel_novelty_salted.py (SALTED fork-minimise-speed in salted_new.sif, Slurm job 1827715) on the shipped model and on
 	// its copy with zeta = 2, lambda 0 read from FEATS where the script reads FEATL, in input order: kmax0, row of kmax0, nov0;
@@ -2094,6 +2094,41 @@ TEST(SaltedFchkPredictorTests, KernelNoveltyDropsEigenvaluesBelowEigcut)
 		}
 	}
 	std::filesystem::remove_all(dir);
+}
+
+// at the default eigcut K_MM - eigcut I is positive definite for every species of cysteine and water, so K_MM's Cholesky
+// factor gives nov0, within 1e-10 of the eigendecomposition's; at eigcut 1e-2 K_MM drops eigenvalues and the eigendecomposition runs
+TEST(SaltedFchkPredictorTests, KernelNoveltyCholeskyMatchesTheEigendecomposition)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto run = [&root](const std::filesystem::path& xyz, const double eigcut, const bool eig, std::string& out) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		testing::internal::CaptureStdout();
+		const auto r = novelty_of(xyz, root / "SALTED" / "Model" / "model.salted", eigcut, eig);
+		out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return r;
+	};
+	for (const auto& ref : novelty_refs)
+	{
+		std::string chol, eig, cut;
+		const auto c = run(root / ref.xyz, 1e-10, false, chol), e = run(root / ref.xyz, 1e-10, true, eig);
+		EXPECT_NE(chol.find("K_MM Cholesky"), std::string::npos) << chol;
+		EXPECT_EQ(chol.find("eigendecomposition"), std::string::npos) << chol;
+		EXPECT_EQ(eig.find("Cholesky"), std::string::npos) << eig;
+		ASSERT_EQ(c.size(), ref.kmax0.size());
+		ASSERT_EQ(e.size(), ref.kmax0.size());
+		for (int a = 0; a < (int)c.size(); a++)
+		{
+			EXPECT_NEAR(c[a].nov0, e[a].nov0, 1e-10) << ref.xyz << " atom " << a;			EXPECT_EQ(c[a].kmax0, e[a].kmax0) << ref.xyz << " atom " << a;
+			EXPECT_EQ(c[a].nearest, e[a].nearest) << ref.xyz << " atom " << a;
+		}
+		run(root / ref.xyz, 1e-2, false, cut);
+		EXPECT_NE(cut.find("K_MM eigendecomposition"), std::string::npos) << cut;
+		EXPECT_EQ(cut.find("Cholesky"), std::string::npos) << cut;
+	}
 }
 
 // the eigcut after the xyz reaches the novelty, and one that is no number stops
