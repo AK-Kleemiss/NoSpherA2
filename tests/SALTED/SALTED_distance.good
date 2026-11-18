@@ -13,23 +13,38 @@ Descriptor sets identical: sharing one copy
 SALTED kernel novelty at lambda = 0, eigcut 1e-10: nov0 is 0 inside the span of the model's reference environments and 1 outside it
 Atom  Label   El  Model                           Role             kmax0    cosine      nov0  status
 1     S       S   Model/model.salted              assigned      0.754045  0.981133  0.011780  ok
+      from: H-H 35 %, O-S 21 %, others 44 %; elements: H 46 %, S 20 %, others 34 %
 2     O       O   Model/model.salted              assigned      0.774496  0.986242  0.004537  ok
+      from: H-H 41 %, H-C 27 %, others 32 %; elements: H 58 %, C 18 %, others 24 %
 3     O       O   Model/model.salted              assigned      0.739953  0.985901  0.008702  ok
+      from: H-H 48 %, O-S 16 %, others 36 %; elements: H 61 %, O 15 %, others 25 %
 4     N       N   Model/model.salted              assigned      0.645009  0.984040  0.014097  ok
+      from: H-H 51 %, H-O 17 %, others 32 %; elements: H 73 %, O 9 %, others 18 %
 5     C       C   Model/model.salted              assigned      0.642696  0.990358  0.013645  ok
+      from: H-H 58 %, H-O 19 %, others 22 %; elements: H 77 %, O 11 %, others 12 %
 6     C       C   Model/model.salted              assigned      0.655478  0.983517  0.011260  ok
+      from: H-H 34 %, H-C 18 %, others 48 %; elements: H 53 %, C 29 %, others 18 %
 7     C       C   Model/model.salted              assigned      0.659873  0.982646  0.008983  ok
+      from: H-H 49 %, H-O 17 %, others 35 %; elements: H 68 %, C 16 %, others 16 %
 8     H       H   Model/model.salted              assigned      0.677864  0.982631  0.002272  ok
+      from: H-C 23 %, H-H 19 %, others 58 %; elements: H 48 %, C 25 %, others 27 %
 9     H       H   Model/model.salted              assigned      0.726286  0.985096  0.001774  ok
+      from: H-H 31 %, H-C 23 %, others 45 %; elements: H 58 %, C 22 %, others 20 %
 10    H       H   Model/model.salted              assigned      0.734167  0.984519  0.001923  ok
+      from: H-C 31 %, H-H 19 %, others 50 %; elements: H 50 %, C 26 %, others 24 %
 11    H       H   Model/model.salted              assigned      0.777846  0.982365  0.001875  ok
+      from: H-O 22 %, H-C 19 %, others 59 %; elements: H 46 %, C 23 %, others 30 %
 12    H       H   Model/model.salted              assigned      0.732884  0.989432  0.001369  ok
+      from: H-O 33 %, H-H 25 %, others 42 %; elements: H 55 %, O 21 %, others 24 %
 13    H       H   Model/model.salted              assigned      0.706837  0.982296  0.001952  ok
+      from: H-H 33 %, H-C 20 %, others 47 %; elements: H 58 %, C 19 %, others 23 %
 14    H       H   Model/model.salted              assigned      0.717943  0.986270  0.001004  ok
+      from: H-H 37 %, H-C 22 %, others 41 %; elements: H 64 %, C 17 %, others 20 %
 nov0 per element, assigned models:
   C  n = 3, median 0.011260, max 0.013645 (atom 5, C)
   H  n = 7, median 0.001875, max 0.002272 (atom 8, H)
   N  n = 1, median 0.014097, max 0.014097 (atom 4, N)
   O  n = 2, median 0.006620, max 0.008702 (atom 3, O)
   S  n = 1, median 0.011780, max 0.011780 (atom 1, S)
-Wrote test_cysteine_salted_distance.csv
+Channels absent from the model's references: none
+Wrote test_cysteine_salted_distance.csv and test_cysteine_salted_distance.json
