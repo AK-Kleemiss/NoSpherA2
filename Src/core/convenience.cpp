@@ -835,6 +835,12 @@ std::string help_message =
  "                                    Mark a model trained on ECP densities\n"
  "                                    (mode as -ECP: 1 def2, 2 xTB, 3 pTB);\n"
  "                                    its atoms get the core back at prediction.\n"
+ "  -SALTED_distance <model> <xyz> [eigcut]\n"
+ "                                    How far each atom lies outside the model's\n"
+ "                                    training span: lambda = 0 kernel novelty\n"
+ "                                    (0 inside, 1 outside), largest kernel and\n"
+ "                                    cosine to a reference environment; eigcut\n"
+ "                                    default 1e-10. Writes <xyz>_salted_distance.csv.\n"
  "  -SALTED_COEFS <model-dir>         Write SALTED_COEFS.npy (requires -wfn).\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
@@ -3322,6 +3328,18 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		err_checkf(i + 3 < argc, "-salted_ecp needs the model, the file to write and the ECP mode", std::cout);
 		write_salted_ecp(arguments[i + 1], arguments[i + 2], stoi(arguments[i + 3]));
+		finished = true; return true;
+	}
+	else if (temp == "-SALTED_distance")
+	{
+		err_checkf(i + 2 < argc, "-SALTED_distance needs the model and the xyz", std::cout);
+#ifdef NOSPHERA2_USE_GPU
+		//The parser runs before run_app_impl sets the GPU globals, as for -SALTED_COEFS: needs -no_gpu_salted before it
+		equicomb_set_gpu(use_gpu && gpu_salted);
+		if (use_gpu && gpu_salted)
+			sf_gpu_warmup_start();
+#endif
+		salted_distance(arguments[i + 1], arguments[i + 2], i + 3 < argc && arguments[i + 3].find("-") != 0 ? stod(arguments[i + 3]) : 1e-10, *this);
 		finished = true; return true;
 	}
 	else if (temp == "-mtc")

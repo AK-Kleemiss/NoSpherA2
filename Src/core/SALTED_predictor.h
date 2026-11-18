@@ -17,6 +17,16 @@ struct SALTED_model_store
 	bool keep = true;
 };
 
+//-SALTED_distance, one atom and one model covering it: kmax0 the largest l = 0 kernel to a reference environment
+//(row nearest of the model's block), self = p0.p0, nov0 = 1 - |k0^zeta V|^2 / self^zeta the share of the atom's own
+//kernel outside the span of the references, role assigned/shared/alternative, status ok/filled/empty environment/not computable
+struct salted_novelty
+{
+	int atom = -1, nearest = -1;
+	std::string label, element, model, role, status;
+	double kmax0 = NAN, cosine = NAN, self = NAN, nov0 = NAN;
+};
+
 //The SALTED prediction for a structure as a flat table with its coefficients, so rho and the ESP
 //can be evaluated at points without a wavefunction (xyz input); opt.salted_model_dir names the model
 class SALTEDPredictor
@@ -38,6 +48,9 @@ public:
 	const bool basis_set_loaded() const { return bbasis_set_loaded; };
 	//The basis this model predicts in: its own BASIS block if it has one, else the library set it names
 	std::shared_ptr<BasisSet> get_model_basis() const;
+	//One row per atom of full (the structure this predictor was made from), in its order, and per model covering it;
+	//only the l = 0 block is built, the eigendecomposition of K_MM once per model and species
+	std::vector<salted_novelty> kernel_novelty(const WFN& full, const double eigcut);
 
 private:
 	bool bbasis_set_loaded = false;
@@ -59,6 +72,10 @@ private:
 	// The atoms of wavy predict() makes descriptor centres, sorted, all when empty; score_only stops it after env_score
 	ivec centres{};
 	bool score_only = false;
+	// kernel_novelty: the eigenvalue cut of K_MM (off below 0) and, per atom of wavy, its l = 0 novelty
+	double novelty_eigcut = -1.0;
+	vec kmax0{}, self0{}, nov0{};
+	ivec nearest0{};
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
 	vec merge_predictions();
 	// Estimate what the spherically filled atoms should carry, so the size of the
@@ -136,4 +153,7 @@ private:
 // Writes the model `in` to `out` as VERSION 4: weights and features folded into ENVW (zeta = 1) or
 // GENV + FEATL + PROJW (zeta != 1), which replace FEATS, PROJ and WEIGH
 void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out);
+// -SALTED_distance: the kernel novelty of every atom of xyz against model (file or folder) in the log and in
+// <xyz stem>_salted_distance.csv in the working directory
+std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, const std::filesystem::path& xyz, const double eigcut, options& opt);
 

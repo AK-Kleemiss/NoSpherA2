@@ -566,6 +566,137 @@ vec SALTEDPredictor::merge_predictions()
 	return coefs;
 }
 
+std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, const double eigcut)
+{
+	auto pass = [eigcut](SALTEDPredictor& p, const ivec& c) {
+		p.centres = c;
+		p.score_only = true;
+		p.novelty_eigcut = eigcut;
+		p.setup_atomic_environment();
+		p.read_model_data();
+		err_checkf(!p.env_folded, (p.SALTED_DIR / p.config.salted_filename).string()
+			+ " keeps no reference features (ENVW, folded at zeta = 1): the novelty needs FEATS or FEATL, take the unfolded model", std::cout);
+		const int n = p.wavy.get_ncen();
+		p.kmax0.assign(n, NAN);
+		p.self0.assign(n, NAN);
+		p.nov0.assign(n, NAN);
+		p.nearest0.assign(n, -1);
+		p.predict();
+		p.shrink_intermediate_vectors();
+		p.score_only = false;
+	};
+	// (model, index there, role) per atom of wavy, model -1 for this one
+	std::vector<std::vector<std::tuple<int, int, std::string>>> cand(wavy.get_ncen());
+	if (sub_models.empty())
+	{
+		pass(*this, {});
+		for (int a = 0; a < wavy.get_ncen(); a++) cand[a].push_back({ -1, a, "assigned" });
+	}
+	else
+	{
+		std::vector<ivec> need(sub_models.size());
+		for (int a = 0; a < wavy.get_ncen(); a++)
+		{
+			need[atom_model[a]].push_back(atom_in_model[a]);
+			for (const auto& [m, p, w] : atom_also[a]) need[m].push_back(p);
+			for (const auto& [m, p] : atom_alt[a]) need[m].push_back(p);
+		}
+		for (int m = 0; m < (int)sub_models.size(); m++)
+		{
+			if (need[m].empty()) continue;
+			std::sort(need[m].begin(), need[m].end());
+			need[m].erase(std::unique(need[m].begin(), need[m].end()), need[m].end());
+			pass(*sub_models[m], need[m]);
+		}
+		for (int a = 0; a < wavy.get_ncen(); a++)
+		{
+			// assigned as merge_predictions picks: the alternative with the closest reference, the default on a tie
+			std::pair<int, int> own{ atom_model[a], atom_in_model[a] };
+			for (const auto& c : atom_alt[a])
+				if (sub_models[c.first]->env_score[c.second] > sub_models[own.first]->env_score[own.second]) own = c;
+			cand[a].push_back({ own.first, own.second, "assigned" });
+			for (const auto& [m, p, w] : atom_also[a])
+				if (std::make_pair(m, p) != own) cand[a].push_back({ m, p, "shared" });
+			for (const auto& c : atom_alt[a])
+				if (c != own) cand[a].push_back({ c.first, c.second, "alternative" });
+		}
+	}
+	const ivec idx = map_atoms(full, wavy);
+	std::vector<salted_novelty> rows;
+	for (int a = 0; a < full.get_ncen(); a++)
+	{
+		salted_novelty r;
+		r.atom = a;
+		r.label = full.get_atom_label(a);
+		r.element = constants::atnr2letter(full.get_atom_charge(a));
+		if (idx[a] < 0) { r.status = "filled"; rows.push_back(r); continue; }
+		for (const auto& [m, p, role] : cand[idx[a]])
+		{
+			const SALTEDPredictor& s = m < 0 ? *this : *sub_models[m];
+			r.model = (s.SALTED_DIR / s.config.salted_filename).string();
+			r.role = role;
+			r.kmax0 = s.kmax0[p];
+			r.cosine = s.env_score[p];
+			r.nearest = s.nearest0[p];
+			r.self = s.self0[p];
+			r.nov0 = s.nov0[p];
+			r.status = r.self == 0.0 ? "empty environment" : std::isnan(r.nov0) ? "not computable" : "ok";
+			rows.push_back(r);
+		}
+	}
+	return rows;
+}
+
+std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, const std::filesystem::path& xyz, const double eigcut, options& opt)
+{
+	WFN wavy(xyz);
+	opt.salted_model_dirs.clear();
+	opt.salted_model_dir = model;
+	SALTEDPredictor SP(wavy, opt);
+	const std::vector<salted_novelty> rows = SP.kernel_novelty(wavy, eigcut);
+	std::ostream& log = opt.log_file;
+	auto name = [](const std::string& m) { const std::filesystem::path p(m); return m.empty() ? std::string("-") : (p.parent_path().filename() / p.filename()).generic_string(); };
+	auto num = [](const double x) { std::ostringstream s; if (std::isnan(x)) s << "-"; else s << std::fixed << std::setprecision(6) << x; return s.str(); };
+	log << "SALTED kernel novelty at lambda = 0, eigcut " << eigcut << ": nov0 is 0 inside the span of the model's reference environments and 1 outside it\n"
+		<< std::left << std::setw(6) << "Atom" << std::setw(8) << "Label" << std::setw(4) << "El" << std::setw(32) << "Model" << std::setw(12) << "Role"
+		<< std::right << std::setw(10) << "kmax0" << std::setw(10) << "cosine" << std::setw(10) << "nov0" << "  status\n";
+	for (const auto& r : rows)
+		log << std::left << std::setw(6) << r.atom + 1 << std::setw(8) << r.label << std::setw(4) << r.element << std::setw(32) << name(r.model)
+			<< std::setw(12) << (r.role.empty() ? "-" : r.role) << std::right << std::setw(10) << num(r.kmax0) << std::setw(10) << num(r.cosine)
+			<< std::setw(10) << num(r.nov0) << "  " << r.status << "\n";
+	std::map<std::string, std::vector<std::pair<double, int>>> el;
+	for (int i = 0; i < (int)rows.size(); i++)
+		if (rows[i].role == "assigned" && rows[i].status == "ok") el[rows[i].element].push_back({ rows[i].nov0, i });
+	log << "nov0 per element, assigned models:\n";
+	for (auto& [e, v] : el)
+	{
+		std::sort(v.begin(), v.end());
+		const size_t n = v.size();
+		const double med = n % 2 ? v[n / 2].first : 0.5 * (v[n / 2 - 1].first + v[n / 2].first);
+		const salted_novelty& top = rows[v.back().second];
+		log << "  " << std::left << std::setw(3) << e << "n = " << n << ", median " << num(med) << ", max " << num(top.nov0)
+			<< " (atom " << top.atom + 1 << ", " << top.label << ")\n";
+	}
+	const std::filesystem::path csv = xyz.stem().string() + "_salted_distance.csv";
+	std::ofstream o(csv);
+	o << "atom,label,element,model,role,kmax0,cosine,nov0,status,nearest,p0p0\n" << std::setprecision(12);
+	auto cell = [&o](const double x) { if (!std::isnan(x)) o << x; o << ","; };
+	for (const auto& r : rows)
+	{
+		o << r.atom + 1 << "," << r.label << "," << r.element << "," << r.model << "," << r.role << ",";
+		cell(r.kmax0);
+		cell(r.cosine);
+		cell(r.nov0);
+		o << r.status << ",";
+		if (r.nearest >= 0) o << r.nearest;
+		o << ",";
+		if (!std::isnan(r.self)) o << r.self;
+		o << "\n";
+	}
+	log << "Wrote " << csv.string() << std::endl;
+	return rows;
+}
+
 /// predict() only wants C_n = psi w_n per (species, l), psi = K V with K the kernel between the structure's
 // descriptors p and the model's sparse features F. VERSION 4 folds the weights into the projector,
 // VW = V W^T (PROJW, nmax columns instead of Mcut), and the features in as well:
@@ -1189,6 +1320,42 @@ vec SALTEDPredictor::predict()
 					const double pn = norm(pvec_lam, i);
 					for (int j = 0; j < (int)k.extent(1); j++) s = std::max(s, k(i, j) / (pn * rn[j] + 1e-300));
 					env_score[centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]]] = s;
+				}
+				if (novelty_eigcut >= 0.0 && R.extent(0) > 0)
+				{
+					// K_MM = (F0 F0^T)^zeta = U diag(e) U^T, V = U diag(e)^-1/2 over e > eigcut: V V^T is its pseudo-inverse and
+					// |k0^zeta V|^2 the part of the atom's own kernel (p0.p0)^zeta the references span
+					const auto _t_eig = std::chrono::steady_clock::now();
+					const int M = (int)R.extent(0);
+					dMatrix2 RR = dot(R, R, false, true), kz = k;
+					const dMatrix2 K = elementWiseExponentiation(RR, config.zeta);
+					vec U(K.data(), K.data() + (size_t)M * M), e(M);
+					const bool ok = try_make_Eigenvalues(U, e);
+					int r = 0;
+					for (int j = 0; j < M; j++) r += ok && e[j] > novelty_eigcut;
+					dMatrix2 V(M, r);
+					for (int c = 0; c < r; c++)
+						for (int j = 0; j < M; j++) V(j, c) = U[(size_t)j * M + M - r + c] / std::sqrt(e[M - r + c]);
+					const double eig_s = _elapsed(_t_eig);
+					const auto _t_psi = std::chrono::steady_clock::now();
+					kz = elementWiseExponentiation(kz, config.zeta);
+					const dMatrix2 psi = r > 0 ? dot(kz, V, false, false) : dMatrix2(k.extent(0), 0);
+					for (int i = 0; i < (int)k.extent(0); i++)
+					{
+						const int a = centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]];
+						double pp = 0.0, q = 0.0;
+						int j0 = 0;
+						for (int f = 0; f < (int)pvec_lam.extent(1); f++) pp += pvec_lam(i, f) * pvec_lam(i, f);
+						for (int c = 0; c < r; c++) q += psi(i, c) * psi(i, c);
+						for (int j = 1; j < M; j++) if (k(i, j) > k(i, j0)) j0 = j;
+						kmax0[a] = k(i, j0);
+						nearest0[a] = j0;
+						self0[a] = pp;
+						nov0[a] = ok && pp > 0.0 ? 1.0 - q / std::pow(pp, config.zeta) : NAN;
+					}
+					if (ProgressBar::report_counts)
+						std::cout << "[novelty] " << spe << ": K_MM eigendecomposition " << eig_s << " s (rank " << r << " of " << M
+								  << "), psi " << _elapsed(_t_psi) << " s" << std::endl;
 				}
 			}
 
