@@ -101,6 +101,7 @@ set_tests_properties(
     TomlIntegrationTests.SaltedFillTshb
     TomlIntegrationTests.SALTED_write_coefs
     TomlIntegrationTests.SALTED_coef_file
+    TomlIntegrationTests.SaltedDistance
     SALTEDTests.ReadingSALTEDBinaryFile
     SaltedFchkPredictorTests.PredictWaterMonomer
     SaltedFchkPredictorTests.FoldedModelPredictsTheSame
