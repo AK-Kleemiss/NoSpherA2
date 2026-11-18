@@ -587,6 +587,8 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 		p.nearest0.assign(n, -1);
 		p.split0.assign(n, {});
 		p.absent0.assign(n, {});
+		p.unrep0.assign(n, {});
+		p.unrep_model0.clear();
 		p.path0.clear();
 		p.predict();
 		p.shrink_intermediate_vectors();
@@ -660,6 +662,8 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 			r.zeta = s.config.zeta;
 			r.split = s.split0[p];
 			r.absent = s.absent0[p];
+			r.unrepresented = s.unrep0[p];
+			r.model_unrepresented = s.unrep_model0;
 			if (s.path0.count(r.element)) r.path = s.path0.at(r.element);
 			r.status = r.self == 0.0 ? "empty environment" : std::isnan(r.nov0) ? "not computable" : "ok";
 			rows.push_back(r);
@@ -730,22 +734,28 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 			<< " (atom " << top.atom + 1 << ", " << top.label << ")\n";
 	}
 	for (const auto& m : no_split) log << "Channel split not available for " << m << ": its shares are sums of squares only for integer zeta\n";
-	std::map<std::string, std::map<std::string, ivec>> absent;
-	for (const auto& r : rows)
-		if (r.role == "assigned")
-			for (const auto& c : r.absent) absent[r.element][c].push_back(r.atom + 1);
-	log << "Channels absent from the model's references:" << (absent.empty() ? " none" : "");
-	for (const auto& [e, cs] : absent)
-	{
-		log << (e == absent.begin()->first ? " " : "; ") << e << ":";
-		for (const auto& [c, at] : cs)
+	//the channels f lists for the assigned rows, per element and channel with their atoms
+	auto channels = [&log, &rows](const std::string& title, svec salted_novelty::* f, const bool none) {
+		std::map<std::string, std::map<std::string, ivec>> by;
+		for (const auto& r : rows)
+			if (r.role == "assigned")
+				for (const auto& c : r.*f) by[r.element][c].push_back(r.atom + 1);
+		if (by.empty() && !none) return;
+		log << title << (by.empty() ? " none" : "");
+		for (const auto& [e, cs] : by)
 		{
-			log << (c == cs.begin()->first ? " " : ", ") << c << " (atom" << (at.size() > 1 ? "s " : " ");
-			for (int i = 0; i < (int)at.size(); i++) log << (i ? ", " : "") << at[i];
-			log << ")";
+			log << (e == by.begin()->first ? " " : "; ") << e << ":";
+			for (const auto& [c, at] : cs)
+			{
+				log << (c == cs.begin()->first ? " " : ", ") << c << " (atom" << (at.size() > 1 ? "s " : " ");
+				for (int i = 0; i < (int)at.size(); i++) log << (i ? ", " : "") << at[i];
+				log << ")";
+			}
 		}
-	}
-	log << "\n";
+		log << "\n";
+	};
+	channels("Channels absent from the kept features of the model's references:", &salted_novelty::absent, true);
+	channels("Channels the model keeps no features for:", &salted_novelty::unrepresented, false);
 	const std::filesystem::path csv = xyz.stem().string() + "_salted_distance.csv";
 	std::ofstream o(csv);
 	o << "atom,label,element,model,role,kmax0,cosine,nov0,status,nearest,p0p0\n" << std::setprecision(12);
@@ -769,7 +779,8 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 		nlohmann::ordered_json a{ { "atom", r.atom + 1 }, { "label", r.label }, { "element", r.element }, { "model", r.model }, { "role", r.role },
 			{ "kmax0", r.kmax0 }, { "cosine", r.cosine }, { "nov0", r.nov0 }, { "status", r.status },
 			{ "nearest", r.nearest >= 0 ? nlohmann::ordered_json(r.nearest) : nlohmann::ordered_json() }, { "p0p0", r.self },
-			{ "channels", nlohmann::ordered_json::object() }, { "elements", nlohmann::ordered_json::object() }, { "absent", r.absent } };
+			{ "channels", nlohmann::ordered_json::object() }, { "elements", nlohmann::ordered_json::object() }, { "absent", r.absent },
+			{ "unrepresented", r.unrepresented } };
 		//share: the channel's part of nov0 (the shares sum to nov0), fraction: share / nov0, environment: |p0_c|^2 / p0.p0
 		for (const auto& [c, v] : r.split)
 			a["channels"][c] = { { "share", v.second }, { "fraction", v.second / r.nov0 }, { "environment", v.first },
@@ -780,6 +791,7 @@ std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, 
 			nlohmann::ordered_json& m = j["models"][r.model];
 			m["zeta"] = r.zeta;
 			m["split"] = r.zeta >= 1.0 && r.zeta == std::floor(r.zeta);
+			m["unrepresented"] = r.model_unrepresented;
 			if (!r.path.empty()) m["path"][r.element] = r.path;
 		}
 		j["atoms"].push_back(a);
@@ -1463,6 +1475,47 @@ vec SALTEDPredictor::predict()
 					const auto _t_split = std::chrono::steady_clock::now();
 					path0[spe] = chol ? "Cholesky" : "eigendecomposition";
 					const double z = config.zeta;
+					const int n = (int)k.extent(0), nr2 = config.nspe2 * config.nrad2;
+					// feature g = (n1 nr2 + n2) llmax + l, n1 = s1 nrad1 + n over neighspe1 (featomic keeps the order of the selected keys), n2 alike
+					auto rank = [this](const std::string& x) {
+						const int i = (int)(std::find(config.neighspe1.begin(), config.neighspe1.end(), x) - config.neighspe1.begin());
+						return i < config.nspe1 ? i : config.nspe1 + (int)(std::find(config.neighspe2.begin(), config.neighspe2.end(), x) - config.neighspe2.begin());
+					};
+					auto channel = [&rank](std::string s1, std::string s2) { if (rank(s2) < rank(s1)) std::swap(s1, s2); return s1 + "-" + s2; };
+					std::map<std::string, ivec> cols;
+					for (int f = 0; f < (int)pvec_lam.extent(1); f++)
+					{
+						const int64_t g = config.sparsify ? vfps[0][f] : f;
+						if (g >= (int64_t)llmax * config.nspe1 * config.nrad1 * nr2) continue;
+						cols[channel(config.neighspe1[g / ((int64_t)llmax * nr2) / config.nrad1], config.neighspe2[(g / llmax) % nr2 / config.nrad2])].push_back(f);
+					}
+					// the channels the FPS kept no feature of, and per atom those its neighbour densities within rcut (the centre's own among them) have
+					std::set<std::string> um;
+					for (const auto& s1 : config.neighspe1)
+						for (const auto& s2 : config.neighspe2)
+							if (!cols.count(channel(s1, s2))) um.insert(channel(s1, s2));
+					unrep_model0.assign(um.begin(), um.end());
+					const double* pos = featomic_system.positions();
+					auto has = [](const svec& v, const std::string& s) { return std::find(v.begin(), v.end(), s) != v.end(); };
+					ivec fi;
+					for (int j = 0; j < (int)featomic_system.size(); j++)
+						if (has(config.species, constants::Labels[featomic_system.types()[j]])) fi.push_back(j);
+					for (int i = 0; i < n && !um.empty(); i++)
+					{
+						const int a = centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]], c = fi[a];
+						std::set<std::string> n1, n2, u;
+						for (int j = 0; j < (int)featomic_system.size(); j++)
+						{
+							const double d = std::hypot(pos[3 * j] - pos[3 * c], pos[3 * j + 1] - pos[3 * c + 1], pos[3 * j + 2] - pos[3 * c + 2]);
+							const std::string l = constants::Labels[featomic_system.types()[j]];
+							if (d < config.rcut1 && has(config.neighspe1, l)) n1.insert(l);
+							if (d < config.rcut2 && has(config.neighspe2, l)) n2.insert(l);
+						}
+						for (const auto& s1 : n1)
+							for (const auto& s2 : n2)
+								if (um.count(channel(s1, s2))) u.insert(channel(s1, s2));
+						unrep0[a].assign(u.begin(), u.end());
+					}
 					int nch = 0;
 					if (ok && z >= 1.0 && z == std::floor(z))
 					{
@@ -1470,21 +1523,6 @@ vec SALTEDPredictor::predict()
 						// alpha = K_MM^+ k0^zeta the residual |phi(p) - sum_m alpha_m phi(f_m)|^2 = nov0 self^zeta splits into
 						// A_c = h_c(p, p) - 2 sum_m alpha_m h_c(p, f_m) + alpha^T (G_c o G^(zeta-1)) alpha, G_c = F_c F_c^T,
 						// each a sum of squares over the tensor blocks for integer zeta
-						const int n = (int)k.extent(0), nr2 = config.nspe2 * config.nrad2;
-						// feature g = (n1 nr2 + n2) llmax + l, n1 = s1 nrad1 + n over neighspe1 (featomic keeps the order of the selected keys), n2 alike
-						auto rank = [this](const std::string& x) {
-							const int i = (int)(std::find(config.neighspe1.begin(), config.neighspe1.end(), x) - config.neighspe1.begin());
-							return i < config.nspe1 ? i : config.nspe1 + (int)(std::find(config.neighspe2.begin(), config.neighspe2.end(), x) - config.neighspe2.begin());
-						};
-						std::map<std::string, ivec> cols;
-						for (int f = 0; f < (int)pvec_lam.extent(1); f++)
-						{
-							const int64_t g = config.sparsify ? vfps[0][f] : f;
-							if (g >= (int64_t)llmax * config.nspe1 * config.nrad1 * nr2) continue;
-							std::string s1 = config.neighspe1[g / ((int64_t)llmax * nr2) / config.nrad1], s2 = config.neighspe2[(g / llmax) % nr2 / config.nrad2];
-							if (rank(s2) < rank(s1)) std::swap(s1, s2);
-							cols[s1 + "-" + s2].push_back(f);
-						}
 						dMatrix2 At(n, M), kz1(z == 1.0 ? 0 : n, M);
 						if (chol) std::copy(y.begin(), y.end(), At.data());
 						else if (r > 0) At = dot(psi, V, false, true);

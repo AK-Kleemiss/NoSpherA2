@@ -21,14 +21,16 @@ struct SALTED_model_store
 //(row nearest of the model's block), self = p0.p0, nov0 = 1 - |k0^zeta V|^2 / self^zeta the share of the atom's own
 //kernel outside the span of the references, role assigned/shared/alternative, status ok/filled/empty environment/not computable;
 //split: neighbour pair channel -> (|p0_c|^2 / self, its share of nov0, the shares summing to nov0), empty unless zeta is an
-//integer; absent: the channels of the atom no reference environment of its element has; path: how K_MM was inverted
+//integer; absent: the atom's channels on which every reference of its element is zero among the kept features;
+//unrepresented: the atom's channels (by its neighbours within rcut) the model keeps no feature of, model_unrepresented all
+//of those; path: how K_MM was inverted
 struct salted_novelty
 {
 	int atom = -1, nearest = -1;
 	std::string label, element, model, role, status, path;
 	double kmax0 = NAN, cosine = NAN, self = NAN, nov0 = NAN, zeta = NAN;
 	std::map<std::string, std::pair<double, double>> split;
-	svec absent;
+	svec absent, unrepresented, model_unrepresented;
 };
 
 //The SALTED prediction for a structure as a flat table with its coefficients, so rho and the ESP
@@ -82,9 +84,10 @@ private:
 	bool novelty_eig = false;
 	vec kmax0{}, self0{}, nov0{};
 	ivec nearest0{};
-	// per atom of wavy its salted_novelty split and absent channels, per species the K_MM path
+	// per atom of wavy its salted_novelty split, absent and unrepresented channels, the model's unrepresented ones, per species the K_MM path
 	std::vector<std::map<std::string, std::pair<double, double>>> split0{};
-	std::vector<svec> absent0{};
+	std::vector<svec> absent0{}, unrep0{};
+	svec unrep_model0{};
 	std::map<std::string, std::string> path0{};
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
 	vec merge_predictions();
