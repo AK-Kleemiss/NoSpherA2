@@ -227,11 +227,21 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 	double quant_diff_mem = 0;
 	occ::Mat dm_last = scf.ctx.mo.D;
 	const std::string iteration_timer = label_ + " SCF iteration";
-	do {
-		const _time_point scf_t0 = get_time();
-		converged = SCF_iteration(scf, alpha_damp, quant_diff_mem, last_quant, dm_last);
-		throughput::record_time(iteration_timer.c_str(), false, get_msec(scf_t0, get_time()));
-	} while (!converged && !trah_stalled_ && scf.iter < scf.maxiter);
+	for (;;) {
+		do {
+			const _time_point scf_t0 = get_time();
+			converged = SCF_iteration(scf, alpha_damp, quant_diff_mem, last_quant, dm_last);
+			throughput::record_time(iteration_timer.c_str(), false, get_msec(scf_t0, get_time()));
+		} while (!converged && !trah_stalled_ && scf.iter < scf.maxiter);
+		if (!converged || confirm_SCF(scf, dm_last, last_quant)) break;
+		converged = false;
+		if (scf.iter >= scf.maxiter) break;
+		//on from the canonical orbitals as a warm start, which takes the next iteration to TRAH (SOSCF under `notrah`)
+		print_centered_message("***Confirmation iteration not converged: on from its canonical orbitals***", 100, writer_->log);
+		trah_reset();
+		soscf_active_ = false;
+		warm_start_ = true;
+	}
 
 	writer_->log << "____________________________________________________________________________________________________\n";
 	if (converged) {
@@ -319,7 +329,7 @@ void SCF_solver::solve_orbitals(scf_t& scf, const occ::Mat& F) const {
 //occ's ConvergenceAccelerator::update with the CDIIS commutator S D F - F D S from MKL; with
 //the three matrices symmetric it is T - T^T for T = S D F. CDIIS is cdiis_extrapolate below,
 //ADIIS is occ's, under occ's default strategy ADIIS_CDIIS (NoSpherA2 never sets another).
-occ::Mat SCF_solver::diis_update(scf_t& scf) {
+occ::Mat SCF_solver::commutator(const scf_t& scf) const {
 	const occ::Mat& S = scf.ctx.S;
 	const occ::Mat& D = scf.ctx.mo.D;
 	const occ::Mat& F = scf.ctx.F;
@@ -330,6 +340,13 @@ occ::Mat SCF_solver::diis_update(scf_t& scf) {
 		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.0, SD.data(), n, F.data() + b * n, nb * n, 0.0, T.data(), n);
 		comm.middleRows(static_cast<Eigen::Index>(b) * n, n) = T - T.transpose();
 	}
+	return comm;
+}
+
+occ::Mat SCF_solver::diis_update(scf_t& scf) {
+	const occ::Mat& D = scf.ctx.mo.D;
+	const occ::Mat& F = scf.ctx.F;
+	const occ::Mat comm = commutator(scf);
 	scf.diis_error = comm.array().abs().maxCoeff();
 	occ::Mat F_cdiis = cdiis_extrapolate(F, comm);
 	if (scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
@@ -1128,6 +1145,36 @@ bool SCF_solver::rescue_scf(scf_t& scf, const double quant, double& alpha_damp, 
 	settings.apply_shift = true;
 	settings.apply_damping = true;
 	return true;
+}
+
+//The confirmation iteration of a converged run: model term and Fock matrix rebuilt in full at the converged density, then
+//F C = e S C without shift or damping, so the orbitals are canonical and their energies the eigenvalues. SOSCF and TRAH
+//leave the occupied and the virtual orbitals rotated among themselves; the density moves only by the residual gradient.
+//True when every criterion holds, judged as an iteration from the converged density; dm_last and last_quant are then
+//where an iteration that goes on from here starts
+bool SCF_solver::confirm_SCF(scf_t& scf, occ::Mat& dm_last, double& last_quant) {
+	dm_last = scf.ctx.mo.D;
+	const double quant0 = quant_;
+	evaluate_model_term(scf, true);
+	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
+	scf.ctx.F = scf.ctx.H + two_electron_fock(scf, false);
+	builds_.iter++;
+	scf.update_scf_energy(false);
+	quant_ = scf.ctx.energy["total"] + model_energy();
+	add_model_fock(scf.ctx.F);
+	last_quant = quant_;
+	settings.current_quant_diff = std::abs(quant_ - quant0);
+	settings.current_max_diis_error = commutator(scf).array().abs().maxCoeff();
+	settings.current_gradient = compute_orbital_gradient(scf);
+	solve_orbitals(scf, scf.ctx.F);
+	const bool ok = SCF_convergence_check(scf, dm_last);
+	std::ostringstream row;
+	row << "Confirmation iteration (full Fock build, canonical orbitals): " << functional_name() << " " << std::fixed << std::setprecision(10) << quant_
+		<< std::scientific << std::setprecision(2) << ", change " << quant_ - quant0 << ", DIIS error " << settings.current_max_diis_error
+		<< ", orbital gradient " << settings.current_gradient << ", density change RMS " << settings.current_RMSP_diff << " max " << settings.current_MaxP_diff
+		<< (ok ? "" : " - not converged") << '\n';
+	writer_->log << row.str();
+	return ok;
 }
 
 bool SCF_solver::SCF_convergence_check(scf_t& scf, occ::Mat& dm_last) {

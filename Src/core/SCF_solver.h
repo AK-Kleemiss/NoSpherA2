@@ -103,6 +103,7 @@ private:
 
 	// The Roothaan step and the DIIS of OCC's SCF with their matrix products on MKL
 	void solve_orbitals(scf_t& scf, const occ::Mat& F) const;
+	occ::Mat commutator(const scf_t& scf) const;
 	occ::Mat diis_update(scf_t& scf);
 	// CDIIS over the last settings.diis_size Fock matrices and their commutators, see cdiis_extrapolate
 	occ::Mat cdiis_extrapolate(const occ::Mat& F, const occ::Mat& E);
@@ -211,6 +212,7 @@ private:
 
 	// Computes convergence criteria related to the density matrix (RMSP and MaxP)
 	void get_density_criteria(double& RMSP_diff, double& maxP_diff, const occ::Mat& dm, const occ::Mat& dm_last);
+	bool confirm_SCF(scf_t& scf, occ::Mat& dm_last, double& last_quant);
 
 	// Takes care of dynamic damping
 	double dynamic_damping(const scf_t& scf, const double& current_alpha_damp, const double& e_diff, double& e_diff_mem);
