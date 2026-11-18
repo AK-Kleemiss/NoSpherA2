@@ -1,0 +1,35 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Descriptor sets identical: sharing one copy
+[              Calculating descriptors for l = 0              ]
+[#############################################################] 100% 
+SALTED kernel novelty at lambda = 0, eigcut 1e-10: nov0 is 0 inside the span of the model's reference environments and 1 outside it
+Atom  Label   El  Model                           Role             kmax0    cosine      nov0  status
+1     S       S   Model/model.salted              assigned      0.754045  0.981133  0.011780  ok
+2     O       O   Model/model.salted              assigned      0.774496  0.986242  0.004537  ok
+3     O       O   Model/model.salted              assigned      0.739953  0.985901  0.008702  ok
+4     N       N   Model/model.salted              assigned      0.645009  0.984040  0.014097  ok
+5     C       C   Model/model.salted              assigned      0.642696  0.990358  0.013645  ok
+6     C       C   Model/model.salted              assigned      0.655478  0.983517  0.011260  ok
+7     C       C   Model/model.salted              assigned      0.659873  0.982646  0.008983  ok
+8     H       H   Model/model.salted              assigned      0.677864  0.982631  0.002272  ok
+9     H       H   Model/model.salted              assigned      0.726286  0.985096  0.001774  ok
+10    H       H   Model/model.salted              assigned      0.734167  0.984519  0.001923  ok
+11    H       H   Model/model.salted              assigned      0.777846  0.982365  0.001875  ok
+12    H       H   Model/model.salted              assigned      0.732884  0.989432  0.001369  ok
+13    H       H   Model/model.salted              assigned      0.706837  0.982296  0.001952  ok
+14    H       H   Model/model.salted              assigned      0.717943  0.986270  0.001004  ok
+nov0 per element, assigned models:
+  C  n = 3, median 0.011260, max 0.013645 (atom 5, C)
+  H  n = 7, median 0.001875, max 0.002272 (atom 8, H)
+  N  n = 1, median 0.014097, max 0.014097 (atom 4, N)
+  O  n = 2, median 0.006620, max 0.008702 (atom 3, O)
+  S  n = 1, median 0.011780, max 0.011780 (atom 1, S)
+Wrote test_cysteine_salted_distance.csv

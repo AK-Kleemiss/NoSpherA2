@@ -32,6 +32,7 @@ tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_eli.cube
 tests/epoxide_gbw/converted.wfn
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
 tests/reading_SALTED/alanine_rho.cube
+tests/SALTED/test_cysteine_salted_distance.csv
 tests/reading_SALTED/ORCA/water_monomer.densities
 tests/reading_SALTED/ORCA/water_monomer.gbw
 tests/reading_SALTED/ORCA/water_monomer.inp
