@@ -566,14 +566,15 @@ vec SALTEDPredictor::merge_predictions()
 	return coefs;
 }
 
-std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, const double eigcut)
+std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, const double eigcut, const bool eig)
 {
-	auto pass = [eigcut](SALTEDPredictor& p, const ivec& c) {
+	auto pass = [eigcut, eig](SALTEDPredictor& p, const ivec& c) {
 		const ivec c0 = p.centres;
 		const double e0 = p.novelty_eigcut;
 		p.centres = c;
 		p.score_only = true;
 		p.novelty_eigcut = eigcut;
+		p.novelty_eig = eig;
 		p.setup_atomic_environment();
 		p.read_model_data();
 		err_checkf(!p.env_folded, (p.SALTED_DIR / p.config.salted_filename).string()
@@ -588,6 +589,7 @@ std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, con
 		p.score_only = false;
 		p.centres = c0;
 		p.novelty_eigcut = e0;
+		p.novelty_eig = false;
 	};
 	// (model, index there, role) per atom of wavy, model -1 for this one
 	std::vector<std::vector<std::tuple<int, int, std::string>>> cand(wavy.get_ncen());
@@ -1340,24 +1342,37 @@ vec SALTEDPredictor::predict()
 					const int M = (int)R.extent(0);
 					dMatrix2 RR = dot(R, R, false, true), kz = k;
 					const dMatrix2 K = elementWiseExponentiation(RR, config.zeta);
-					vec U(K.data(), K.data() + (size_t)M * M), e(M);
-					const bool ok = try_make_Eigenvalues(U, e);
+					// every e > eigcut exactly when K_MM - eigcut I is positive definite; then V V^T = K_MM^-1 and
+					// |k0^zeta V|^2 = k0^zeta K_MM^-1 k0^zeta from the Cholesky factor of K_MM
+					vec U(K.data(), K.data() + (size_t)M * M), e(M), y;
+					for (int j = 0; j < M; j++) U[(size_t)j * (M + 1)] -= novelty_eigcut;
+					bool chol = !novelty_eig && cholesky_factor(U, M) == 0;
+					U.assign(K.data(), K.data() + (size_t)M * M);
+					if (chol) chol = cholesky_factor(U, M) == 0;
+					const bool ok = chol || try_make_Eigenvalues(U, e);
 					int r = 0;
-					for (int j = 0; j < M; j++) r += ok && e[j] > novelty_eigcut;
-					dMatrix2 V(M, r);
-					for (int c = 0; c < r; c++)
+					for (int j = 0; j < M; j++) r += ok && (chol || e[j] > novelty_eigcut);
+					dMatrix2 V(M, chol ? 0 : r);
+					for (int c = 0; c < (int)V.extent(1); c++)
 						for (int j = 0; j < M; j++) V(j, c) = U[(size_t)j * M + M - r + c] / std::sqrt(e[M - r + c]);
 					const double eig_s = _elapsed(_t_eig);
 					const auto _t_psi = std::chrono::steady_clock::now();
 					kz = elementWiseExponentiation(kz, config.zeta);
-					const dMatrix2 psi = r > 0 ? dot(kz, V, false, false) : dMatrix2(k.extent(0), 0);
+					if (chol)
+					{
+						// the rows of k0^zeta are the right-hand sides one after another
+						y.assign(kz.data(), kz.data() + kz.extent(0) * M);
+						cholesky_solve(U, M, y, kz.extent(0));
+					}
+					const dMatrix2 psi = V.extent(1) > 0 ? dot(kz, V, false, false) : dMatrix2(k.extent(0), 0);
 					for (int i = 0; i < (int)k.extent(0); i++)
 					{
 						const int a = centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]];
 						double pp = 0.0, q = 0.0;
 						int j0 = 0;
 						for (int f = 0; f < (int)pvec_lam.extent(1); f++) pp += pvec_lam(i, f) * pvec_lam(i, f);
-						for (int c = 0; c < r; c++) q += psi(i, c) * psi(i, c);
+						for (int c = 0; c < (int)psi.extent(1); c++) q += psi(i, c) * psi(i, c);
+						if (chol) for (int j = 0; j < M; j++) q += kz(i, j) * y[(size_t)i * M + j];
 						for (int j = 1; j < M; j++) if (k(i, j) > k(i, j0)) j0 = j;
 						kmax0[a] = k(i, j0);
 						nearest0[a] = j0;
@@ -1365,7 +1380,7 @@ vec SALTEDPredictor::predict()
 						nov0[a] = ok && pp > 0.0 ? 1.0 - q / std::pow(pp, config.zeta) : NAN;
 					}
 					if (ProgressBar::report_counts)
-						std::cout << "[novelty] " << spe << ": K_MM eigendecomposition " << eig_s << " s (rank " << r << " of " << M
+						std::cout << "[novelty] " << spe << (chol ? ": K_MM Cholesky " : ": K_MM eigendecomposition ") << eig_s << " s (rank " << r << " of " << M
 								  << "), psi " << _elapsed(_t_psi) << " s" << std::endl;
 				}
 			}

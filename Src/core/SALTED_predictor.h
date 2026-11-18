@@ -49,8 +49,9 @@ public:
 	//The basis this model predicts in: its own BASIS block if it has one, else the library set it names
 	std::shared_ptr<BasisSet> get_model_basis() const;
 	//One row per atom of full (the structure this predictor was made from), in its order, and per model covering it;
-	//only the l = 0 block is built, the eigendecomposition of K_MM once per model and species
-	std::vector<salted_novelty> kernel_novelty(const WFN& full, const double eigcut);
+	//only the l = 0 block is built, K_MM factored once per model and species: Cholesky where K_MM - eigcut I is positive
+	//definite, else (or with eig) the eigendecomposition
+	std::vector<salted_novelty> kernel_novelty(const WFN& full, const double eigcut, const bool eig = false);
 
 private:
 	bool bbasis_set_loaded = false;
@@ -72,8 +73,9 @@ private:
 	// The atoms of wavy predict() makes descriptor centres, sorted, all when empty; score_only stops it after env_score
 	ivec centres{};
 	bool score_only = false;
-	// kernel_novelty: the eigenvalue cut of K_MM (off below 0) and, per atom of wavy, its l = 0 novelty
+	// kernel_novelty: the eigenvalue cut of K_MM (off below 0), the eigendecomposition forced, and per atom of wavy its l = 0 novelty
 	double novelty_eigcut = -1.0;
+	bool novelty_eig = false;
 	vec kmax0{}, self0{}, nov0{};
 	ivec nearest0{};
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
