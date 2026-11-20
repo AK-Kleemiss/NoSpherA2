@@ -46,10 +46,6 @@ public:
 	~Int_Params() = default;// Combine two Int_Params objects
 
 	// Getters
-	int* get_ptr_atm() { return _atm.data(); };
-	int* get_ptr_bas() { return _bas.data(); };
-	double* get_ptr_env() { return _env.data(); };
-
 	ivec get_atm() const { return _atm; };
 	ivec get_bas() const { return _bas; };
 	vec get_env() const { return _env; };
