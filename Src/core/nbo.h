@@ -7,7 +7,7 @@
 class WFN;
 
 //Natural bond orbitals, second-order E2 and natural resonance theory, filled into nbo_run.h's structures
-//so compare_nbo_results() applies unchanged.  The input is the FILE47 written for gennbo, so overlap,
+//so tests/nbo_reference/compare_nbo.py applies unchanged.  The input is the FILE47 written for gennbo, so overlap,
 //density and Fock share the reference run's AO order and phase convention.
 //Search: Foster & Weinhold, JACS 102 (1980) 7211.  NRT: Glendening & Weinhold, J. Comput. Chem. 19
 //(1998) 593, a convex quadratic program on the simplex, in nrt.cpp.

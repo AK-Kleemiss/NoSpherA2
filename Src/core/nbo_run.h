@@ -5,7 +5,7 @@
 #include <vector>
 
 //Drives the external NBO 7 (FILE47 -> gennbo) and parses its output: the reference an in-house
-//NBO implementation has to reproduce, checked with compare_nbo_results().
+//NBO implementation has to reproduce, checked with tests/nbo_reference/compare_nbo.py.
 
 struct NboAtomPopulation {
 	std::string element;
@@ -286,39 +286,6 @@ void write_nbo_json(const NboResults& results, const std::filesystem::path& json
 /** The NRT parent as a "NoSpherA2 Lewis structure" JSON object, the format a parent can be read back from.
 	Lines after the first start with indent; an open shell gets "alpha"/"beta" sub-objects. Empty without a parent. */
 std::string parent_lewis_json(const NboResults& results, const std::string& indent = "");
-
-struct NboTolerances {
-	double charge = 2.0e-3;
-	double occupancy = 2.0e-3;
-	double energy = 2.0e-3;         //a.u.
-	double hybrid_percent = 0.5;    //percentage points of s/p/d character
-	double e2_kcal = 0.1;           //kcal/mol
-	double bond_order = 5.0e-3;
-	double weight_percent = 0.5;    //percentage points of NRT weight
-};
-
-struct NboQuantityAgreement {
-	std::string quantity;
-	int compared = 0;
-	int missing = 0;       //present in the reference, absent from the candidate
-	int failed = 0;
-	double max_deviation = 0.0;
-	std::string worst;     //what the largest deviation was on
-};
-
-struct NboComparison {
-	bool ok = false;
-	std::vector<NboQuantityAgreement> quantities;
-	std::vector<std::string> messages;
-	std::string report() const;
-};
-
-/**
- * Per-quantity agreement between a reference result and a candidate one.
- * The reference drives: every reference entry must have a counterpart.
- */
-NboComparison compare_nbo_results(const NboResults& reference, const NboResults& candidate,
-	const NboTolerances& tolerances = NboTolerances());
 
 struct NboRunOptions {
 	std::filesystem::path wavefunction;

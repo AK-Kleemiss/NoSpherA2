@@ -124,7 +124,7 @@ namespace
 
 	std::string pad(const int v, const size_t w) { return pad(std::to_string(v), w); }
 
-	//compare_nbo_results() matches orbitals on nbo_run.cpp's whitespace-collapsed description,
+	//compare_nbo.py matches orbitals on nbo_run.cpp's whitespace-collapsed description,
 	//so the native side must produce exactly that string
 	std::string collapse(const std::string& s)
 	{
