@@ -7,7 +7,7 @@
 #include "b2c.h"
 #include "eli_family.h"
 #include "topology.h"
-#include "crystal_energies.h"
+#include "gaussian_atom.h"
 #include "spherical_density.h"
 #include "citations.h"
 #include "section_log.h"
