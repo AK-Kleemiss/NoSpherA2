@@ -205,10 +205,8 @@ private:
 	static long long int Afac_pre[9][5][9];
 	constexpr static void fill_Afac_pre();
 	const double fj(int& j, int& l, int& m, double& aa, double& bb) const;
-	const double Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtmp) const;
 	const double compute_dens_cartesian(const d3& Pos, vec2& d, vec& phi) const;
 	const double compute_spin_dens_cartesian(const d3& Pos, vec2& d, vec& phi) const;
-	const double compute_dens_spherical(const d3& Pos, vec2& d, vec& phi) const;
 	// Empties every container and puts every scalar back to its default; ctors and operator= start here
 	void reset();
 	//Orbital values, gradients and Hessians at p, component-major phi[k * nmo + mo] (k: 0 value,
@@ -313,8 +311,6 @@ public:
 	void push_back_spherical_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size);
 	void push_back_cartesian_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size, const int* order = nullptr, const double* scale = nullptr);
 
-	const std::vector<MO> &get_MOs_vec() const { return MOs; };
-
 	//--------------------in and output----------------------------------------
 	/** Change stored basis set name label. */
 	void change_basis_set_name(std::string name) { basis_set_name = name; };
@@ -384,14 +380,12 @@ public:
 	void set_charge(const int& in) { charge = in; };
 	/** Number of primitives (nex). */
 	const int& get_nex() const { return nex; };
-	void set_nex(const int& in) { nex = in; };
 	/** Number of centers / atoms. */
 	const int& get_ncen() const { return ncen; };
 	/** Manually set number of centers (use with care). */
 	const void set_ncen(const int& in) { ncen = in; };
 	/** Number of MOs (including unoccupied). */
 	const int& get_nmo() const { return nmo; };
-	void set_nmo(const int& in) { nmo = in; };
 	/** Number of (optionally only occupied) MOs. */
 	const int get_nmo(const bool& only_occ) const;
 	/** Origin/file type code. */
@@ -486,14 +480,6 @@ public:
 	/** Total SCF energy (if available). */
 	const double& get_total_energy() const { return total_energy; };
 	const dMatrix2& get_MO_sph() const { return MO_sph; };
-	/** Virial ratio (if available). */
-	const double& get_virial_ratio() const { return virial_ratio; };
-	/** Upper-triangular density matrix (linear storage). */
-	const vec& get_DensityMatrix() const { return UT_DensityMatrix; };
-	/** Upper-triangular spin density matrix (linear storage). */
-	const vec& get_SpinDensityMatrix() const { return UT_SpinDensityMatrix; };
-	/** Number of basis functions (if tracked). */
-	const int& get_nfunc() const { return nfunc; };
 	/**
 	 * Deletes the basis set information from all atoms (shell definitions & primitives).
 	 * @return true if the basis set information was successfully deleted, false otherwise.
@@ -588,8 +574,6 @@ public:
 	int get_atom_basis_set_size(const int& nr) const { return atoms[nr].get_basis_set_size(); };
 	/** Get full basis set entry (coefficient/exponent/type/shell). */
 	basis_set_entry get_atom_basis_set_entry(const int& nr, const int& bs) const;
-	/** Assign anisotropic displacement parameters (ADPs). */
-	void set_atom_ADPs(const int& nr, const vec2& adps) { atoms[nr].set_ADPs(adps); };
 	/** Set fractional coordinates for atom (crystallography). */
 	void set_atom_frac_coords(const int& nr, const d3& frac) { atoms[nr].set_frac_coords(frac); };
 	void set_atom_group_nr(const int atm_nr, const int group_nr) { atoms[atm_nr].set_group_nr(group_nr); };
@@ -690,8 +674,6 @@ public:
 	void set_dm(const dMatrix2& in) { DM = in; };
 	/** Beta-spin density matrix if the reader kept one, empty otherwise. */
 	dMatrix2 get_dm_beta() const { return DM_beta; };
-	/** Set beta-spin density matrix*/
-	void set_dm_beta(const dMatrix2& in) { DM_beta = in; };
 	//----------S_DM Handling--------------------------------
 	/** Append spin density matrix element. */
 	void push_back_SDM(const double& value = 0.0);
@@ -764,6 +746,3 @@ public:
 	// Converting to other formats
 	void wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf);
 };
-
-#include "mo_class.h"
-#include "constants.h"

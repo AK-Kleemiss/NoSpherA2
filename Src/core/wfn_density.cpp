@@ -1706,15 +1706,11 @@ const double WFN::compute_MO_spherical(
 	//return phi;
 }
 
-const double WFN::compute_dens_spherical(
-	const d3 &Pos,
-	vec2 &d,
-	vec &phi) const
-{
-	err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
-	return 0.0;
-	(void)d;
-	(void)phi;
+//const double WFN::compute_dens_spherical(
+//	const d3 &Pos,
+//	vec2 &d,
+//	vec &phi) const
+//{
 	//err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
 	//std::fill(phi.begin(), phi.end(), 0.0);
 	//double Rho = 0.0;
@@ -1869,7 +1865,7 @@ const double WFN::compute_dens_spherical(
 	//}
 
 	//return Rho;
-}
+//}
 
 //Transposed MO coefficients, [primitive * nmo + mo], built once and reused by every point.
 //The first caller is usually several threads at once: make_chi parallelises over atom
@@ -3662,18 +3658,6 @@ const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
 	}
 	return temp;
 };
-
-const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const
-{
-	double temp = fjtmp * pow(0.25 / gamma, r + i) / Afac_pre[l][r][i];
-	const int num = l - 2 * r - 2 * i;
-	if (num != 0)
-		temp *= pow(PC, num);
-	if (i % 2 == 1)
-		return -temp;
-	else
-		return temp;
-}
 
 // (l, r, s) terms of one axis with l_i + l_j = L: sum over l <= L, r <= l / 2 of (l - 2 r) / 2 + 1; L <= 8 (g x g)
 static int esp_axis_terms(const int L)
