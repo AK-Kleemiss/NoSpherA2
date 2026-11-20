@@ -1,4 +1,5 @@
-#pragma once
+#include "pch.h"
+#include "dev_diagnostics.h"
 #include "spherical_density.h"
 #include "scattering_factors.h"
 #include "AtomGrid.h"
@@ -86,9 +87,9 @@ double calc_grid_averaged_at_r(const WFN &wavy,
 double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
 	const int i, /// now counts for several atoms
 	const double &r,
-	const int &min_angular = 60,
-	const int &max_angular = 1000,
-	const bool print = false)
+	const int &min_angular,
+	const int &max_angular,
+	const bool print)
 {
 
 	const int min_num_angular_points_closest =
@@ -172,9 +173,9 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
 double calc_fukui_averaged_at_r(const WFN &wavy1,
 	const WFN &wavy2,
 	const double &r,
-	const int &min_angular = 60,
-	const int &max_angular = 1000,
-	const bool print = false)
+	const int &min_angular,
+	const int &max_angular,
+	const bool print)
 {
 
 	const int min_num_angular_points_closest =
@@ -599,7 +600,7 @@ void cube_from_coef_npy(vec &coefs, WFN &wave)
 }
 
 
-void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis, const int atom_idx_1, const int atom_idx_2, const int gridpoints = 1000, const double padding = 2.0) {
+void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis, const int atom_idx_1, const int atom_idx_2, const int gridpoints, const double padding) {
 	GridConfiguration config;
 	config.accuracy = 0;
 	config.partition_type = PartitionType::TFVC;
@@ -680,7 +681,7 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis,
 	grid_manager.writeSimpleGrid("Density_" + wavy.get_atom_label(atom_idx_2) + std::to_string(atom_idx_2) + ".dat", grid_points, data_atom2);
 }
 
-void draw_orbital(const int lambda, const int m, const double resulution = 0.025, const double radius = 3.5)
+void draw_orbital(const int lambda, const int m, const double resulution, const double radius)
 {
 	if (m > lambda || m < -lambda)
 	{
