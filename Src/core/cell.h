@@ -102,7 +102,6 @@ public:
 	//void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
 	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
 	void resolve_internal_symmetry(std::vector<asym_atom>& asym_atoms);
-	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
 	ivec confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms);
 	// sym_fact of a grown model: every position the kept operations reach is counted exactly once
 	void set_sym_fact_from_position_counts(std::vector<asym_atom>& asym_atoms, const int operations_before_deletion);
@@ -279,7 +278,6 @@ public:
 	double get_sym(const int& i, const int& j, const int& k) const { return sym[i][j][k]; };
 	ivec3 get_sym() const { return sym; };
 	vec2 get_trans() const { return trans; };
-	void set_sym(ivec3& set_vector) { sym = set_vector; };
 	double get_a() const { return a; };
 	double get_b() const { return b; };
 	double get_c() const { return c; };
