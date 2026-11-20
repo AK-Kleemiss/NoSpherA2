@@ -59,3 +59,42 @@ TEST(ConvenienceCleanup, PrimitiveConstructorsMatchMaster)
 	for (int i = 0; i < 20000; i++)
 		expect_same({ i % 5, ty(rng), std::pow(10.0, le(rng)), co(rng), 0 });
 }
+
+//The step matrix of a cell cube: column j times NbSteps[j] is cell axis j in bohr, so the columns have the cell's
+//lengths and the angles between them are the cell's angles; NbSteps covers each axis at the resolution
+TEST(ConvenienceCleanup, CellBoxFromCifHasTheCellsAxes)
+{
+	const struct { const char *cif; double a, b, c, al, be, ga; } cases[] = {
+		{ "tests/P1_test/P1_test.cif", 4.8819, 6.4182, 8.9900, 74.040, 83.655, 80.497 },
+		{ "tests/epoxide_gbw/epoxide.cif", 4.633, 8.400, 6.577, 90.0, 100.37, 90.0 } };
+	for (const auto &t : cases)
+	{
+		properties_options opts;
+		opts.resolution = 0.13;
+		vec2 cm(3, vec(3, 0.0));
+		readxyzMinMax_fromCIF(nos_test_repo_root() / t.cif, opts, cm);
+		const double len[3] = { t.a, t.b, t.c }, ang[3] = { t.al, t.be, t.ga };
+		d3 col[3];
+		for (int j = 0; j < 3; j++)
+		{
+			EXPECT_EQ(opts.NbSteps[j], (int)std::ceil(len[j] / 0.13)) << t.cif;
+			for (int i = 0; i < 3; i++)
+				col[j][i] = cm[i][j] * opts.NbSteps[j];
+			EXPECT_NEAR(array_length(col[j]), constants::ang2bohr(len[j]), 1e-10) << t.cif << " axis " << j;
+		}
+		EXPECT_EQ(cm[1][0], 0.0);
+		EXPECT_EQ(cm[2][0], 0.0);
+		EXPECT_EQ(cm[2][1], 0.0);
+		for (int k = 0; k < 3; k++)
+		{
+			const d3 &u = col[(k + 1) % 3], &v = col[(k + 2) % 3];
+			EXPECT_NEAR(vec_dot(u, v) / (array_length(u) * array_length(v)), std::cos(ang[k] * constants::PI / 180.0), 1e-12) << t.cif << " angle " << k;
+		}
+		for (int i = 0; i < 3; i++)
+		{
+			EXPECT_EQ(opts.MinMax[i], 0.0);
+			//x and y are converted with 0.529177249, z with constants::a0: equal to 1e-7 relative
+			EXPECT_NEAR(opts.MinMax[3 + i], col[0][i] + col[1][i] + col[2][i], 1e-5) << t.cif << " corner " << i;
+		}
+	}
+}
