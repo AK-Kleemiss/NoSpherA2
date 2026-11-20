@@ -1592,26 +1592,6 @@ cdouble sfac_bessel(
 	}
 }
 
-//Radial part of the Fourier-Bessel transform, keyed on (exponent, l) so it can be tabulated per k-point
-static inline double fourier_bessel_radial(const double b, const int l, const double exp_l_plus_3_2, const double H)
-{
-	return (pow(H, l) * exp(-H * H / (4.0 * b))) / (constants::pow_2[l] * exp_l_plus_3_2);
-}
-
-//As sfac_bessel(), but with the radial factor already evaluated
-static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, const double* coefs, const double radial)
-{
-	const int l = p.get_type();
-	const double v = constants::PI3_2 * radial * p.get_normalized_coefficient() * constants::spherical_harmonic(l, k_point, coefs);
-	switch (l % 4) {
-	case 0: return cdouble(v, 0);
-	case 1: return cdouble(0, v);
-	case 2: return cdouble(-v, 0);
-	case 3: return cdouble(0, -v);
-	default: return constants::cnull;
-	}
-}
-
 namespace {
 //Atoms whose shells match (one element of one basis) share their transformed basis functions
 struct salted_sf_group {
@@ -2737,71 +2717,6 @@ void calc_SF(const int& points,
 	if (!do_XCW) {
 		delete (progress);
 	}
-}
-
-void calc_SF_CUDA(const int& points,
-	vec2& k_pt,
-	vec2& d1,
-	vec2& d2,
-	vec2& d3,
-	vec2& dens,
-	cvec2& sf,
-	std::ostream& file,
-	_time_point& start,
-	_time_point& end1,
-	bool debug,
-	bool no_date) {
-	const long long int imax = static_cast<long long int>(dens.size());
-	const long long int smax = static_cast<long long int>(k_pt[0].size());
-	sf.reserve(imax * smax);
-	sf.resize(imax);
-#pragma omp parallel for
-	for (int i = 0; i < imax; i++)
-		sf[i].resize(smax, constants::cnull);
-	using namespace std;
-	if (debug)
-		file << "Initialized FFs" << std::endl
-		<< "asym atom list size: " << imax << " total grid size: " << points << endl;
-	end1 = get_time();
-
-	if (!no_date)
-	{
-		long long int dur = get_sec(start, end1);
-		if (dur < 1)
-			file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl
-			<< endl;
-		else
-			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl
-			<< endl;
-	}
-#ifdef __CUDACC__
-	double** gpu_k_pt = NULL,
-		** gpu_sf_r = NULL,
-		** gpu_sf_i = NULL;
-	vector<double> long_kpt;
-	long_kpt.resize(3 * k_pt_unique[0].size());
-	for (int i = 0; i < k_pt_unique[0].size(); i++)
-	{
-		long_kpt[3 * i + 0] = k_pt_unique[0][i];
-		long_kpt[3 * i + 1] = k_pt_unique[1][i];
-		long_kpt[3 * i + 2] = k_pt_unique[2][i];
-	}
-	gpu_k_pt = (double**)malloc(sizeof(double*));
-	gpu_sf_r = (double**)malloc(sizeof(double*));
-	gpu_sf_i = (double**)malloc(sizeof(double*));
-	cudaMalloc((void**)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
-	cudaMalloc((void**)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
-	cudaMalloc((void**)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
-	cudaMemcpy(gpu_k_pt[0], long_kpt.data(), sizeof(double) * k_pt_unique[0].size() * 3, cudaMemcpyHostToDevice);
-
-	dim3 blocks(asym_atom_list.size(), k_pt_unique[0].size());
-	gpu_make_sf << <blocks, 1 >> > (
-		gpu_sf_r[0],
-		gpu_sf_i[0],
-		gpu_k_pt[0],
-
-		);
-#endif
 }
 
 /**

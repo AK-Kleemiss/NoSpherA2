@@ -263,27 +263,6 @@ void read_atoms_from_CIF(std::ifstream& cif_input,
 //    const bool debug);
 
 /**
- * @brief Adds ECP (Effective Core Potential) contribution to the scattering factors.
- * @param asym_atom_list The list of asymmetric atoms.
- * @param wave The wavefunction.
- * @param sf The scattering factors.
- * @param cell The unit cell.
- * @param hkl The hkl (Miller indices) list.
- * @param file The output stream to write the results to.
- * @param mode The mode for adding ECP contribution.
- * @param debug Flag indicating whether to enable debug mode.
- */
-static void add_ECP_contribution(
-	const ivec& asym_atom_list,
-	const WFN& wave,
-	cvec2& sf,
-	const cell& cell,
-	hkl_list& hkl,
-	std::ostream& file,
-	const int& mode = 0,
-	const bool debug = false);
-
-/**
  * @brief Calculates the scattering factors.
  * @param points The number of points.
  * @param k_pt The list of k-points.
@@ -355,13 +334,6 @@ itsc_block calculate_scattering_factors_from_cube(
 	WFN& wave,
 	const cube& density_cube,
 	std::ostream& file);
-
-struct hkl_sym {
-	int h;
-	int k;
-	int l;
-	int sym;
-};
 
 void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);
 hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, scatter_data& obs, bool debug = false);
