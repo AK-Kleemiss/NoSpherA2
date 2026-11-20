@@ -34,12 +34,6 @@
 #endif
 
 
-#ifdef PEOJECT_NAME
-#define FLO_CUDA
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "CUDA_utilities.h"
-#endif
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
