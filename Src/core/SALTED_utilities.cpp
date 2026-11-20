@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "tuning.h"
 #include "SALTED_utilities.h"
+#include "SALTED_descriptors.h"
 #include "basis_set.h"
 #include <set>
 #include "integration_params.h"

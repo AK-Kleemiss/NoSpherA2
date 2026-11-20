@@ -3,9 +3,7 @@
 #include "convenience.h"
 #include "cube.h"
 #include "aux_density_table.h"
-#include "featomic.hpp"
 #include "constants.h"
-#include "metatensor.h"
 
 struct SALTEDConfig;
 
@@ -66,59 +64,11 @@ namespace SALTED_Utils
 	std::vector<char> filter_input(WFN& wavy, options& opt, const SALTEDConfig& config);
 	void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const BasisSet& basis_set, std::vector<std::string> species);
 	int get_lmax_max(std::unordered_map<std::string, int> &lmax);
-
-	// skip[a] != 0 leaves atom a out, z[a] replaces its nuclear charge as the featomic type
-	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn, const std::vector<char>& skip = {}, const ivec& z = {})
-	{
-		featomic::SimpleSystem featomic_system;
-		const auto& atoms = *wfn.get_atoms_ptr();
-		for (size_t i = 0; i < atoms.size(); i++)
-		{
-			if (i < skip.size() && skip[i]) continue;
-			const atom& a = atoms[i];
-			d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
-										  constants::bohr2ang(a.get_coordinate(1)),
-										  constants::bohr2ang(a.get_coordinate(2)) };
-			featomic_system.add_atom(z.empty() ? a.get_charge() : z[i], xyz);
-		}
-		return featomic_system;
-	}
-
-	struct FeatomicHyperParameters
-	{
-		struct RadialBasis
-		{
-			std::string type = "Gto";
-			double spline_accuracy = 1e-6;
-		};
-
-		struct CutoffFunction
-		{
-			std::string type = "ShiftedCosine";
-			double width = 0.1;
-		};
-
-		double cutoff_radius = 2.0;
-		int max_radial = 3;
-		int max_angular = 3;
-		double atomic_gaussian_width = 0.5;
-		double center_atom_weight = 1.0;
-
-		std::vector<std::string> species = { "H", "C", "N", "O" };
-		std::vector<std::string> neighspe = { "H", "C", "N", "O" };
-
-		RadialBasis radial_basis{};
-		CutoffFunction cutoff_function{};
-
-		std::string to_json() const;
-	};
-
-	// centres: the featomic atoms that get a descriptor row, all when empty
-	SALTEDDescriptors calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters, const std::vector<int32_t>& centres = {});
-	metatensor::TensorMap calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
 }
 
 cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr = -1);
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr = -1);
 
 void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const options& opts);
+//geometry_aid.h still takes the featomic declarations from here
+#include "SALTED_descriptors.h"
