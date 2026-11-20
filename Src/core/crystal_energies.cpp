@@ -145,11 +145,11 @@ namespace crystal_energies {
 		}
 	}
 
-	std::vector<pair> contacts(const cell& c, const std::vector<WFN>& mol, const double cutoff)
+	std::vector<pair> contacts(const cell& c, const std::vector<WFN>& mol, const double cutoff, const double radius)
 	{
 		const std::vector<symop> ops = symops(c);
 		const vec2 M = cell_matrix(c), Mi = inverse3(M);
-		const double cut = constants::ang2bohr(cutoff), cut2 = cut * cut;
+		const double cut = constants::ang2bohr(cutoff), cut2 = cut * cut, rl = constants::ang2bohr(radius);
 		const int nm = (int)mol.size();
 		vec2 cen(nm, vec(3, 0.0));
 		vec rad(nm, 0.0), spacing(3);
@@ -191,7 +191,7 @@ namespace crystal_energies {
 					const vec cR = mul(R, cen[j]);
 					vec cB0 = mul(Rf, mul(Mi, cen[j]));
 					ivec base(3), range(3), n(3);
-					for (int x = 0; x < 3; x++) cB0[x] += ops[s].trans[x], base[x] = (int)std::lround(cA[x] - cB0[x]), range[x] = (int)std::ceil((rad[i] + rad[j] + cut) / spacing[x]) + 1;
+					for (int x = 0; x < 3; x++) cB0[x] += ops[s].trans[x], base[x] = (int)std::lround(cA[x] - cB0[x]), range[x] = (int)std::ceil(std::max(rad[i] + rad[j] + cut, rl) / spacing[x]) + 1;
 					for (n[0] = base[0] - range[0]; n[0] <= base[0] + range[0]; n[0]++)
 						for (n[1] = base[1] - range[1]; n[1] <= base[1] + range[1]; n[1]++)
 							for (n[2] = base[2] - range[2]; n[2] <= base[2] + range[2]; n[2]++) {
@@ -202,7 +202,8 @@ namespace crystal_energies {
 								double dc2 = 0.0;
 								for (int x = 0; x < 3; x++) dc2 += std::pow(cX[x] - cen[i][x], 2);
 								//no atom pair can be closer than the centroids minus both extents
-								if (std::sqrt(dc2) - rad[i] - rad[j] >= cut) continue;
+								const double dc = std::sqrt(dc2);
+								if (dc - rad[i] - rad[j] >= cut && dc >= rl) continue;
 								double dmin2 = DBL_MAX;
 								for (int b = 0; b < nb; b++)
 									for (int a = 0; a < na; a++) {
@@ -210,19 +211,21 @@ namespace crystal_energies {
 										for (int x = 0; x < 3; x++) d2 += std::pow(XB[b][x] + tc[x] - PA[a][x], 2);
 										dmin2 = std::min(dmin2, d2);
 									}
-								if (dmin2 >= cut2) continue;
+								if (dmin2 >= cut2 && dc >= rl) continue;
 								if (i == j && dc2 < 1e-6) continue;
 								if (!seen.insert(key(cX)).second) continue;
+								int w = 1;
 								if (i == j) {
-									//the same pair seen from B: A is the image of B under the inverse operation
+									//the same pair seen from B: A is the image of B under the inverse operation, a second neighbour of A unless it is B
 									vec d(3), cY(3, 0.0);
 									for (int x = 0; x < 3; x++) d[x] = cen[i][x] - tc[x];
 									for (int x = 0; x < 3; x++)
 										for (int y = 0; y < 3; y++) cY[x] += R[y][x] * d[y];
+									w = key(cY) == key(cX) ? 1 : 2;
 									seen.insert(key(cY));
 								}
 								pair p;
-								p.A = i, p.B = j, p.op = s, p.n = n, p.distance = constants::bohr2ang(std::sqrt(dc2)), p.R = R, p.t = tc;
+								p.A = i, p.B = j, p.op = s, p.w = w, p.contact = dmin2 < cut2, p.n = n, p.distance = constants::bohr2ang(dc), p.R = R, p.t = tc;
 								p.centroid_A = cen[i], p.centroid_B = cX;
 								for (int x = 0; x < 3; x++) p.centroid_A[x] = constants::bohr2ang(p.centroid_A[x]), p.centroid_B[x] = constants::bohr2ang(p.centroid_B[x]);
 								p.symop = symop_string(ops[s], n);
@@ -292,6 +295,7 @@ namespace crystal_energies {
 			b = trim(b);
 			if (key == "cif") J.cif = resolve(a);
 			else if (key == "cutoff") J.cutoff = std::stod(a);
+			else if (key == "lattice") J.lattice = std::stod(a);
 			else if (key == "output") J.output = resolve(a);
 			else if (key == "molecule") J.structures.push_back(resolve(a)), J.coefficients.push_back(b.empty() ? std::filesystem::path() : resolve(b));
 			else err_checkf(false, "Unknown keyword \"" + key + "\" in " + file.string(), std::cout);
@@ -301,13 +305,14 @@ namespace crystal_energies {
 		return J;
 	}
 
-	void write_table(const std::vector<pair>& pairs, const pathvec& structures, const dipole& D, std::ostream& out)
+	void write_table(const std::vector<pair>& pairs, const pathvec& structures, const dipole& D, std::ostream& out, const double radius)
 	{
 		const double kJ = constants::kcal_mol_per_hartree * 4.184;
 		out << "# NoSpherA2 interaction energies in kJ/mol; B = symop(B) + n, centroids and R_AB in Angstrom\n";
 		for (int i = 0; i < (int)structures.size(); i++) out << "# molecule " << i << " " << structures[i].string() << "\n";
 		out << "# A B symop n1 n2 n3 R_AB xA yA zA xB yB zB E_elst E_pol E_disp E_rep E_xc E_total\n";  // E_rep = kinetic (or overlap) repulsion, E_xc = its exchange part
 		for (const pair& p : pairs) {
+			if (!p.contact) continue;
 			out << p.A << " " << p.B << " " << p.symop << " " << p.n[0] << " " << p.n[1] << " " << p.n[2] << std::fixed << std::setprecision(4) << " " << p.distance;
 			for (int x = 0; x < 3; x++) out << " " << p.centroid_A[x];
 			for (int x = 0; x < 3; x++) out << " " << p.centroid_B[x];
@@ -317,6 +322,24 @@ namespace crystal_energies {
 		out << "# cell_dipole Mx My Mz |M| (Debye) Z V (A^3) dE_dip (kJ/mol per molecule, spherical direct sum to tin-foil)\n"
 			<< std::setprecision(4) << "# cell_dipole " << D.M[0] * debye << " " << D.M[1] * debye << " " << D.M[2] * debye << " "
 			<< std::sqrt(D.M[0] * D.M[0] + D.M[1] * D.M[1] + D.M[2] * D.M[2]) * debye << " " << D.Z << " " << constants::bohr2ang_p(D.volume, 3) << " " << D.E * kJ << "\n";
+		if (radius > 0) {
+			/*E_latt = 1/(2 N) sum_A sum_X E_AX, a listed pair stands for w neighbours of A, or for one of A and one of B;
+			the weight falls linearly over the outer fifth of the sphere, the mean of the sums over those radii, which damps the
+			shell-to-shell jumps of a sharp cutoff on polar molecules
+			*/
+			vec E(6, 0.0);
+			int np = 0, nm = (int)structures.size();
+			for (const pair& p : pairs) {
+				if (p.distance >= radius) continue;
+				const double f = (p.A == p.B ? p.w : 2) * std::min(1.0, (radius - p.distance) / (0.2 * radius)) * kJ / (2.0 * nm), e[6] = { p.E.electrostatic(), p.E.pol_A + p.E.pol_B, p.E.disp, p.E.rep - p.E.rep_x, p.E.rep_x, p.E.total() };
+				for (int k = 0; k < 6; k++) E[k] += f * e[k];
+				np++;
+			}
+			out << "# lattice R pairs E_elst E_pol E_disp E_rep E_xc E_total E_total+dE_dip (kJ/mol per molecule, molecule-centred sphere of radius R in A, tapered over 0.8-1 R)\n"
+				<< std::setprecision(3) << "# lattice " << radius << " " << np;
+			for (int k = 0; k < 6; k++) out << " " << E[k];
+			out << " " << E[5] + D.E * kJ << "\n";
+		}
 		out << std::flush;
 	}
 
@@ -331,8 +354,21 @@ namespace crystal_energies {
 			mol.emplace_back(WFN(J.structures[i]), opt, J.coefficients[i]);
 			aux.push_back(mol.back().basis());
 		}
-		std::vector<pair> pairs = contacts(c, aux, J.cutoff);
-		std::cout << pairs.size() << " molecule pairs within " << J.cutoff << " A" << std::endl;
+		double radius = J.lattice;
+		for (int i = 0; i < (int)mol.size() && radius > 0; i++) {
+			//a fractional charge q adds q^2 pi rho R^2 to a spherical sum: scale the density to the nearest integer charge
+			const double q = mol[i].charge(), N = mol[i].electrons(), qi = std::round(q);
+			vec cf = mol[i].coefficients();
+			for (int k = 0; k < (int)cf.size(); k++) cf[k] *= (N + q - qi) / N;
+			mol[i] = Gaussian_Molecule(mol[i].basis(), cf);
+			std::cout << "Molecule " << i << " net charge " << std::fixed << std::setprecision(4) << q << ", density scaled by " << (N + q - qi) / N << " to " << qi << "\n";
+			//a charged molecule needs an Ewald sum
+			if (qi != 0) radius = 0, std::cout << "Charged molecule, no lattice sum\n";
+		}
+		std::vector<pair> pairs = contacts(c, aux, J.cutoff, radius);
+		std::cout << pairs.size() << " molecule pairs within " << J.cutoff << " A";
+		if (radius > 0) std::cout << " or centroids within " << radius << " A";
+		std::cout << std::endl;
 		const double kJ = constants::kcal_mol_per_hartree * 4.184;
 		for (int p = 0; p < (int)pairs.size(); p++) {
 			pairs[p].E = mol[pairs[p].A].interaction(mol[pairs[p].B].transformed(pairs[p].R, pairs[p].t), opt.repulsion_overlap, opt.repulsion_exchange);
@@ -343,8 +379,8 @@ namespace crystal_energies {
 		const dipole D = cell_dipole(c, mol);
 		std::ofstream out(J.output);
 		err_checkf(out.good(), "Could not write " + J.output.string(), std::cout);
-		write_table(pairs, J.structures, D, out);
-		write_table(pairs, J.structures, D, std::cout);
+		write_table(pairs, J.structures, D, out, radius);
+		write_table(pairs, J.structures, D, std::cout, radius);
 		std::cout << "Wrote " << J.output.string() << std::endl;
 		return 0;
 	}
