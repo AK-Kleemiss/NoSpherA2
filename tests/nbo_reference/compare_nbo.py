@@ -17,15 +17,14 @@ comparison is symmetric on membership: a reference entry with no counterpart is 
 candidate entry with no counterpart is `surplus`, and either fails. Exit code 0 means every
 quantity agreed within tolerance and neither side printed anything the other did not.
 
-The C++ side of the same check is compare_nbo_results() in Src/core/nbo_run.h, used by
-tests/src/Nbo47Tests.cpp; this script is for comparing against the stored dataset, which
-lives next to it as <molecule>.nbo.json with index.json describing the set.
+The stored dataset lives next to this script as <molecule>.nbo.json with index.json
+describing the set.
 """
 import json
 import os
 import sys
 
-TOL = {  # mirrors NboTolerances in Src/core/nbo_run.h
+TOL = {
     "charge": 2.0e-3,
     "occupancy": 2.0e-3,
     "energy": 2.0e-3,        # a.u.
