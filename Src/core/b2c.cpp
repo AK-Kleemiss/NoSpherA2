@@ -605,12 +605,6 @@ bool b2c(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp)
 	return true;
 };
 
-// Structure to store pre-computed gradient direction for each grid point
-struct GradientDirection {
-	int next_x, next_y, next_z;  // Next point to follow (-1 if local maximum or invalid)
-	double gradient;              // Gradient magnitude
-};
-
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube *cub, bool debug, double value_floor, double gradient_epsilon)
 {
 	const i3 sizes = cub->get_sizes();
