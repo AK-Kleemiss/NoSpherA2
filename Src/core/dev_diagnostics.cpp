@@ -834,3 +834,26 @@ void test_NNLS()
 //     case 2: result = p * 7.5 * (7. * x * x - 1.) * s * s; break;
 //     case 3: result = p * 105. * x * s * s * s; break;
 //     case 4: result = p * 105. * s * s * s * s; break;
+
+void write_spherical_atoms() {
+#pragma omp parallel for
+	for (int i = 1; i < 103; i++) {
+		std::cout << "Atom " << i << std::endl;
+		Thakkar atom(i);
+		std::ofstream out("spherical_" + std::string(constants::atnr2letter(i)) + ".txt");
+		out << std::scientific << std::setprecision(10);
+		out << std::to_string(i) << " r Density" << std::endl;
+		const double min_dist = 1E-7;
+		const double incr = 1.025;
+
+		// Make radial grids
+		double current = 1;
+		double _dist = min_dist;
+		while (current > 1E-15)
+		{
+			current = atom.get_radial_density(_dist);
+			out << _dist << " " << current << std::endl;
+			_dist *= incr;
+		}
+	}
+}

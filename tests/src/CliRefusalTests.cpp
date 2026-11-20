@@ -190,7 +190,7 @@ TEST(CliRefusal, PositionalWavefunctionThatDoesNotExistIsFatal)
 //source catches a new flag that is neither digested nor listed before it aborts real runs
 TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
 {
-	const auto src = nos_test_repo_root() / "Src" / "core" / "convenience.cpp";
+	const auto src = nos_test_repo_root() / "Src" / "core" / "options_parse.cpp";
 	std::ifstream in(src);
 	ASSERT_TRUE(in.good()) << src;
 	const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());

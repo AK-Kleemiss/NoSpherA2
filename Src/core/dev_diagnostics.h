@@ -25,3 +25,4 @@ void cube_from_coef_npy(vec &coefs, WFN &wave);
 void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>> &aux_basis, const int atom_idx_1, const int atom_idx_2, const int gridpoints = 1000, const double padding = 2.0);
 void draw_orbital(const int lambda, const int m, const double resulution = 0.025, const double radius = 3.5);
 void test_NNLS();
+void write_spherical_atoms();
