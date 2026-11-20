@@ -570,7 +570,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
 			return c_tensor;
 		}
 		else {
-			double norm_factor = (l == 0) ? 0.282094791773878143 : 0.488602511902919921;
+			double norm_factor = NOS_CINTcommon_fac_sp(l);
 			for (auto &val : c_tensor.container()) {
 				val *= norm_factor;
 			}

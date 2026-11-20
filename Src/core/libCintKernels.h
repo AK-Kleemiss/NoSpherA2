@@ -37,6 +37,8 @@ enum COORDINATE_TYPE {
 //ao_loc of a bas table: shell offsets in spherical or cartesian functions
 template<COORDINATE_TYPE CT>
 ivec make_loc(ivec& bas, int nbas);
+//sqrt(1/4pi) for s, sqrt(3/4pi) for p, which libcint leaves out of their cart2sph, 1 otherwise
+double NOS_CINTcommon_fac_sp(int l);
 
 void GTOval_sph(int ngrids, int* shls_slice, int* ao_loc,
 	double* ao, double* coord, uint8_t* non0table,

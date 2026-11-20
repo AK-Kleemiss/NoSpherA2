@@ -311,7 +311,7 @@ typedef void (*FPtr_eval)(double* gto, double* ri, double* exps,
  * to optimize memory copy in cart2sph.c, remove the common factor for s
  * and p function in cart2sph
  */
-double CINTcommon_fac_sp(FINT l)
+double NOS_CINTcommon_fac_sp(int l)
 {
 	switch (l) {
 	case 0: return 0.282094791773878143;
@@ -477,7 +477,7 @@ void GTOeval_sph_iter(FPtr_eval feval, FPtr_exp fexp, double fac,
 		nc = bas[bas_id * BAS_SLOTS + NCTR_OF];
 		l = bas[bas_id * BAS_SLOTS + ANG_OF];
 		deg = l * 2 + 1;
-		fac1 = fac * CINTcommon_fac_sp(l);
+		fac1 = fac * NOS_CINTcommon_fac_sp(l);
 		p_exp = env + bas[bas_id * BAS_SLOTS + PTR_EXP];
 		pcoeff = env + bas[bas_id * BAS_SLOTS + PTR_COEFF];
 		atm_id = bas[bas_id * BAS_SLOTS + ATOM_OF];

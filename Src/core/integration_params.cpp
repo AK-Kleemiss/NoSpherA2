@@ -337,16 +337,3 @@ void Int_Params::print_data(std::string name) {
 	}
 	file.close();
 }
-
-double NOS_CINTcommon_fac_sp(int l)
-{
-	switch (l)
-	{
-	case 0:
-		return 0.282094791773878143;
-	case 1:
-		return 0.488602511902919921;
-	default:
-		return 1;
-	}
-}
