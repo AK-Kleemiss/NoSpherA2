@@ -1554,14 +1554,7 @@ primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), 
 	normalized_coefficient = coefficient * norm_const;
 };
 
-primitive::primitive(const SimplePrimitive &other) : center(other.center), type(other.type), exp(other.exp), coefficient(other.coefficient)
-{
-	exp_l_plus_3_2 = pow(other.exp, type + 1.5);
-	norm_const = pow(
-		pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
-		0.25);
-	normalized_coefficient = coefficient * norm_const;
-};
+primitive::primitive(const SimplePrimitive &other) : primitive(other.center, other.type, other.exp, other.coefficient) {};
 
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
