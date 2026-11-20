@@ -21,7 +21,7 @@ namespace constants
 	const double* sph2cart(const int l);
 	//ORCA stores g over sqrt(3) and h and up over sqrt((2l-1)!!) of the physical primitive norm; the tables follow ORCA, occ does not
 	constexpr double sph2cart_norm2[11] = { 1, 1, 1, 1, 3, 945, 10395, 135135, 2027025, 34459425, 654729075 };
-	static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
+	constexpr double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
 	//Electrons an RI (ab|P) triplet may move onto an atom before it is computed (see computeRho), sized for tsc within 1e-5
 	//of max|f| and charges within 1e-4 e of the unscreened fit; -tune NOS_RI_SCREEN overrides it for one run.
 	constexpr double ri_screen_threshold = 3e-7;
