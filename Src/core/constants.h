@@ -237,25 +237,16 @@ namespace constants
 
 	//constexpr long long int ft[21]{ 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000 };
 	constexpr int MAX_FACTORIAL = 30;
-	constexpr std::array<size_t, MAX_FACTORIAL> factorial_const() {
-		std::array<size_t, MAX_FACTORIAL> ft{};
-
-		ft[0] = 1;
-		for (int i = 1; i < MAX_FACTORIAL; i++) {
-			ft[i] = ft[i - 1] * i;
-		}
-		return ft;
-	}
-
-	constexpr std::array<size_t, MAX_FACTORIAL> ft = factorial_const();
-	// ft[n] wraps silently from 21! on (> 2^64); use this one wherever n can exceed 20
-	constexpr std::array<double, MAX_FACTORIAL> factorial_double() {
-		std::array<double, MAX_FACTORIAL> f{};
-		f[0] = 1.0;
+	template <typename T>
+	constexpr std::array<T, MAX_FACTORIAL> factorial_table() {
+		std::array<T, MAX_FACTORIAL> f{};
+		f[0] = 1;
 		for (int i = 1; i < MAX_FACTORIAL; i++) f[i] = f[i - 1] * i;
 		return f;
 	}
-	constexpr std::array<double, MAX_FACTORIAL> ftd = factorial_double();
+	constexpr std::array<size_t, MAX_FACTORIAL> ft = factorial_table<size_t>();
+	// ft[n] wraps silently from 21! on (> 2^64); use this one wherever n can exceed 20
+	constexpr std::array<double, MAX_FACTORIAL> ftd = factorial_table<double>();
 
 	constexpr double log_approx(const double &x, int n = 25) {
 		if (x <= 0.0) return -1.0; // log is not defined for non-positive values
