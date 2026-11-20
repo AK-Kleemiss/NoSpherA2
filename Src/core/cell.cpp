@@ -1,7 +1,5 @@
 #include "pch.h"
 #include "cell.h"
-#include "convenience.h"
-#include "nos_math.h"
 #include <bit>
 #include <cctype>
 #include <Eigen/Dense>

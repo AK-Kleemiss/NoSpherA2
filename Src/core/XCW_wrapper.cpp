@@ -3,7 +3,6 @@
 #ifdef NOSPHERA2_USE_GPU
 #include "xcw_grid_gpu.h"
 #endif
-#include "scattering_factors.h"
 #include "basis_set.h"
 #include "gaussian_atom.h"
 #include "SALTED_utilities.h"

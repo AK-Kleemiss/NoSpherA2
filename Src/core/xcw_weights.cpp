@@ -1,9 +1,7 @@
 #include "pch.h"
 #include "structure_factors.h"
 #include "AtomGrid.h"
-#include "GridManager.h"
 #include "spherical_density.h"
-#include "constants.h"
 #include "tuning.h"
 
 //TFVC, MBIS and EMBIS shares on XCW's grid from the density the SCF carries, see structure_factors::xcw_grid. The fits are

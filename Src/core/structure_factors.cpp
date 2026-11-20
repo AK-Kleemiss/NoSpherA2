@@ -1,10 +1,6 @@
 #include "pch.h"
 #include "tuning.h"
 #include "structure_factors.h"
-#include "wfn_class.h"
-#include "scattering_factors.h"
-#include "GridManager.h"
-#include "nos_math.h"
 #include "basis_set.h"
 #include <limits>
 #include <numeric>
