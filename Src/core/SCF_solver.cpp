@@ -8,7 +8,7 @@
 #include <limits>
 #include <random>
 
-SCF_solver::SCF_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& basis, const options::SCF_settings& settings_in, SCF_log_writer& writer) : settings(settings_in), mol_(mol), basis_(basis), nmo_(static_cast<int>(basis.nbf())), writer_(&writer) {}
+SCF_solver::SCF_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& basis, const options::SCF_settings& settings_in, SCF_log_writer& writer) : settings(settings_in), mol_(mol), nmo_(static_cast<int>(basis.nbf())), writer_(&writer) {}
 
 //C = op(A) op(B) for column-major occ matrices through MKL, Src/core's Eigen being serial
 static occ::Mat gemm(const occ::Mat& A, const occ::Mat& B, const bool ta = false, const bool tb = false)
