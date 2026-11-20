@@ -295,7 +295,7 @@ void calc_SF(const int& points,
 	bool gpu_fp32 = false,
 	const struct sf_shell_layout* layout = nullptr);
 
-//Fourier-Bessel transform of atom-centred Lebedev shell grids (see scattering_factors.cpp): fills sf[i] (sized to the
+//Fourier-Bessel transform of atom-centred Lebedev shell grids (see sf_kernels.cpp): fills sf[i] (sized to the
 //k list) for every atom layout places on a prototype grid and that it does faster than the direct sum, and returns
 //which ones; the rest (no layout: cube grids, hand-made points) need the direct sum. L_override < 0 takes L = D/2 of
 //the prototype's largest Lebedev degree; exact skips the |k| table; L_override >= 0, exact or force take every atom.

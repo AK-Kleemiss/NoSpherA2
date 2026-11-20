@@ -1,6 +1,8 @@
 /**
  * @file scattering_factors.cpp
- * @brief This file contains functions related to reading and generating hkl indices and k-points.
+ * @brief The tsc/tshb drivers (calculate_scattering_factors and its streamed parts), the ECP and electron-diffraction
+ * conversions and the diffuse scattering factors. hkl and k-point I/O: hkl_io.cpp; CIF atoms: cif_atoms.cpp; calc_SF and
+ * its kernels: sf_kernels.cpp; SALTED form factors: sf_salted.cpp.
  *
  */
 #include "pch.h"
