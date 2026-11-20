@@ -80,6 +80,29 @@ static void set_occ_df_budget(occ::io::OccInput &config, const options &opt)
 	if (avail > 0.0) config.method.df_store_memory_mb = avail / 2;
 }
 
+//false, after saying so on both streams, when occ's basis data cannot be found
+static bool occ_data_path_found(int argc, char **argv, std::ostream &log_file)
+{
+	if (ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
+		return true;
+	std::cerr << "ERROR: OCC basis set data directory not found.\n"
+			  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
+			  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
+	log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+	return false;
+}
+
+//The table the run asked for: .tscb and/or the text .tsc
+static void write_tables(const itsc_block &res, const options &opt, std::ostream &log_file)
+{
+	log_file << "Writing tsc file... " << std::flush;
+	if (opt.binary_tsc)
+		res.write_tscb_file();
+	if (opt.old_tsc)
+		res.write_tsc_file(opt.cif);
+	log_file << " ... done!" << std::endl;
+}
+
 //Field 22 of a /proc/<pid>/stat line, the start time in clock ticks after boot; -1 for a line that is not one
 double stat_start_ticks(const std::string &stat)
 {
@@ -267,6 +290,8 @@ static int run_app_impl(int argc, char **argv)
 	} join_warmup;
 #endif
 	vector<WFN> wavy;
+	//Hands cout back to the console and says the job is done
+	const auto finished = [&]() { log_file.flush(); std::cout.rdbuf(_coutbuf); std::cout << "Finished!" << endl; return 0; };
 
 	if (opt.promol_nci)
 	{
@@ -619,14 +644,8 @@ static int run_app_impl(int argc, char **argv)
 			//If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
 			if (opt.combined_tsc_calc_files[i].extension() == ".toml")
 			{
-				if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
-				{
-					std::cerr << "ERROR: OCC basis set data directory not found.\n"
-							  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
-							  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
-					log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+				if (!occ_data_path_found(argc, argv, log_file))
 					return 1;
-				}
 				log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
 				occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
 				set_occ_df_budget(config, opt);
@@ -735,23 +754,13 @@ static int run_app_impl(int argc, char **argv)
 			log_file << "Writing tsc file...  ... done!" << endl;
 			log_file << (opt.tsc_replaced_by_tshb ? "  (no table: experimental.tshb holds the fitted densities)"
 				: "  (written block by block while the factors were computed)") << endl;
-			log_file.flush();
-			std::cout.rdbuf(_coutbuf);
-			std::cout << "Finished!" << endl;
-			return 0;
+			return finished();
 		}
 		known_scatterer = result.get_scatterers_string();
 		log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
 		_time_point start = get_time();
 		const auto t_write = std::chrono::steady_clock::now();
-		log_file << "Writing tsc file... " << flush;
-		if (opt.binary_tsc)
-			result.write_tscb_file();
-		if (opt.old_tsc)
-		{
-			result.write_tsc_file(opt.cif);
-		}
-		log_file << " ... done!" << endl;
+		write_tables(result, opt, log_file);
 		if (ProgressBar::report_counts)
 			std::cout << "[stages] write table " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_write).count() << " s" << endl;
 		if (!opt.no_date)
@@ -767,10 +776,7 @@ static int run_app_impl(int argc, char **argv)
 			if (opt.write_CIF)
 				write_wfn_CIF(wavy, "test.wfn_cif", result, opt);
 		}
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Performs the Thakkar IAM
 	if (opt.iam_switch)
@@ -799,21 +805,11 @@ static int run_app_impl(int argc, char **argv)
 		}
 		else
 		{
-			log_file << "Writing tsc file... " << flush;
-			if (opt.binary_tsc)
-				res.write_tscb_file();
-			if (opt.old_tsc)
-			{
-				res.write_tsc_file(opt.cif);
-			}
-			log_file << " ... done!" << endl;
+			write_tables(res, opt, log_file);
 			if (opt.write_CIF)
 				write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
 		}
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Partition electron density read from a cube file and perform Fourier transform to TSC.
 	if (opt.cube_density != "")
@@ -845,17 +841,9 @@ static int run_app_impl(int argc, char **argv)
 			opt.groups[0].push_back(0);
 
 		itsc_block res = calculate_scattering_factors_from_cube(opt, cube_wave, density_cube, log_file);
-		log_file << "Writing tsc file... " << flush;
-		if (opt.binary_tsc)
-			res.write_tscb_file();
-		if (opt.old_tsc)
-			res.write_tsc_file(opt.cif);
-		log_file << " ... done!" << endl;
+		write_tables(res, opt, log_file);
 
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf);
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// This one has conversion to fchk and calculation of one single tsc file
 	if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0 && !opt.do_XCW)
@@ -863,14 +851,8 @@ static int run_app_impl(int argc, char **argv)
 		if (opt.occ != "") {
 			log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
 			if (opt.occ.ends_with(".toml")) {
-				if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
-				{
-					std::cerr << "ERROR: OCC basis set data directory not found.\n"
-							  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
-							  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
-					log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+				if (!occ_data_path_found(argc, argv, log_file))
 					return 1;
-				}
 				occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
 				set_occ_df_budget(config, opt);
 				occ::log::set_log_file("NoSpherA2_OCC.log");
@@ -1020,24 +1002,14 @@ static int run_app_impl(int argc, char **argv)
 			else
 			{
 				const auto t_write = std::chrono::steady_clock::now();
-				log_file << "Writing tsc file... " << flush;
-				if (opt.binary_tsc)
-					res.write_tscb_file();
-				if (opt.old_tsc)
-				{
-					res.write_tsc_file(opt.cif);
-				}
-				log_file << " ... done!" << endl;
+				write_tables(res, opt, log_file);
 				if (ProgressBar::report_counts)
 					std::cout << "[stages] write table " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_write).count() << " s" << endl;
 				if (opt.write_CIF)
 					write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
 			}
 		}
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Performs XCW
 	if (!opt.properties.calc() && opt.do_XCW)
@@ -1062,10 +1034,7 @@ static int run_app_impl(int argc, char **argv)
 	if (opt.properties.calc())
 	{
 		properties_calculation(opt);
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Converts gbw file to wfn file and leaves
 	if (opt.gbw2wfn)
