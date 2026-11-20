@@ -5,7 +5,6 @@
 //tests run with -no_gpu_cublas to stay independent of whether a CUDA toolkit is installed.
 
 void cublas_dynamic_set_enabled(bool on);
-bool cublas_dynamic_enabled();
 
 //Enabled and loadable
 bool cublas_dynamic_available();

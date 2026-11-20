@@ -97,7 +97,6 @@ bool load_locked()
 } //namespace
 
 void cublas_dynamic_set_enabled(bool on) { g_enabled = on; }
-bool cublas_dynamic_enabled() { return g_enabled; }
 
 bool cublas_dynamic_available()
 {
