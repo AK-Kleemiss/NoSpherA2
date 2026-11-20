@@ -741,6 +741,7 @@ void cell::transform_ADPs(vec2& ADPs, const vec2& M) {
 		ADPs[0][5] = U[1][2];
 	}
 	if (ADPs.size() > 1 && ADPs[1].size() > 0) {
+		int running_idx = 0;
 		vec C_out(10);
 		for (int i = 0, idx = 0; i < 3; i++) {
 			for (int j = i; j < 3; j++) {

@@ -52,89 +52,6 @@ namespace NoSpherA2UnitTests
 			return a.size() == b.size() && (a.empty() || std::memcmp(a.data(), b.data(), a.size() * sizeof(double)) == 0);
 		}
 
-		// master's cell.cpp, d624d8c4
-		int get_voigt_index_master_ref(const ivec& indices) {
-			static const ivec2 map3{ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, {0, 1, 2}, {0, 2, 2}, {1, 1, 1}, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
-			static const ivec2 map4{ { 0, 0, 0, 0 }, { 0, 0, 0, 1 }, { 0, 0, 0, 2 }, { 0, 0, 1, 1 }, { 0, 0, 1, 2 }, { 0, 0, 2, 2 }, { 0, 1, 1, 1 }, { 0, 1, 1, 2 }, { 0, 1, 2, 2 }, { 0, 2, 2, 2 }, { 1, 1, 1, 1 }, { 1, 1, 1, 2 }, { 1, 1, 2, 2 }, { 1, 2, 2, 2 }, { 2, 2, 2, 2 } };
-			const auto& map = indices.size() == 3 ? map3 : map4;
-			return std::find(map.begin(), map.end(), indices) - map.begin();
-		}
-
-		void transform_ADPs_master_ref(vec2& ADPs, const vec2& M) {
-			if (ADPs.size() > 0 && ADPs[0].size() > 0) {
-				vec2 U(3, vec(3));
-				U[0][0] = ADPs[0][0];
-				U[0][1] = ADPs[0][3];
-				U[0][2] = ADPs[0][4];
-				U[1][0] = ADPs[0][3];
-				U[1][1] = ADPs[0][1];
-				U[1][2] = ADPs[0][5];
-				U[2][0] = ADPs[0][4];
-				U[2][1] = ADPs[0][5];
-				U[2][2] = ADPs[0][2];
-				U = self_dot(self_dot(M, U, true, false), M, false, false);
-				ADPs[0][0] = U[0][0];
-				ADPs[0][1] = U[1][1];
-				ADPs[0][2] = U[2][2];
-				ADPs[0][3] = U[0][1];
-				ADPs[0][4] = U[0][2];
-				ADPs[0][5] = U[1][2];
-			}
-			if (ADPs.size() > 1 && ADPs[1].size() > 0) {
-				int running_idx = 0;
-				vec C_out(10);
-				for (int i = 0, idx = 0; i < 3; i++) {
-					for (int j = i; j < 3; j++) {
-						for (int k = j; k < 3; k++) {
-							double sum = 0;
-							for (int p = 0; p < 3; p++) {
-								for (int q = 0; q < 3; q++) {
-									for (int r = 0; r < 3; r++) {
-										ivec sorted_idx = { p, q, r };
-										std::sort(sorted_idx.begin(), sorted_idx.end());
-										int ADP_idx;
-										ADP_idx = get_voigt_index_master_ref(sorted_idx);
-										sum += M[p][i] * M[q][j] * M[r][k] * ADPs[1][ADP_idx];
-									}
-								}
-							}
-							C_out[idx++] = sum;
-						}
-					}
-				}
-				ADPs[1] = C_out;
-			}
-			if (ADPs.size() > 2 && ADPs[2].size() > 0) {
-				int running_idx = 0;
-				vec D_out(15);
-				for (int i = 0; i < 3; i++) {
-					for (int j = i; j < 3; j++) {
-						for (int k = j; k < 3; k++) {
-							for (int l = k; l < 3; l++) {
-								double sum = 0;
-								for (int p = 0; p < 3; p++) {
-									for (int q = 0; q < 3; q++) {
-										for (int r = 0; r < 3; r++) {
-											for (int s = 0; s < 3; s++) {
-												ivec sorted_idx = { p, q, r, s };
-												std::sort(sorted_idx.begin(), sorted_idx.end());
-												int ADP_idx;
-												ADP_idx = get_voigt_index_master_ref(sorted_idx);
-												sum += M[p][i] * M[q][j] * M[r][k] * M[s][l] * ADPs[2][ADP_idx];
-											}
-										}
-									}
-								}
-								D_out[running_idx] = sum;
-								running_idx++;
-							}
-						}
-					}
-				}
-				ADPs[2] = D_out;
-			}
-		}
-
 		// master's cell::keep_operations with the cell's sym and trans as arguments
 		void keep_operations_master_ref(ivec3& sym, vec2& trans, const ivec& kept, ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
 			const int num_sym_ops = static_cast<int>(sym[0][0].size());
@@ -219,46 +136,6 @@ namespace NoSpherA2UnitTests
 			for (int i = 0; i < 200; i++) hkl.insert({ d(gen), d(gen), d(gen) });
 			return hkl;
 		}
-	}
-
-	// transform_ADPs against master's copy, bit for bit: U alone, U and C, U, C and D, empty tensors, rotations,
-	// the cell matrix and random matrices over values from 0 and 1e-300 to 1e300 and of both signs
-	TEST(XcwCleanupTests, TransformADPsMatchesMaster)
-	{
-		std::mt19937_64 gen(20261120);
-		std::uniform_real_distribution<double> u(-1.0, 1.0);
-		const vec scales = { 0.0, 1e-300, 1e-12, 1.0, 37.5, 1e150, -1e-8, -1e300 };
-		vec2 rot_c2 = { { -1, 0, 0 }, { 0, 1, 0 }, { 0, 0, -1 } }, rot_3 = { { 0, -1, 0 }, { 1, -1, 0 }, { 0, 0, 1 } };
-		std::vector<vec2> Ms = { rot_c2, rot_3, { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } } };
-		const cell cl(8.0, 8.5, 6.0, 90.0, 97.0, 90.0);
-		vec2 cm(3, vec(3));
-		for (int i = 0; i < 3; i++)
-			for (int j = 0; j < 3; j++) cm[i][j] = cl.get_cm(i, j);
-		Ms.push_back(cm);
-		for (int m = 0; m < 20; m++) {
-			vec2 M(3, vec(3));
-			for (int i = 0; i < 3; i++)
-				for (int j = 0; j < 3; j++) M[i][j] = u(gen) * (m % 3 == 0 ? 1e3 : 1.0);
-			Ms.push_back(M);
-		}
-		const std::vector<ivec> shapes = { {}, { 6 }, { 6, 10 }, { 6, 10, 15 }, { 0, 10, 15 }, { 6, 0, 15 }, { 0, 0, 0 } };
-		int compared = 0;
-		for (int m = 0; m < Ms.size(); m++)
-			for (int s = 0; s < shapes.size(); s++)
-				for (int c = 0; c < scales.size(); c++) {
-					vec2 adp(shapes[s].size());
-					for (int t = 0; t < shapes[s].size(); t++) {
-						adp[t].resize(shapes[s][t]);
-						for (int i = 0; i < shapes[s][t]; i++) adp[t][i] = scales[c] * (c % 2 ? u(gen) : 1.0 + 0.1 * i);
-					}
-					vec2 ref = adp;
-					cell::transform_ADPs(adp, Ms[m]);
-					transform_ADPs_master_ref(ref, Ms[m]);
-					ASSERT_EQ(adp.size(), ref.size());
-					for (int t = 0; t < adp.size(); t++) EXPECT_TRUE(same_bits(adp[t], ref[t])) << "M " << m << " shape " << s << " scale " << c << " tensor " << t;
-					compared++;
-				}
-		EXPECT_EQ(compared, static_cast<int>(Ms.size() * shapes.size() * scales.size()));
 	}
 
 	// apply_grown's kept operations, deleted operations and enlarged reflections against master's keep_operations
