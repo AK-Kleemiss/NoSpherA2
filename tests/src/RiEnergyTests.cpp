@@ -1592,6 +1592,49 @@ namespace NoSpherA2UnitTests
 		std::filesystem::remove(cif), std::filesystem::remove(cif3);
 	}
 
+	TEST(CrystalEnergyTests, CellDipoleSumsTheImagesAndVanishesOutsidePolarGroups)
+	{
+		const std::filesystem::path dir = geometry_aid_tmp("crystal_dipole"), cif = dir / "c.cif";
+		std::filesystem::create_directories(dir);
+		std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+		//one O with only the first p shell set, m = -1 (y) and m = 1 (x): electrons pushed to +x +y
+		auto molecule = [&](const std::string& pos) {
+			const std::filesystem::path xyz = dir / "o.xyz";
+			{ std::ofstream out(xyz); out << "1\ntest\nO " << pos << "\n"; }
+			const WFN aux = generate_aux_wfn(WFN(xyz), basis);
+			vec coef(aux_size(aux), 0.0);
+			const atom O = aux.get_atoms()[0];
+			for (int shell = 0, prim = 0, offset = 0; shell < (int)O.get_shellcount_size(); shell++) {
+				const int l = O.get_basis_set_entry(prim).get_type();
+				if (l == 1) { coef[offset] = 0.2, coef[offset + 2] = 0.3; break; }
+				offset += 2 * l + 1, prim += O.get_shellcount(shell);
+			}
+			return std::vector<Gaussian_Molecule>{ Gaussian_Molecule(aux, coef) };
+		};
+		auto dipole = [&](const std::vector<Gaussian_Molecule>& m, const std::string& op) {
+			write_p1bar_cif(cif, op);
+			return crystal_energies::cell_dipole(cell(cif, std::cout, false, true), m);
+		};
+		const std::vector<Gaussian_Molecule> general = molecule("1.0 2.0 3.0"), axis = molecule("0.0 2.0 0.0");
+		const Multipoles q = general[0].electrical_moments(1)[0];
+		ASSERT_GT(q(1, -1), 0.0);
+		ASSERT_GT(q(1, 1), 0.0);
+		const double V = std::pow(constants::ang2bohr(10.0), 3);
+		const crystal_energies::dipole P1bar = dipole(general, "-x, -y, -z"), P2 = dipole(general, "-x, y, -z"), P2_axis = dipole(axis, "-x, y, -z");
+		EXPECT_EQ(P1bar.Z, 2);
+		for (int x = 0; x < 3; x++) EXPECT_NEAR(P1bar.M[x], 0.0, 1e-12);
+		EXPECT_NEAR(P1bar.E, 0.0, 1e-15);
+		EXPECT_EQ(P2.Z, 2);
+		EXPECT_NEAR(P2.M[0], 0.0, 1e-12);
+		EXPECT_NEAR(P2.M[1], -2.0 * q(1, -1), 1e-12);
+		EXPECT_NEAR(P2.M[2], 0.0, 1e-12);
+		EXPECT_NEAR(P2.volume, V, 1e-6 * V);
+		EXPECT_NEAR(P2.E, -2.0 * constants::PI * std::pow(2.0 * q(1, -1), 2) / (3.0 * V * 2), 1e-12);
+		EXPECT_EQ(P2_axis.Z, 1);
+		EXPECT_NEAR(P2_axis.M[0], -q(1, 1), 1e-12);
+		std::filesystem::remove_all(dir);
+	}
+
 	TEST(CrystalEnergyTests, RunAppWritesThePairTableWithInvertedCoefficients)
 	{
 		const std::filesystem::path dir = geometry_aid_tmp("crystal"), cif = dir / "p1bar.cif", xyz = dir / "o.xyz", npy = dir / "o.npy", job = dir / "job.txt", table = dir / "ie.txt";

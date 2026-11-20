@@ -235,6 +235,44 @@ namespace crystal_energies {
 		return out;
 	}
 
+	dipole cell_dipole(const cell& c, const std::vector<Gaussian_Molecule>& molecules)
+	{
+		const std::vector<symop> ops = symops(c);
+		const vec2 M = cell_matrix(c), Mi = inverse3(M);
+		dipole D;
+		D.M.assign(3, 0.0);
+		for (const Gaussian_Molecule& m : molecules) {
+			const std::vector<Gaussian_Atom>& at = m.atoms();
+			const std::vector<Multipoles> q = m.electrical_moments(1);
+			vec cen(3, 0.0), mu(3, 0.0);
+			for (const Gaussian_Atom& a : at)
+				for (int x = 0; x < 3; x++) cen[x] += a.centre()[x] / at.size();
+			for (int a = 0; a < (int)at.size(); a++) {
+				//q_1m in m = -1, 0, 1 order is the electron moment along y, z, x
+				const double Q = at[a].Z() - q[a].q[0], p[3] = { q[a].q[3], q[a].q[1], q[a].q[2] };
+				for (int x = 0; x < 3; x++) mu[x] += Q * (at[a].centre()[x] - cen[x]) - p[x];
+			}
+			//the images of a molecule on a special position coincide, each counts once
+			std::set<std::array<long, 3>> seen;
+			const vec f = mul(Mi, cen);
+			for (const symop& op : ops) {
+				vec2 Rf(3, vec(3));
+				for (int x = 0; x < 3; x++)
+					for (int y = 0; y < 3; y++) Rf[x][y] = op.rot[x][y];
+				const vec g = mul(Rf, f);
+				std::array<long, 3> k;
+				for (int x = 0; x < 3; x++) k[x] = ((std::lround((g[x] + op.trans[x]) * 1000) % 1000) + 1000) % 1000;
+				if (!seen.insert(k).second) continue;
+				const vec Rmu = mul(mul(M, mul(Rf, Mi)), mu);
+				for (int x = 0; x < 3; x++) D.M[x] += Rmu[x];
+				D.Z++;
+			}
+		}
+		D.volume = std::abs(M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]));
+		D.E = -2.0 * constants::PI * (D.M[0] * D.M[0] + D.M[1] * D.M[1] + D.M[2] * D.M[2]) / (3.0 * D.volume * D.Z);
+		return D;
+	}
+
 	job read_job(const std::filesystem::path& file)
 	{
 		err_checkf(std::filesystem::exists(file), "The job file does not exist: " + file.string(), std::cout);
@@ -263,7 +301,7 @@ namespace crystal_energies {
 		return J;
 	}
 
-	void write_table(const std::vector<pair>& pairs, const pathvec& structures, std::ostream& out)
+	void write_table(const std::vector<pair>& pairs, const pathvec& structures, const dipole& D, std::ostream& out)
 	{
 		const double kJ = constants::kcal_mol_per_hartree * 4.184;
 		out << "# NoSpherA2 interaction energies in kJ/mol; B = symop(B) + n, centroids and R_AB in Angstrom\n";
@@ -275,6 +313,10 @@ namespace crystal_energies {
 			for (int x = 0; x < 3; x++) out << " " << p.centroid_B[x];
 			out << std::setprecision(3) << " " << p.E.electrostatic() * kJ << " " << (p.E.pol_A + p.E.pol_B) * kJ << " " << p.E.disp * kJ << " " << (p.E.rep - p.E.rep_x) * kJ << " " << p.E.rep_x * kJ << " " << p.E.total() * kJ << "\n";
 		}
+		const double debye = constants::bohr2ang(1.0) / constants::e_A2Debye;
+		out << "# cell_dipole Mx My Mz |M| (Debye) Z V (A^3) dE_dip (kJ/mol per molecule, spherical direct sum to tin-foil)\n"
+			<< std::setprecision(4) << "# cell_dipole " << D.M[0] * debye << " " << D.M[1] * debye << " " << D.M[2] * debye << " "
+			<< std::sqrt(D.M[0] * D.M[0] + D.M[1] * D.M[1] + D.M[2] * D.M[2]) * debye << " " << D.Z << " " << constants::bohr2ang_p(D.volume, 3) << " " << D.E * kJ << "\n";
 		out << std::flush;
 	}
 
@@ -298,10 +340,11 @@ namespace crystal_energies {
 			std::cout << "PAIR " << p + 1 << "/" << pairs.size() << " " << pairs[p].A << " " << pairs[p].B << " " << pairs[p].symop << " n=" << pairs[p].n[0] << "," << pairs[p].n[1] << "," << pairs[p].n[2]
 					  << std::fixed << std::setprecision(3) << " R=" << pairs[p].distance << " total=" << pairs[p].E.total() * kJ << " kJ/mol" << std::endl;
 		}
+		const dipole D = cell_dipole(c, mol);
 		std::ofstream out(J.output);
 		err_checkf(out.good(), "Could not write " + J.output.string(), std::cout);
-		write_table(pairs, J.structures, out);
-		write_table(pairs, J.structures, std::cout);
+		write_table(pairs, J.structures, D, out);
+		write_table(pairs, J.structures, D, std::cout);
 		std::cout << "Wrote " << J.output.string() << std::endl;
 		return 0;
 	}
