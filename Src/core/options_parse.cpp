@@ -36,15 +36,6 @@
 #include "citations.h"
 #include "b2c.h"
 #include "section_log.h"
-#include "git_commit.h"
-
-#ifdef _WIN32
-#include <windows.h>
-#include <psapi.h>
-#elif defined(__APPLE__)
-#include <mach/mach.h>
-#include <sys/sysctl.h>
-#endif
 
 namespace {
 	ivec parse_rgbi_group_indices(const std::string &spec)

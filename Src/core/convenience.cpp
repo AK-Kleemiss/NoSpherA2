@@ -1,50 +1,6 @@
 #include "pch.h"
 #include "convenience.h"
-#include "cell.h"
-#include "tsc_block.h"
-#include "tshb_block.h"
-#include "scattering_factors.h"
-#include "tsc_label_converter.h"
-#include "dev_diagnostics.h"
-#include "spherical_density.h"
-#include "AtomGrid.h"
-#include "npy.h"
-#include "SALTED_utilities.h"
-#include "sphere_lebedev_rule.h"
-#include "nos_math.h"
-#include "featomic.hpp"
-#include "metatensor.h"
-#include "GridManager.h"
-#include "integrator.h"
-#include "properties.h"
 #include "wfn_class.h"
-#include "atoms.h"
-#include "basis_set.h"
-#include "fchk.h"
-#include "bondwise_analysis.h"
-#include "geometry_aid.h"
-#include "crystal_energies.h"
-#include "SALTED_equicomb.h"
-#include "SALTED_predictor.h"
-#ifdef NOSPHERA2_USE_GPU
-#include "sf_gpu.h"
-#endif
-#include "nbo_run.h"
-#include "nbo.h"
-#include "eli_family.h"
-#include "topology.h"
-#include "citations.h"
-#include "b2c.h"
-#include "section_log.h"
-#include "git_commit.h"
-
-#ifdef _WIN32
-#include <windows.h>
-#include <psapi.h>
-#elif defined(__APPLE__)
-#include <mach/mach.h>
-#include <sys/sysctl.h>
-#endif
 
 bool is_similar_rel(const double &first, const double &second, const double &tolerance)
 {
