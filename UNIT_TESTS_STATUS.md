@@ -1300,6 +1300,8 @@ Added: 2026-06-14.
 | RGBI_Groups_NH3BH3_sym_ANO | RGBI_groups | NH3BH3_sym_ano.good | no | ✅ passing (release-windows targeted 2026-07-03) |
 | RGBI_NH3Li | RGBI | nh3li_nao.good | no | ✅ passing (explicit `-rgbi_basis nao`; macOS arm64, regenerated 2026-07-03) |
 | RGBI_NH3Li_ANO | RGBI | nh3li_ano.good | no | ✅ passing (ANO default; release-windows targeted 2026-09-15, regenerated after atomic-basis normalization fix) |
+| RGBI_NH3Li_direct | RGBI | nh3li_nao.good | no | ✅ passing (`-rgbi <wfn>` form, shares RGBI_NH3Li's golden; release-windows 2026-11-20) |
+| QTAIM_NH3Li | RGBI | nh3li_qtaim.good | no | ✅ passing (`-qtaim <wfn>`: ELI_NH3Li's QTAIM tables without the ELI-D basins; release-windows 2026-11-20) |
 | rubredoxin_cmtc | rubredoxin_cmtc | rubredoxin_cmtc.good | no | ✅ passing |
 | SALTED | SALTED | SALTED.good | no | ✅ passing (CPU-pinned with `-no_gpu_salted` for hardware-independent golden output) |
 | sucrose_IAM | sucrose_IAM_SF | sucrose_IAM.good | no | ✅ passing |

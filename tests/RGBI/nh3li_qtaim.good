@@ -1,0 +1,141 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Analysing QTAIM basins in the wavefunction...
+Atom positions:
+  Atom 0: (-10.4831, 10.0894, 2.20913)
+  Atom 1: (-9.42104, 9.37453, 3.71125)
+  Atom 2: (-12.306, 9.34279, 2.332)
+  Atom 3: (-9.67065, 9.4595, 0.524323)
+  Atom 4: (-10.574, 13.775, 2.31452)
+Density critical points from the analytic field: NCP 5, BCP 4, RCP 0, CCP 0; Poincare-Hopf sum 1 against 1 (COMPLETE)
+Density Critical Points (9 found):
+
+  CP   1  [attractor   ]  converged   N0
+    Position  :       -10.4831        10.0894         2.2091
+    Rho       :       198.5481
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -7.3910e+05    -7.3910e+05    -7.3909e+05
+    DelSqRho  :  -2217289.4414
+   V         :    -5.5438e+05   G         :        27.6340   K         :     5.5435e+05   L         :     5.5432e+05
+
+  CP   2  [attractor   ]  converged   Li4
+    Position  :       -10.5740        13.7750         2.3145
+    Rho       :        13.6761
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.2435e+04    -1.2435e+04    -1.2435e+04
+    DelSqRho  :    -37304.6708
+   V         :    -9.3262e+03   G         :         0.0125   K         :     9.3262e+03   L         :     9.3262e+03
+
+  CP   3  [attractor   ]  converged   H1
+    Position  :        -9.4395         9.3859         3.6850
+    Rho       :         0.4044
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.2086e+00    -8.1952e+00    -7.2655e+00
+    DelSqRho  :       -23.6694
+   V         :    -5.9484e+00   G         :         0.0155   K         :     5.9329e+00   L         :     5.9173e+00
+
+  CP   4  [attractor   ]  converged   H2
+    Position  :       -12.2742         9.3548         2.3298
+    Rho       :         0.4044
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.2086e+00    -8.1952e+00    -7.2655e+00
+    DelSqRho  :       -23.6692
+   V         :    -5.9484e+00   G         :         0.0155   K         :     5.9329e+00   L         :     5.9173e+00
+
+  CP   5  [attractor   ]  converged   H3
+    Position  :        -9.6848         9.4694         0.5537
+    Rho       :         0.4044
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -8.2085e+00    -8.1951e+00    -7.2655e+00
+    DelSqRho  :       -23.6691
+   V         :    -5.9484e+00   G         :         0.0155   K         :     5.9328e+00   L         :     5.9173e+00
+
+  CP   6  [bond        ]  converged   H1-N0 bond
+    Position  :        -9.7021         9.5581         3.3134
+    Rho       :         0.3090
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.1221e+00    -1.0858e+00     8.3089e-01
+    DelSqRho  :        -1.3770
+    Bond Ellipticity:         0.0334
+    Bond Path :   N0-H1   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
+   V         :    -4.4986e-01   G         :         0.0528   K         :     3.9705e-01   L         :     3.4424e-01
+
+  CP   7  [bond        ]  converged   H2-N0 bond
+    Position  :       -11.8232         9.5348         2.2993
+    Rho       :         0.3090
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.1220e+00    -1.0858e+00     8.3089e-01
+    DelSqRho  :        -1.3769
+    Bond Ellipticity:         0.0334
+    Bond Path :   N0-H2   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
+   V         :    -4.4985e-01   G         :         0.0528   K         :     3.9704e-01   L         :     3.4423e-01
+
+  CP   8  [bond        ]  converged   H3-N0 bond
+    Position  :        -9.8856         9.6206         0.9703
+    Rho       :         0.3090
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.1220e+00    -1.0857e+00     8.3089e-01
+    DelSqRho  :        -1.3769
+    Bond Ellipticity:         0.0334
+    Bond Path :   N0-H3   BPL :         1.9738   GPL :         1.9737   BPL-GPL :         0.0001 bohr   end maxima off nuclei by 0.0000 / 0.0339
+   V         :    -4.4984e-01   G         :         0.0528   K         :     3.9703e-01   L         :     3.4422e-01
+
+  CP   9  [bond        ]  converged   Li4-N0 bond
+    Position  :       -10.5408        12.4272         2.2760
+    Rho       :         0.0348
+    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -6.1343e-02    -6.1342e-02     3.4404e-01
+    DelSqRho  :         0.2214
+    Bond Ellipticity:         0.0000
+    Bond Path :   N0-Li4   BPL :         3.6882   GPL :         3.6882   BPL-GPL :         0.0000 bohr
+   V         :    -4.0482e-02   G         :         0.0479   K         :    -7.4285e-03   L         :    -5.5339e-02
+
+QTAIM attractors from the analytic field: 5 (5 nuclei, 0 non-nuclear)
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 66074 grid points.
+  QTAIM basin field on the host: auto, the host field costs 2.15 us a point, below 15
+Quadrature points sent along the field: 42019, left the grid: 0
+
+QTAIM Analysis (atomic quadrature grids):
+[QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
+[QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013
+  basin  label               electrons     charge      volume         maximum        x          y          z
+      1  N0                     8.2814    -1.2814    382.0554        198.5481    -10.483     10.089      2.209
+      2  H1                     0.6296     0.3704    102.7758          0.4000     -9.421      9.375      3.711
+      3  H2                     0.6297     0.3703    101.7784          0.4000    -12.306      9.343      2.332
+      4  H3                     0.6296     0.3704    102.4575          0.4000     -9.671      9.459      0.524
+      5  Li4                    2.7498     0.2502    907.0907         13.6761    -10.574     13.775      2.315
+  total in basins: 12.9200   outside every basin: 0.0871
+
+Delocalization indices (13 occupied orbitals):
+[LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
+  sum over basins and outside of S^A - identity: 7.23e-03   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
+
+  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
+  B includes the region beyond rho = 1e-04 e/bohr^3.
+      1  N0                     8.2814      6.8213            1.4610      0.0009
+      2  H1                     0.6296      0.1683            0.4615      0.0002
+      3  H2                     0.6297      0.1683            0.4616      0.0002
+      4  H3                     0.6296      0.1683            0.4615      0.0002
+      5  Li4                    2.7498      2.4801            0.2748      0.0051
+
+  basin pair                                delta(A,B)
+  N0                H1                      0.8535
+  N0                H3                      0.8535
+  N0                H2                      0.8534
+  N0                Li4                     0.3312
+  H2                Li4                     0.0337
+  H3                Li4                     0.0336
+  H1                Li4                     0.0336
+  H2                H3                      0.0158
+  H1                H2                      0.0158
+  H1                H3                      0.0158
+  0 further pairs below 0.01

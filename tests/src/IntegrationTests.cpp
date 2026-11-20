@@ -947,6 +947,18 @@ TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
 	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");
 	EXPECT_TRUE(result.success) << result.message;
 }
+
+TEST(TomlIntegrationTests, RGBI_NH3Li_direct)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_direct");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, QTAIM_NH3Li)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "QTAIM_NH3Li");
+	EXPECT_TRUE(result.success) << result.message;
+}
 TEST(TomlIntegrationTests, cube_rho)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "cube_rho");

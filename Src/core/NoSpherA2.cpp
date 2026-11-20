@@ -408,8 +408,11 @@ static int run_app_impl(int argc, char **argv)
 		WFN basins(opt.wfn);
 		if (opt.ECP) basins.set_has_ECPs(true, true, opt.ECP_mode);
 		const section_log::section qtaim_file(opt.wfn, "qtaim", "QTAIM: critical points, atomic basins and delocalization indices",
-			{ citations::Method::QTAIM, citations::Method::LIDI }, opt.no_date),
-			eli_file(opt.wfn, "eli", "ELI-D: electron localizability basins", { citations::Method::ELID }, opt.no_date);
+			{ citations::Method::QTAIM, citations::Method::LIDI }, opt.no_date);
+		//-qtaim writes no .eli_log
+		std::optional<section_log::section> eli_file;
+		if (!opt.qtaim_only)
+			eli_file.emplace(opt.wfn, "eli", "ELI-D: electron localizability basins", std::vector<citations::Method>{ citations::Method::ELID }, opt.no_date);
 		ELI_analysis(basins, opt);
 		return 0;
 	}

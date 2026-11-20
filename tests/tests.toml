@@ -658,6 +658,23 @@ good = "nh3li_eli.good"
 [ELI_NH3Li.args]
 eli_analysis = "../RGBI_groups/nh3li.gbw"
 
+# -rgbi <wfn> is -wfn <wfn> -rgbi: RGBI_NH3Li's golden
+[RGBI_NH3Li_direct]
+directory = "RGBI"
+good = "nh3li_nao.good"
+
+[RGBI_NH3Li_direct.args]
+rgbi = "../RGBI_groups/nh3li.gbw"
+rgbi_basis = "nao"
+
+# -qtaim: ELI_NH3Li's QTAIM tables, no ELI-D basins
+[QTAIM_NH3Li]
+directory = "RGBI"
+good = "nh3li_qtaim.good"
+
+[QTAIM_NH3Li.args]
+qtaim = "../RGBI_groups/nh3li.gbw"
+
 # The ELI-D tables come from the orbitals even with -ri_fit, so they are ELI_NH3Li's byte for
 # byte; -no_spin_eli keeps the spin-resolved half of them from being computed a second time.
 [ELI_NH3Li_RI]

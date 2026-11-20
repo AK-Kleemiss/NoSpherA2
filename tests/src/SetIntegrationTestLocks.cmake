@@ -67,6 +67,8 @@ set_tests_properties(
     TomlIntegrationTests.RGBI_NH3Li_ANO
     TomlIntegrationTests.ELI_NH3Li
     TomlIntegrationTests.ELI_NH3Li_RI
+    TomlIntegrationTests.RGBI_NH3Li_direct
+    TomlIntegrationTests.QTAIM_NH3Li
     PROPERTIES
         RESOURCE_LOCK integration_RGBI_groups
 )

@@ -69,11 +69,11 @@ std::filesystem::path fixture(const std::string& rel)
 
 } // namespace
 
-//RGBI has no positional form: `-rgbi water.gbw` sets the flag and leaves opt.wfn empty
+//bare -rgbi reads -wfn, so with neither there is nothing to analyse
 TEST(CliRefusal, RgbiWithoutWavefunctionExitsNonZeroAndNamesTheInput)
 {
 	Cli cli("rgbi");
-	const int rc = cli.run({"-rgbi", fixture("RGBI_groups/nh3li.gbw").string()});
+	const int rc = cli.run({"-rgbi"});
 	EXPECT_NE(rc, 0);
 	const std::string out = cli.output();
 	EXPECT_NE(out.find("-rgbi"), std::string::npos) << out;
