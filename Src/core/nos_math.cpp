@@ -492,5 +492,5 @@ NNLSResult nnls(dMatrix2& A,
 
 
 // Remaining functions which were separated for readability
-#include "mat_nos_math.cpp"
-#include "vec_nos_math.cpp"
+#include "mat_nos_math.inl"
+#include "vec_nos_math.inl"
