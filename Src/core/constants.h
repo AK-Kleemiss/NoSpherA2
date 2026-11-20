@@ -61,20 +61,14 @@ namespace constants
 	// Constants for later use
 	constexpr double SQRT2 = sqrt(2.0);
 	constexpr double SQRT3 = sqrt(3.0);
-	constexpr double SQRT5 = sqrt(5.0);
 	constexpr double INV_SQRT2 = 1.0 / SQRT2;
 	constexpr double INV_SQRT3 = 1.0 / SQRT3;
-	constexpr double INV_SQRT5 = 1.0 / SQRT5;
 	constexpr int hardness = 3;
 	constexpr double cutoff = 1.0e-20;
 	constexpr double far_away = 10.0;
 	constexpr double far_away_sq = far_away * far_away;
-	constexpr double PI_4 = PI / 4.0;
-	constexpr long double SQRTPI_4L = .8862269254527580136490837416705725913987747280611935641069038949264l;
 	constexpr double INV_PI = 1.0 / PI;
-	constexpr double PI_2 = PI / 2.0;
 	constexpr double TWO_PI = 2 * PI;
-	constexpr double INV_TWO_PI = 1.0 / TWO_PI;
 	constexpr double FOUR_PI = 4 * PI;
 	constexpr double INV_FOUR_PI = 1.0 / FOUR_PI;
 	constexpr double EIGHT_PI = 8 * PI;
@@ -110,39 +104,18 @@ namespace constants
 	constexpr double c_23 = 2.0 / 3.0;
 	constexpr double c_53 = 5.0 / 3.0;
 	constexpr double c_1_21 = 1.0 / 21.0;
-	constexpr double c_1_30 = 1.0 / 30.0;
 	constexpr double c_1_35 = 1.0 / 35.0;
 	constexpr double c_1_15 = 1.0 / 15.0;
 	constexpr double c_3_40 = 3.0 / 40.0;
-	constexpr double c_1_79 = 1.0 / 79.0;
 	constexpr double c_4_105 = 4.0 / 105.0;
 	constexpr double c_1_105 = 1.0 / 105.0;
 	constexpr double c_9_280 = 9.0 / 280.0;
-	constexpr double c_m43 = -4.0 / 3.0;
 	constexpr double c_m53 = -5.0 / 3.0;
-	constexpr double barnsbohr = 2.80028520539078E+7;
-	constexpr double fine_struct = 7.2973525693E-3;
-	constexpr double inv_fine_struct = 1 / fine_struct;
-	constexpr double fine_pi = inv_fine_struct / TWO_PI / PI;
-	constexpr double inv_fine_mod = inv_fine_struct / FOUR_PI;
 	constexpr double keV_per_hartree = 0.027211386245988;
 	constexpr double kcal_mol_per_hartree = 627.5094740631;
-	constexpr double angstrom2eV = 1.23984193 * 10000;
-	constexpr double angstrom2keV = 12.3984193;
-	constexpr double f_to_mu = 4208.031548;
-	constexpr double barns_to_electrons = 1.43110541E-8;
-	constexpr double SI2Debye = 3.33564E-30;               // in C*m
 	constexpr double e_A2Debye = 0.2081943;                // in e*Angstrom
 	constexpr double a0 = 0.529177210903E-10;              // in m
-	constexpr double h = 6.62607015E-34 / 1.602176634E-19; // in eV*s
-	constexpr double Ryd_ener = 13.6056923;                // in eV
-	constexpr double alpha = 0.0072973525693;              // Sommerfeld fine structure constant
-	constexpr double el_mass = 9.1093837015E-31;           // in kg
-	constexpr double el_charge = 1.602176634E-19;          // in C
-	constexpr double speed_of_light = 2.99792458E8;        // m/s
-	constexpr double null = 0.0;
 	constexpr std::complex<double> cnull = std::complex<double>(0.0, 0.0);
-	constexpr std::complex<double> cone = std::complex<double>(0.0, 1.0);
 
 	constexpr double ctelf = 0.21940410461360746;
 
@@ -150,9 +123,6 @@ namespace constants
 
 	constexpr size_t sod = sizeof(double);
 	constexpr size_t soi = sizeof(int);
-	constexpr size_t soc = sizeof(char);
-	constexpr size_t sob = sizeof(bool);
-	constexpr size_t socd = sizeof(std::complex<double>);
 	constexpr size_t soli = sizeof(long int);
 
 	constexpr double exp_approx(const double &x, int n = 25) {
