@@ -810,6 +810,12 @@ TEST(TomlIntegrationTests, SALTED)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, SaltedDistance)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_distance");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, SucroseIAM)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_IAM");
