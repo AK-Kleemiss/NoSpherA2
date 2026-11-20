@@ -8,7 +8,6 @@
 #include "SALTED_utilities.h"
 #include <occ/core/eeq.h>
 #include "spherical_density.h"
-#include "SALTED_equicomb.h"
 #include "nos_math.h"
 #include "constants.h"
 #include "wfn_class.h"
