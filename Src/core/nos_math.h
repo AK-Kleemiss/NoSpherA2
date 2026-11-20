@@ -191,7 +191,6 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
 vec2 elementWiseExponentiation(const vec2& matrix, double exponent);
 dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent);
 
-void _test_openblas();
 void _test_lahva();
 
 // all three overwrite b with the solution and return the LAPACK info (0 = success)
