@@ -218,6 +218,9 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
 WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& space, const std::string& spec,
 				 bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log, vec2* expansion = nullptr);
 
+/** Which NRT structures an E2 average used, for the log and the printout. */
+std::string e2_avg_window(const NboE2Average& a);
+
 /** Print the tables of a native result in NoSpherA2's table layout; the JSON keeps gennbo's labels. */
 void print_nbo(const NboResults& results, std::ostream& out);
 
