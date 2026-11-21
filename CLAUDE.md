@@ -212,7 +212,7 @@ Linux/               Linux packaging/build helper scripts
 Key core modules live in `Src/core`:
 
 - I/O: `fchk.cpp/h`, `cif.cpp/h`, `wfn_class.cpp/h`
-- Molecular representation: `atoms.cpp/h`, `molecule.cpp/h`, `basis_set.cpp/h`
+- Molecular representation: `atoms.cpp/h`, `basis_set.cpp/h`
 - Integration engine: `AtomGrid.cpp/h`, `GridManager.cpp/h`, `integrator.cpp/h`, `integration_params.cpp/h`
 - Math/integrals: `nos_math.cpp/h`, `libCintMain.cpp/h`, `libCintKernels.cpp/h`
 - Analysis/output: `scattering_factors.cpp/h`, `bondwise_analysis.cpp/h`, `isosurface.cpp/h`, `properties.cpp/h`, `cube.cpp/h`, `tsc_block.h`
