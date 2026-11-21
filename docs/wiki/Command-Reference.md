@@ -605,3 +605,6 @@ interface and can change without notice.
 | `-lahvatest`, `-lukas_test` | Ad-hoc development tests. |
 | `-rkpts`, `-skpts` | Read / save the k-point set. |
 | `-out <file>` | Rename the log file (read before the parser, so position-independent). |
+| `-h [word]` | The help, or only its sections whose title contains `word` (`-h gpu`, `-h bonding`); also `--h`, `-help`, `--help`. Printed to the console. |
+| `-mask <file.fab>` | Solvent-mask contribution read when the XCW settings file has the `mask` keyword. |
+| `-beta_spheres` | The default; undoes `-no_beta_spheres`. |

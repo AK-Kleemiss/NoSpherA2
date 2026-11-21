@@ -22,7 +22,8 @@ nothing reads, are written to the console on stderr as well.
 ## "Did not understand the task to perform!"
 
 The parser accepted every flag but nothing on the line selected a job, so
-NoSpherA2 fell through to printing the help text. The two common causes:
+NoSpherA2 fell through to printing the help text into the log and exits 0; the
+console gets one line saying so on stderr. The two common causes:
 
 * The job flag was consumed as the **argument** of an earlier flag that takes
   one more value than you thought.

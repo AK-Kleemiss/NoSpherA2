@@ -1071,5 +1071,6 @@ static int run_app_impl(int argc, char **argv)
 	std::cout << "Did not understand the task to perform!\n"
 		<< help_message << endl;
 	log_file.flush();
+	std::cerr << "Did not understand the task to perform: no option on the command line selects a job. The help is in " << output_file << ", or run NoSpherA2 -h" << endl;
 	return 0;
 }

@@ -85,3 +85,60 @@ TEST(CliUsability, KnownOptionsPrintNothingToTheConsole)
 	const Parsed p = digest({"-acc", "1", "-no_date", "-all_charges"});
 	EXPECT_TRUE(p.err.empty()) << p.err;
 }
+
+//-h <word> prints the sections whose title holds the word, and names the sections when none does
+TEST(CliUsability, HelpSectionPrintsOnlyThatSection)
+{
+	const std::string gpu = help_section("gpu");
+	EXPECT_NE(gpu.find("GPU ACCELERATION"), std::string::npos) << gpu;
+	EXPECT_NE(gpu.find("-gpu_cublas"), std::string::npos) << gpu;
+	EXPECT_EQ(gpu.find("BONDING ANALYSIS"), std::string::npos) << gpu;
+	EXPECT_LT(gpu.size(), help_message.size() / 4);
+	const std::string none = help_section("no_such_section");
+	EXPECT_NE(none.find("No help section matches"), std::string::npos) << none;
+	EXPECT_NE(none.find("BONDING ANALYSIS"), std::string::npos) << none;
+}
+
+//every flag a digester compares against is in -h; case variants and old names count as listed
+TEST(CliUsability, EveryParsedFlagIsInTheHelp)
+{
+	const auto src = nos_test_repo_root() / "Src" / "core" / "options_parse.cpp";
+	std::ifstream in(src);
+	ASSERT_TRUE(in.good()) << src;
+	const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	auto lower = [](std::string s) { for (char& c : s) c = (char)tolower((unsigned char)c); return s; };
+	const std::string help = lower(help_message);
+	const std::set<std::string> aliases = {"-cube", "-nbo_native", "-lahvatest"};
+	std::vector<std::string> missing;
+	int found = 0;
+	for (size_t p = text.find("temp == \"-"); p != std::string::npos; p = text.find("temp == \"-", p + 1))
+	{
+		const size_t b = p + 9, e = text.find('"', b);
+		const std::string flag = lower(text.substr(b, e - b));
+		found++;
+		bool listed = false;
+		for (size_t q = help.find(flag); q != std::string::npos && !listed; q = help.find(flag, q + 1))
+			listed = q + flag.size() == help.size() || !(isalnum((unsigned char)help[q + flag.size()]) || help[q + flag.size()] == '_');
+		if (!listed && !aliases.count(text.substr(b, e - b)))
+			missing.push_back(text.substr(b, e - b));
+	}
+	ASSERT_GT(found, 100) << "the scan found nothing - did the parser move?";
+	EXPECT_TRUE(missing.empty()) << [&] { std::string s; for (const auto& m : missing) s += m + " "; return s; }();
+}
+
+//no job: the help goes to the log as before, and the console is told where it went
+TEST(CliUsability, NoJobTellsTheConsole)
+{
+	const std::filesystem::path log = std::filesystem::temp_directory_path() / "CliUsability_nojob.log";
+	std::vector<std::string> args = {"NoSpherA2", "-out", log.string(), "-no_date"};
+	std::vector<char*> argv;
+	for (std::string& a : args) argv.push_back(a.data());
+	std::ostringstream err;
+	std::streambuf* previous = std::cerr.rdbuf(err.rdbuf());
+	const int rc = run_app((int)args.size(), argv.data());
+	std::cerr.rdbuf(previous);
+	std::filesystem::remove(log);
+	EXPECT_EQ(rc, 0);
+	EXPECT_NE(err.str().find("Did not understand the task to perform"), std::string::npos) << err.str();
+	EXPECT_NE(err.str().find(log.string()), std::string::npos) << err.str();
+}

@@ -592,7 +592,7 @@ void options::look_for_debug(int &argc, char **argv)
 			// exit() below unwinds nothing, so without this the entire help text
 			// is written to the log file and the console stays empty.
 			std::cout.rdbuf(original_coutbuf());
-			std::cout << NoSpherA2_message() << help_message << build_date << std::endl;
+			std::cout << NoSpherA2_message() << (i + 1 < argc && argv[i + 1][0] != '-' ? help_section(argv[i + 1]) : help_message) << build_date << std::endl;
 			exit(0);
 		}
 	}
