@@ -168,8 +168,16 @@ bool WFN::read_orca_json_density(const std::filesystem::path &filename, std::ost
 	return read_gbw(gbw, file, debug, false, &natural);
 }
 
+bool WFN::known_wavefunction_format(const std::filesystem::path &fileName)
+{
+	static const svec ext = {".wfn", ".ffn", ".wfx", ".fch", ".fchk", ".FCh", ".FChK", ".FChk", ".xyz", ".molden", ".gbw", ".nat", ".mp2nat",
+		".json", ".xtb", ".stda", ".orbital_energies,restricted", ".MO_energies,r", ".molecular_orbitals,restricted", ".MOs,r"};
+	return std::find(ext.begin(), ext.end(), fileName.extension().string()) != ext.end() || fileName.string().find("stdout") != std::string::npos;
+}
+
 void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
 {
+	err_checkf(known_wavefunction_format(fileName), "Unknown filetype!", file);
 	if (fileName.extension() == ".wfn")
 		err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
 	else if (fileName.extension() == ".ffn")

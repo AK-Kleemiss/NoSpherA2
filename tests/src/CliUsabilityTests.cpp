@@ -40,6 +40,27 @@ void die_on(const std::vector<std::string>& args)
 	opt.digest_options();
 }
 
+//what an input form decides: the wavefunction, the analysis switches and the grid
+std::string fields(const std::vector<std::string>& args)
+{
+	std::vector<std::string> owned{"NoSpherA2"};
+	owned.insert(owned.end(), args.begin(), args.end());
+	std::vector<char*> argv;
+	for (auto& a : owned) argv.push_back(a.data());
+	int argc = static_cast<int>(argv.size());
+	std::ostringstream log, s;
+	options opt(argc, argv.data(), log);
+	opt.digest_options();
+	s << opt.wfn.string() << " eli " << opt.eli_analysis_run << opt.qtaim_only << " fba " << opt.fba << opt.eli_contributions << " npa " << opt.npa
+	  << opt.npa_orbitals << " ibo " << opt.ibo << " cube " << opt.properties.calc() << " grid " << opt.properties.resolution << " " << opt.properties.radius;
+	return s.str();
+}
+
+std::string fixture(const std::string& rel)
+{
+	return (nos_test_repo_root() / "tests" / rel).string();
+}
+
 } // namespace
 
 //The refusal names the flag and the file it could not find
@@ -187,6 +208,63 @@ TEST(CliUsability, TuneListPrintsTheKnobsAndStops)
 	EXPECT_NE(out.str().find("NOSPHERA2_ERI_DYNAMIC"), std::string::npos) << out.str();
 	EXPECT_NE(out.str().find("NOSPHERA2_GPU_BACKEND=cuda|hip"), std::string::npos) << out.str();
 	EXPECT_EXIT(digest({"-tune", "list", "-cif", "no_such_file.cif"}), ::testing::ExitedWithCode(0), "");
+}
+
+//an analysis flag takes its wavefunction right after it or from -wfn, on either side; both give the same options
+TEST(CliUsability, AnalysisFlagsTakeTheirWavefunctionEitherWay)
+{
+	const std::string w = fixture("RGBI_groups/nh3li.gbw");
+	ASSERT_TRUE(std::filesystem::exists(w)) << w;
+	EXPECT_EQ(fields({"-eli_analysis", w}), w + " eli 10 fba 00 npa 01 ibo 0 cube 0 grid 0.05 3");
+	EXPECT_EQ(fields({"-qtaim", w, "0.1", "2.5"}), w + " eli 11 fba 00 npa 01 ibo 0 cube 0 grid 0.1 2.5");
+	EXPECT_EQ(fields({"-fba", w}), w + " eli 00 fba 11 npa 01 ibo 0 cube 0 grid 0.05 3");
+	EXPECT_EQ(fields({"-wfn", w, "-npa"}), w + " eli 00 fba 00 npa 11 ibo 0 cube 0 grid 0.1 2");
+	EXPECT_EQ(fields({"-wfn", w, "-lap"}), w + " eli 00 fba 00 npa 01 ibo 0 cube 1 grid 0.1 2");
+	const std::vector<std::pair<std::vector<std::string>, std::vector<std::string>>> same = {
+		{{"-eli_analysis", w}, {"-wfn", w, "-eli_analysis"}},
+		{{"-eli_analysis", w}, {"-eli_analysis", "-wfn", w}},
+		{{"-eli_analysis", w, "0.1", "2.5"}, {"-wfn", w, "-eli_analysis", "0.1", "2.5"}},
+		{{"-qtaim", w, "0.1", "2.5"}, {"-qtaim", "0.1", "2.5", "-wfn", w}},
+		{{"-fba", w}, {"-wfn", w, "-fba"}},
+		{{"-fba", w}, {"-fba", "-wfn", w}},
+		{{"-wfn", w, "-npa"}, {"-npa", w}},
+		{{"-wfn", w, "-npa"}, {"-npa", w, "-wfn", w}},
+		{{"-wfn", w, "-npa_summary"}, {"-npa_summary", w}},
+		{{"-wfn", w, "-ibo"}, {"-ibo", w}},
+		//a file the reader does not know stays a stray token, as before
+		{{"-wfn", w, "-npa"}, {"-npa", fixture("tests.toml"), "-wfn", w}}};
+	for (const auto& p : same)
+		EXPECT_EQ(fields(p.second), fields(p.first)) << p.second[0] << " " << p.second[1];
+	for (const char* f : {"-rho", "-elf", "-eli", "-lap", "-esp", "-rdg", "-s_rho", "-def", "-HDEF", "-fukui", "-eli_spin"})
+		EXPECT_EQ(fields({f, w}), fields({"-wfn", w, f})) << f;
+}
+
+//neither form, or two different files: refused, naming both forms
+TEST(CliUsability, AnalysisFlagWithoutOrWithTwoWavefunctionsIsRefused)
+{
+	const auto code = ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE);
+	for (const char* f : {"-eli_analysis", "-qtaim", "-fba", "-topology", "-eli_family", "-nbo", "-nbo_external", "-convert_to_47", "-rho_cube", "-laplacian_bonds"})
+		EXPECT_EXIT(die_on({f, "-no_date"}), code, "needs a wavefunction") << f;
+	const std::string w = fixture("RGBI_groups/nh3li.gbw"), w2 = fixture("TFVC/water.gbw");
+	EXPECT_EXIT(die_on({"-npa", w, "-wfn", w2}), code, "Two wavefunctions on one line");
+	EXPECT_EXIT(die_on({"-wfn", w2, "-ibo", w}), code, "Two wavefunctions on one line");
+	EXPECT_EXIT(die_on({"-npa", w, "-ibo", w2}), code, "Two wavefunctions on one line");
+	//the -nbo handler reads its options from right after the flag when the file comes from -wfn
+	EXPECT_EXIT(die_on({"-nbo", "-nrt_maxx", "5", "-wfn", w}), code, "Unknown option -nrt_maxx");
+}
+
+//-wfn after a one-shot analysis that took its file from it is no ignored option; next to a file of its own it still is
+TEST(CliUsability, WfnReadByAOneShotAnalysisIsNotReportedAsIgnored)
+{
+	const std::string w = fixture("TFVC/water.gbw");
+	ASSERT_TRUE(std::filesystem::exists(w)) << w;
+	std::ostringstream out;
+	std::streambuf* previous = std::cout.rdbuf(out.rdbuf());
+	const Parsed after = digest({"-topology", "-wfn", w}), before = digest({"-wfn", w, "-topology"}), both = digest({"-topology", w, "-wfn", w});
+	std::cout.rdbuf(previous);
+	EXPECT_TRUE(after.err.empty()) << after.err;
+	EXPECT_TRUE(before.err.empty()) << before.err;
+	EXPECT_NE(both.err.find("WARNING: ignored after -topology, which runs its job and ends the command line: -wfn"), std::string::npos) << both.err;
 }
 
 //a one-shot option ends the command line: what follows is named, except what is read wherever it stands

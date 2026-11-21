@@ -320,6 +320,8 @@ public:
 	bool add_exp(const int& cent, const int& type, const double& e);
 	/** Auto-detect file type and read wavefunction. */
 	void read_known_wavefunction_format(const std::filesystem::path& fileName, std::ostream& file, const bool debug = false);
+	/** The files read_known_wavefunction_format reads: by extension, tonto by "stdout" in the name. */
+	static bool known_wavefunction_format(const std::filesystem::path& fileName);
 	/** @brief Declare def2 ECP cores when the orbitals hold exactly constants::ECP_electrons fewer
 	 *  electrons than the nuclei carry; no file states an ECP without -ECP, and filling from Z would
 	 *  count electrons the basis does not describe.  Any other deficit is left alone. */

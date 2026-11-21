@@ -400,6 +400,10 @@ struct options
 	std::filesystem::path eli_mask_cube;
 	//-no_spin_eli: skip the spin-resolved ELI-D basins of a spin-polarised wavefunction
 	bool spin_eli = true;
+	//-npa x.gbw: the wavefunctions written right after flags that otherwise read -wfn; each must be -wfn's
+	pathvec flag_wfns;
+	//a flag without its own file took -wfn from later on the line, so that -wfn is no ignored option
+	bool wfn_read_ahead = false;
 	int threads = -1;
 	int pbc = 0;
 	int charge = 0;
@@ -434,6 +438,10 @@ struct options
 	//development and test-only switches
 	bool digest_dev_options(const std::string &temp, int &i);
 	void digest_options();
+	//the wavefunction of a flag written without its own file: -wfn before it, else -wfn later on the line
+	std::filesystem::path line_wfn(const std::string &flag, const int i);
+	//-npa x.gbw: takes an existing wavefunction file right after a flag that otherwise reads -wfn
+	void flag_wavefunction(int &i);
 	void loadXCWsettings();
 	/** @brief The error for a requested analysis with no wavefunction to run on, "" when runnable;
 	 *  without -wfn/-occ run_app_impl skips its wavefunction branch silently. */

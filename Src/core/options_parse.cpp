@@ -202,6 +202,26 @@ static void merge_tshb_args(const pathvec& files, const svec& arguments, const i
 	merge_tshbs(files, "combined.tshb", cifs.empty() ? nullptr : &keys);
 }
 
+std::filesystem::path options::line_wfn(const std::string &flag, const int i)
+{
+	for (int j = i + 1; wfn.empty() && j + 1 < (int)arguments.size(); j++)
+		if (arguments[j] == "-wfn")
+			wfn = arguments[j + 1], wfn_read_ahead = true;
+	err_checkf(!wfn.empty(), flag + " needs a wavefunction: " + flag + " <file>, or -wfn <file> " + flag, std::cout);
+	err_checkf(std::filesystem::exists(wfn), flag + ": wavefunction does not exist: " + wfn.string(), std::cout);
+	return wfn;
+}
+
+void options::flag_wavefunction(int &i)
+{
+	if (i + 1 >= (int)arguments.size() || arguments[i + 1][0] == '-' || !std::filesystem::is_regular_file(arguments[i + 1]) ||
+		!WFN::known_wavefunction_format(arguments[i + 1]))
+		return;
+	flag_wfns.push_back(arguments[++i]);
+	if (wfn.empty())
+		wfn = flag_wfns.back();
+}
+
 bool options::digest_io_options(const std::string &temp, int &i)
 {
 	using namespace std;
@@ -221,11 +241,11 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		err_checkf(std::filesystem::exists(cif), "-cif: CIF doesn't exist: " + cif.string(), std::cout);
 	}
 	else if (temp == "-convert_to_47") {
-		err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
-		refuse_unknown_nbo_suboption(arguments, i + 2, "-convert_to_47");
-		std::filesystem::path _wfn = arguments[i + 1];
+		const int own = i + 1 < argc && arguments[i + 1][0] != '-';
+		refuse_unknown_nbo_suboption(arguments, i + 1 + own, "-convert_to_47");
+		std::filesystem::path _wfn = own ? std::filesystem::path(arguments[i + 1]) : line_wfn(temp, i);
 		std::string keys;
-		for (int j = i + 2; j + 1 < argc; j++)
+		for (int j = i + 1 + own; j + 1 < argc; j++)
 			if (arguments[j] == "-nbo_keywords") keys = arguments[j + 1];
 		WFN wavy(e_origin::NOT_YET_DEFINED);
 		wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
@@ -234,12 +254,12 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		finished = true; return true;
 	}
 	else if (temp == "-nbo_external") {
-		err_checkf(argc >= i + 2, "Not enough arguments for -nbo_external\nPlease provide a wavefunction!", std::cout);
-		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_external");
+		const int own = i + 1 < argc && arguments[i + 1][0] != '-';
+		refuse_unknown_nbo_suboption(arguments, i + 1 + own, "-nbo_external");
 		NboRunOptions opt;
-		opt.wavefunction = arguments[i + 1];
+		opt.wavefunction = own ? std::filesystem::path(arguments[i + 1]) : line_wfn(temp, i);
 		opt.debug = debug;
-		for (int j = i + 2; j + 1 < argc; j++) {
+		for (int j = i + 1 + own; j + 1 < argc; j++) {
 			if (arguments[j] == "-nbo_keywords") opt.keywords = arguments[j + 1];
 			else if (arguments[j] == "-nbo_exe") opt.executable = arguments[j + 1];
 			else if (arguments[j] == "-nbo_json") opt.json_out = arguments[j + 1];
@@ -271,20 +291,20 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	else if (temp == "-nbo" || temp == "-nbo_native") {
 		//-nbo_native is the old name, kept for scripts and Olex2 builds that still send it.
 		//Same JSON as -nbo_external, so tests/nbo_reference/compare_nbo.py compares the two.
-		err_checkf(argc >= i + 2, "Not enough arguments for " + temp + "\nPlease provide a wavefunction!", std::cout);
-		refuse_unknown_nbo_suboption(arguments, i + 2, temp);
+		const int own = i + 1 < argc && arguments[i + 1][0] != '-';
+		refuse_unknown_nbo_suboption(arguments, i + 1 + own, temp);
 		//-nbo ran gennbo until 29 Oct 2026; its options here mean an old command line, not a native run
-		for (int j = i + 2; j < argc; j++)
+		for (int j = i + 1 + own; j < argc; j++)
 			err_checkf(arguments[j] != "-nbo_exe" && arguments[j] != "-nbo_keywords" && arguments[j] != "-nbo_dir",
 					   arguments[j] + " belongs to the external gennbo run, which is -nbo_external now; " + temp +
 						   " is the in-house analysis and would ignore it",
 					   std::cout);
-		std::filesystem::path _wfn = arguments[i + 1];
+		std::filesystem::path _wfn = own ? std::filesystem::path(arguments[i + 1]) : line_wfn(temp, i);
 		err_checkf(std::filesystem::exists(_wfn), "wavefunction doesn't exist: " + _wfn.string(), std::cout);
 		NboOptions opt;
 		opt.debug = debug;
 		std::filesystem::path json = _wfn.parent_path() / (_wfn.stem().string() + ".native.nbo.json");
-		for (int j = i + 2; j + 1 < argc; j++) {
+		for (int j = i + 1 + own; j + 1 < argc; j++) {
 			if (arguments[j] == "-nbo_json") json = arguments[j + 1];
 			else if (arguments[j] == "-nbo_47") opt.file47 = arguments[j + 1];
 			else if (arguments[j] == "-nbo_ref") opt.reference_scf = arguments[j + 1];
@@ -351,7 +371,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 				while (is >> a) opt.nrt_subspace.push_back(a);
 			}
 		}
-		for (int j = i + 2; j < argc; j++)
+		for (int j = i + 1 + own; j < argc; j++)
 			if (arguments[j] == "-nrt") opt.nrt = true;
 			else if (arguments[j] == "-nrt_exhaustive") opt.nrt_exhaustive = true;
 			else if (arguments[j] == "-nrt_no_symmetry") opt.nrt_symmetry = false;
@@ -717,7 +737,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		}
 	}
 	else if (temp == "-def" || temp == "-DEF")
-		properties.def = true;
+		properties.def = true, flag_wavefunction(i);
 	else if (temp == "-ED")
 		electron_diffraction = true;
 	else if (temp == "-embis" || temp == "-EMBIS")
@@ -725,7 +745,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		partition_type = PartitionType::EMBIS;
 	}
 	else if (temp == "-HDEF" || temp == "-hdef")
-		properties.hdef = true;
+		properties.hdef = true, flag_wavefunction(i);
 	else if (temp == "-hirsh")
 		properties.hirsh = true, properties.hirsh_number = stoi(arguments[i + 1]);
 	else if (temp == "-tsc_block")
@@ -1001,13 +1021,13 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		all_charges = true;
 	else if (temp == "-laplacian_bonds")
 	{
-		wfn = arguments[i + 1];
+		wfn = i + 1 < argc && arguments[i + 1][0] != '-' ? std::filesystem::path(arguments[i + 1]) : line_wfn(temp, i);
 		bondwise_laplacian_plots(wfn);
 		finished = true; return true;
 	}
 	else if (temp == "-laplacian_bond_paths")
 	{
-		wfn = arguments[i + 1];
+		wfn = i + 1 < argc && arguments[i + 1][0] != '-' ? std::filesystem::path(arguments[i + 1]) : line_wfn(temp, i);
 		bondwise_laplacian_plots(wfn, true);
 		finished = true; return true;
 	}
@@ -1090,18 +1110,23 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		finished = true; return true;
 	}
 	else if (temp == "-eli")
-		properties.eli = true;
+		properties.eli = true, flag_wavefunction(i);
 	else if (temp == "-eli_spin")
-		properties.eli_spin = true;
+		properties.eli_spin = true, flag_wavefunction(i);
 	//The basins use the analytic field; resolution and radius only shape the cube built for -basin_cube
 	//and a fitted density
 	else if (temp == "-eli_analysis" || temp == "-qtaim") {
-		err_checkf(argc >= i + 2, "Not enough arguments for " + temp + "\nPlease provide a wfn!", std::cout);
-		wfn = arguments[i + 1];
-		err_checkf(std::filesystem::exists(wfn), temp + ": wavefunction does not exist: " + wfn.string(), std::cout);
+		//-wfn x -eli_analysis 0.1 3.0: a number that names no file is the resolution
+		char *end = nullptr;
+		if (i + 1 < argc && arguments[i + 1][0] != '-' &&
+			(std::filesystem::exists(arguments[i + 1]) || (std::strtod(arguments[i + 1].c_str(), &end), *end != '\0'))) {
+			wfn = arguments[++i];
+			err_checkf(std::filesystem::exists(wfn), temp + ": wavefunction does not exist: " + wfn.string(), std::cout);
+		}
+		else
+			line_wfn(temp, i);
 		properties.resolution = 0.05;
 		properties.radius = 3.0;
-		i += 1;
 		if (argc >= i + 3 && arguments[i + 1][0] != '-' && arguments[i + 2][0] != '-') {
 			properties.resolution = stod(arguments[i + 1]);
 			properties.radius = stod(arguments[i + 2]);
@@ -1111,33 +1136,38 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		qtaim_only = temp == "-qtaim";
 	}
 	else if (temp == "-fba") {
-		err_checkf(argc >= i + 2, "Not enough arguments for -fba\nPlease provide a wfn!", std::cout);
-		wfn = arguments[i + 1];
-		err_checkf(std::filesystem::exists(wfn), "-fba: wavefunction does not exist: " + wfn.string(), std::cout);
+		if (i + 1 < argc && arguments[i + 1][0] != '-') {
+			wfn = arguments[++i];
+			err_checkf(std::filesystem::exists(wfn), "-fba: wavefunction does not exist: " + wfn.string(), std::cout);
+		}
+		else
+			line_wfn(temp, i);
 		properties.resolution = 0.05;
 		properties.radius = 3.0;
-		i += 1;
 		fba = true;
 		eli_contributions = true;
 	}
 	//Runs inline rather than setting a flag: it has no cube or basin output to schedule
 	else if (temp == "-eli_family") {
-		err_checkf(argc >= i + 2, "Not enough arguments for -eli_family\nPlease provide at least a wfn!", std::cout);
-		err_checkf(std::filesystem::exists(arguments[i + 1]), "-eli_family: wavefunction does not exist: " + arguments[i + 1], std::cout);
-		const bool has_points = argc >= i + 3 && arguments[i + 2].size() > 0 && arguments[i + 2][0] != '-';
-		eli_family::report(arguments[i + 1], has_points ? std::filesystem::path(arguments[i + 2]) : std::filesystem::path());
+		//-wfn x -eli_family points.txt: an existing file the reader does not know is the points file
+		const int own = i + 1 < argc && arguments[i + 1][0] != '-' &&
+			(WFN::known_wavefunction_format(arguments[i + 1]) || !std::filesystem::exists(arguments[i + 1]));
+		const std::filesystem::path w = own ? std::filesystem::path(arguments[i + 1]) : line_wfn(temp, i);
+		err_checkf(std::filesystem::exists(w), "-eli_family: wavefunction does not exist: " + w.string(), std::cout);
+		const bool has_points = argc >= i + 2 + own && arguments[i + 1 + own].size() > 0 && arguments[i + 1 + own][0] != '-';
+		eli_family::report(w, has_points ? std::filesystem::path(arguments[i + 1 + own]) : std::filesystem::path());
 		finished = true; return true;
 	}
 	else if (temp == "-topology") {
-		err_checkf(argc >= i + 2, "Not enough arguments for -topology\nPlease provide a wfn!", std::cout);
-		err_checkf(std::filesystem::exists(arguments[i + 1]), "-topology: wavefunction does not exist: " + arguments[i + 1], std::cout);
+		const std::filesystem::path w = i + 1 < argc && arguments[i + 1][0] != '-' ? std::filesystem::path(arguments[i + 1]) : line_wfn(temp, i);
+		err_checkf(std::filesystem::exists(w), "-topology: wavefunction does not exist: " + w.string(), std::cout);
 		{
-			const bool complete = topology::report(arguments[i + 1], std::cout);
+			const bool complete = topology::report(w, std::cout);
 			finished = true;
 			//An INCOMPLETE set must exit non-zero. Some incomplete sets balance the Poincare-Hopf sum and
 			//fail only the bond-graph rank, so the message names both.
 			err_checkf(complete, "-topology: the set of critical points printed above is INCOMPLETE "
-								 "for " + arguments[i + 1] + " - either the Poincare-Hopf sum does "
+								 "for " + w.string() + " - either the Poincare-Hopf sum does "
 								 "not close, or it closes while contradicting the bond graph. See the "
 								 "diagnosis printed with the verdict for which class is short or "
 								 "spurious",
@@ -1206,9 +1236,9 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		finished = true; return true;
 	}
 	else if (temp == "-elf")
-		properties.elf = true;
+		properties.elf = true, flag_wavefunction(i);
 	else if (temp == "-esp")
-		properties.esp = true;
+		properties.esp = true, flag_wavefunction(i);
 	else if (temp == "-esp_isosurface")
 	{
 		properties.esp_isosurface = 0.002;
@@ -1267,7 +1297,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	else if (temp == "-gpu_blas")
 		gpu_blas = true;
 	else if (temp == "-fukui" || temp == "-Fukui")
-		properties.fukui = true;
+		properties.fukui = true, flag_wavefunction(i);
 	else if (temp == "-fukui_analysis")
 	{
 		// Only records the request; the analysis itself runs from
@@ -1355,7 +1385,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		hirshfeld_surface2 = arguments[i + 2];
 	}
 	else if (temp == "-lap")
-		properties.lap = true;
+		properties.lap = true, flag_wavefunction(i);
 	else if (temp == "-MO")
 	{
 		if (string(arguments[i + 1]) != "all")
@@ -1426,12 +1456,12 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	else if (temp == "-promol_nci_single_thread")
 		properties.promol_nci_single_threaded = true;
 	else if (temp == "-rdg")
-		properties.rdg = true;
+		properties.rdg = true, flag_wavefunction(i);
 	else if (temp == "-rho")
-		properties.rho = true; //the help advertised it; until now a density cube was only a by-product of -lap and friends
+		properties.rho = true, flag_wavefunction(i); //the help advertised it; until now a density cube was only a by-product of -lap and friends
 	else if (temp == "-rho_cube")
 	{
-		string wfn_name = arguments[i + 1];
+		string wfn_name = i + 1 < argc && arguments[i + 1][0] != '-' ? arguments[i + 1] : line_wfn(temp, i).string();
 		std::cout << "Reading wavefunction: " << wfn_name << endl;
 		WFN wavy = WFN(wfn_name);
 		std::cout << "Assigning ECPs" << endl;
@@ -1442,7 +1472,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		finished = true; return true;
 	}
 	else if (temp.find("-s_rho") < 1)
-		properties.s_rho = true;
+		properties.s_rho = true, flag_wavefunction(i);
 	else if (temp == "-atom_dens_diff")
 	{
 		filesystem::path name_wfn_1 = arguments[i + 1];
@@ -1615,9 +1645,9 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		featomic_structures = geometry_aid::read_structure_list(arguments[++i]);
 	}
 	else if (temp == "-npa")
-		npa = true;
+		npa = true, flag_wavefunction(i);
 	else if (temp == "-ibo")
-		ibo = true;
+		ibo = true, flag_wavefunction(i);
 	else if (temp == "-ibo_cube") {
 		err_checkf(i + 1 < argc, "-ibo_cube needs the IBO list", std::cout);
 		properties.ibo_cube = arguments[++i];
@@ -1635,6 +1665,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	else if (temp == "-npa_summary") {
 		npa = true;
 		npa_orbitals = false;
+		flag_wavefunction(i);
 	}
 	//-rgbi <wfn>, like -nbo and -eli_analysis; the bare flag still reads -wfn
 	else if (temp == "-rgbi") {
@@ -2134,7 +2165,7 @@ void options::digest_options()
 				if (!(o.size() > 1 && o[0] == '-' && isalpha(static_cast<unsigned char>(o[1]))))
 					continue;
 				replace(o.begin() + 1, o.end(), '-', '_');
-				if (o == "-tune" || o == "-out" || o == "-no_date" || o == "-no_date_but_gpu" || o == "-v" || o == "-v2" || o == "-debug" ||
+				if (o == "-tune" || o == "-out" || o == "-no_date" || o == "-no_date_but_gpu" || o == "-v" || o == "-v2" || o == "-debug" || (wfn_read_ahead && o == "-wfn") ||
 					(nbo && (nbo_family_suboptions().count(o) || o == "-cpus")) || (temp.rfind("-merge", 0) == 0 && o == "-cif"))
 					continue;
 				ignored += " " + arguments[j];
@@ -2182,6 +2213,10 @@ void options::digest_options()
 		if (debug)
 			log_file << "Using -xyz input as the SALTED structure: " << wfn << endl;
 	}
+	std::error_code ec;
+	for (int j = 0; j < flag_wfns.size(); j++)
+		err_checkf(std::filesystem::equivalent(flag_wfns[j], wfn, ec), "Two wavefunctions on one line: " + flag_wfns[j].string() + " and " +
+			wfn.string() + ". Name one, right after the analysis flag or with -wfn", log_file);
 	//-multipole_moments without -ri_fit: auto_aux, whichever order the two came in
 	if (multipole_lmax >= 0 && aux_basis.empty())
 		aux_basis.push_back(std::make_shared<BasisSet>());
@@ -2606,7 +2641,7 @@ std::string options::unrunnable_analysis() const
 		if (a.first)
 			return std::string(a.second) + " was asked for, but no wavefunction was given.\n" +
 				   "       Name one with -wfn <file.gbw|.wfx|.fchk|.molden|.wfn> or with -occ;\n" +
-				   "       this option does not take the wavefunction as a bare argument.";
+				   "       -rgbi, -npa and -ibo also take it right after the flag.";
 	return "";
 }
 

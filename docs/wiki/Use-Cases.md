@@ -11,6 +11,10 @@ result.
 The invocations are modelled on the regression suite in `tests/tests.toml`,
 which is the authoritative set of command lines that are known to work.
 
+The analyses take their wavefunction either way: `-topology epoxide.gbw` is
+`-wfn epoxide.gbw -topology`, `-wfn nh3bh3.gbw -npa` is `-npa nh3bh3.gbw`. Each recipe
+shows one form; [Command reference](Command-Reference.md) says which flags take both.
+
 ---
 
 ## 1. Aspherical form factors for a refinement

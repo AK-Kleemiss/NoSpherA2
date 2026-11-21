@@ -80,11 +80,11 @@ TEST(CliRefusal, RgbiWithoutWavefunctionExitsNonZeroAndNamesTheInput)
 	EXPECT_NE(out.find("-wfn"), std::string::npos) << out;
 }
 
-//NPA shares the RGBI branch
+//NPA shares the RGBI branch; -npa <file> names one (CliUsability.AnalysisFlagsTakeTheirWavefunctionEitherWay)
 TEST(CliRefusal, NpaWithoutWavefunctionExitsNonZero)
 {
 	Cli cli("npa");
-	EXPECT_NE(cli.run({"-npa", fixture("RGBI_groups/nh3li.gbw").string()}), 0);
+	EXPECT_NE(cli.run({"-npa"}), 0);
 	EXPECT_NE(cli.output().find("-npa"), std::string::npos) << cli.output();
 }
 
