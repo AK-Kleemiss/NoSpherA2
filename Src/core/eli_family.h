@@ -128,12 +128,6 @@ inline double calculate_eli_d(const WFN& w, const d3& p, const int spin)
 	eli_family::spin_fields(w, p, f);
 	return eli_family::eli_d(f.rho[spin], eli_family::g_same_spin(f, spin));
 }
-inline double calculate_eli_q(const WFN& w, const d3& p, const int spin)
-{
-	eli_family::SpinFields f;
-	eli_family::spin_fields(w, p, f);
-	return eli_family::eli_q(f.rho[spin], eli_family::g_same_spin(f, spin));
-}
 //density_factor depends on N and N_beta only: hoist triplet_density_factor(w) out of a grid loop
 inline double calculate_eli_d_triplet(const WFN& w, const d3& p, const double density_factor)
 {
@@ -143,11 +137,6 @@ inline double calculate_eli_d_triplet(const WFN& w, const d3& p, const double de
 }
 inline double calculate_eli_d_triplet(const WFN& w, const d3& p) { return calculate_eli_d_triplet(w, p, eli_family::triplet_density_factor(w)); }
 
-//A density-only source has no spin resolution: PC07 orbital-free ELI-D of calculate_eli() and its
-//ELI-q partner; no triplet, which needs N
+//A density-only source has no spin resolution: PC07 orbital-free ELI-D of calculate_eli(); no
+//triplet, which needs N
 template<PointDensity S> double calculate_eli_d(const S& s, const d3& p, const int) { return calculate_eli(s, p); }
-template<PointDensity S> double calculate_eli_q(const S& s, const d3& p, const int)
-{
-	const double y = calculate_eli(s, p);
-	return y > 0.0 ? std::pow(y, -8.0 / 3.0) : 0.0;
-}
