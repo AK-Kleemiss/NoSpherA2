@@ -595,6 +595,13 @@ void options::look_for_debug(int &argc, char **argv)
 			std::cout << NoSpherA2_message() << (i + 1 < argc && argv[i + 1][0] != '-' ? help_section(argv[i + 1]) : help_message) << build_date << std::endl;
 			exit(0);
 		}
+		else if (temp == "-tune" && i + 1 < argc && std::string(argv[i + 1]) == "list")
+		{
+			std::cout.rdbuf(original_coutbuf());
+			tuning_list(std::cout);
+			std::cout.flush();
+			exit(0);
+		}
 	}
 };
 

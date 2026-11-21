@@ -709,6 +709,7 @@ std::string help_message =
  "                                    is 1. Diagnostics and cut-offs such as\n"
  "                                    NOSPHERA2_GPU_BACKEND=hip or NOS_RGBI_DEBUG,\n"
  "                                    formerly environment variables.\n"
+ "  -tune list                         Print every knob with its default and stop.\n"
  "  -no_date                           Suppress date information and the GPU notes, so\n"
  "                                    output does not depend on the machine it ran on.\n"
  "  -no_date_but_gpu                   As -no_date, but keeps the GPU notes. For the\n"

@@ -3,7 +3,9 @@
 
 A knob is a literal name passed to tuning() or to one of its wrappers (tuning_double in basin_integration.cpp,
 read_threshold in rgbi.cpp, nao_knob in nao.cpp). A knob read through a variable or a
-new wrapper is invisible here: add the wrapper to CALL. Exit status 1 when the two sets differ.
+new wrapper is invisible here: add the wrapper to CALL. It also checks that the table -tune list prints
+(documented_knobs in Src/core/tuning.cpp) holds the page's first two columns, without the backticks.
+Exit status 1 when the sets differ.
 """
 import io
 import os
@@ -15,6 +17,8 @@ PAGE = os.path.join(ROOT, "docs", "wiki", "Tuning-Knobs.md")
 CALL = re.compile(r'\b(?:tuning|tuning_double|read_threshold|nao_knob)\(\s*"([A-Z][A-Z0-9_]+)"')
 #A knob name in the first column of a table row, with or without =VALUE
 ROW = re.compile(r"^\| `([A-Z][A-Z0-9_]+)[`=]", re.M)
+REGISTRY = os.path.join(ROOT, "Src", "core", "tuning.cpp")
+ENTRY = re.compile(r'^\t\{"([^"]+)", "([^"]*)"\},\r?$', re.M)
 
 
 def source_knobs():
@@ -41,9 +45,20 @@ def main():
         print("not on the page: %s (%s)" % (k, src[k]))
     for k in stale:
         print("on the page, read by no source: %s" % k)
-    if not missing and not stale:
-        print("%d knobs, page and sources agree" % len(src))
-    return 1 if missing or stale else 0
+    rows = set()
+    for line in text.split("\n"):
+        if line.startswith("| `"):
+            c = [x.strip().replace("`", "").replace("\\|", "|") for x in line.strip().strip("|").split(" | ")]
+            rows.add((c[0], c[1]))
+    table = set(ENTRY.findall(io.open(REGISTRY, encoding="utf-8").read()))
+    for r in sorted(rows - table):
+        print("on the page, not in documented_knobs: %s = %s" % r)
+    for r in sorted(table - rows):
+        print("in documented_knobs, not on the page: %s = %s" % r)
+    differ = missing or stale or rows != table
+    if not differ:
+        print("%d knobs, page, sources and -tune list agree" % len(src))
+    return 1 if differ else 0
 
 
 if __name__ == "__main__":

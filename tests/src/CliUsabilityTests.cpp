@@ -155,3 +155,30 @@ TEST(CliUsability, NoJobTellsTheConsole)
 	EXPECT_NE(err.str().find("Did not understand the task to perform"), std::string::npos) << err.str();
 	EXPECT_NE(err.str().find(log.string()), std::string::npos) << err.str();
 }
+
+//-tune NAME is set whatever NAME is, as before; one no source documents is reported
+TEST(CliUsability, UnknownTuningKnobIsReportedAndStillSet)
+{
+	EXPECT_TRUE(tuning_known("NOSPHERA2_XCW_RCHECK"));
+	EXPECT_TRUE(tuning_known("NOSPHERA2_ERI_DYNAMIC"));
+	EXPECT_FALSE(tuning_known("NOSPHERA2_NO_SUCH_KNOB"));
+	Parsed p = digest({"-tune", "NOSPHERA2_NO_SUCH_KNOB=2"});
+	ASSERT_NE(tuning("NOSPHERA2_NO_SUCH_KNOB"), nullptr);
+	EXPECT_STREQ(tuning("NOSPHERA2_NO_SUCH_KNOB"), "2");
+	tuning_end_run();
+	EXPECT_NE(p.err.find("WARNING: -tune NOSPHERA2_NO_SUCH_KNOB"), std::string::npos) << p.err;
+	EXPECT_EQ(p.log.find("NOSPHERA2_NO_SUCH_KNOB"), std::string::npos) << p.log;
+	p = digest({"-tune", "NOSPHERA2_ERI_DYNAMIC"});
+	tuning_end_run();
+	EXPECT_TRUE(p.err.empty()) << p.err;
+}
+
+//-tune list prints the documented knobs and stops before any input is read
+TEST(CliUsability, TuneListPrintsTheKnobsAndStops)
+{
+	std::ostringstream out;
+	tuning_list(out);
+	EXPECT_NE(out.str().find("NOSPHERA2_ERI_DYNAMIC"), std::string::npos) << out.str();
+	EXPECT_NE(out.str().find("NOSPHERA2_GPU_BACKEND=cuda|hip"), std::string::npos) << out.str();
+	EXPECT_EXIT(digest({"-tune", "list", "-cif", "no_such_file.cif"}), ::testing::ExitedWithCode(0), "");
+}

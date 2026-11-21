@@ -597,7 +597,7 @@ interface and can change without notice.
 | --- | --- |
 | `-test` | Run the built-in test suite. |
 | `-profiling [root]` | Profiling run; `root` defaults to `tests`. Also `-profile`. |
-| `-tune NAME[=VALUE]` | Set a developer knob for this run; a bare `NAME` means `1`. Every knob is listed in [Tuning knobs](Tuning-Knobs.md). |
+| `-tune NAME[=VALUE]` | Set a developer knob for this run; a bare `NAME` means `1`. Every knob is listed in [Tuning knobs](Tuning-Knobs.md); `-tune list` prints them with their defaults and stops. |
 | `-partitioning_test` | Partitioning regression test. |
 | `-test_RI` | RI-fitting regression test. |
 | `-RI_WFN_DIFF` | Compare a fitted density against the wavefunction it came from. |

@@ -2076,6 +2076,8 @@ void options::digest_options()
 			const std::string &knob = arguments[++i];
 			const size_t eq = knob.find('=');
 			const std::string name = knob.substr(0, eq);
+			if (!tuning_known(name))
+				std::cerr << "WARNING: -tune " << name << " is no knob this build documents; -tune list shows them" << endl;
 			const char *old = tuning(name.c_str());
 			run_tuned.emplace_back(name, old ? std::optional<std::string>(old) : std::nullopt);
 			set_tuning(name, eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
