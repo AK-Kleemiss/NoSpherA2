@@ -430,7 +430,26 @@ const double WFN::compute_g_cartesian(
 
 	// precalculate some distances and powers of distances for faster computation
 	for (j = 0; j < ncen; j++)
-		cart_powers(d[j].data(), Pos, atoms[j]);
+	{
+		const atom &a = atoms[j];
+		d_ = d[j].data();
+		d_[0] = Pos[0] - a.get_coordinate(0);
+		d_[1] = Pos[1] - a.get_coordinate(1);
+		d_[2] = Pos[2] - a.get_coordinate(2);
+		d_[4] = d_[0] * d_[0];
+		d_[5] = d_[1] * d_[1];
+		d_[6] = d_[2] * d_[2];
+		d_[3] = d_[4] + d_[5] + d_[6];
+		d_[7] = d_[0] * d_[4];
+		d_[8] = d_[1] * d_[5];
+		d_[9] = d_[2] * d_[6];
+		d_[10] = d_[0] * d_[7];
+		d_[11] = d_[1] * d_[8];
+		d_[12] = d_[2] * d_[9];
+		d_[13] = d_[0] * d_[10];
+		d_[14] = d_[1] * d_[11];
+		d_[15] = d_[2] * d_[12];
+	}
 
 	// Pre-cache frequently accessed data
 	const int *centers_data = centers.data();
@@ -776,7 +795,25 @@ const double WFN::compute_spin_dens_cartesian(
 	int j;
 
 	for (j = 0; j < ncen; j++)
-		cart_powers(d[j].data(), Pos, atoms[j]);
+	{
+		d_ = d[j].data();
+		d_[0] = Pos[0] - atoms[j].get_coordinate(0);
+		d_[1] = Pos[1] - atoms[j].get_coordinate(1);
+		d_[2] = Pos[2] - atoms[j].get_coordinate(2);
+		d_[4] = d_[0] * d_[0];
+		d_[5] = d_[1] * d_[1];
+		d_[6] = d_[2] * d_[2];
+		d_[3] = d_[4] + d_[5] + d_[6];
+		d_[7] = d_[0] * d_[4];
+		d_[8] = d_[1] * d_[5];
+		d_[9] = d_[2] * d_[6];
+		d_[10] = d_[0] * d_[7];
+		d_[11] = d_[1] * d_[8];
+		d_[12] = d_[2] * d_[9];
+		d_[13] = d_[0] * d_[10];
+		d_[14] = d_[1] * d_[11];
+		d_[15] = d_[2] * d_[12];
+	}
 
 	const int *centers_data = centers.data();
 	const int *types_data = types.data();
