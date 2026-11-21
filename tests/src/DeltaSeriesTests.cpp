@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "core/spherical_density.h"
-#include "core/constants.h"
-#include "core/Slater_delta_coefs.h"
-#include "core/GTO_ion_delta_coefs.h"
+#include "core/tsc/spherical_density.h"
+#include "core/base/constants.h"
+#include "core/tsc/Slater_delta_coefs.h"
+#include "core/tsc/GTO_ion_delta_coefs.h"
 
 // The delta_k series replaces the extrapolation rho_q = (1-|q|) rho_0 + |q| rho_ion for |q| > 1 by
 // rho_q = rho_n - f * delta_{n+1}, rho_n = rho_1 - sum_{k=2..n} delta_k, between adjacent bound states.

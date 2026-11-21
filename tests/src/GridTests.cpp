@@ -1,15 +1,15 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/AtomGrid.h"
-#include "core/GridManager.h"
-#include "core/cell.h"
-#include "core/cube.h"
-#include "core/wfn_class.h"
-#include "core/spherical_density.h"
-#include "core/integrator.h"
-#include "core/sphere_lebedev_rule.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/integration/AtomGrid.h"
+#include "core/integration/GridManager.h"
+#include "core/xcw/cell.h"
+#include "core/properties/cube.h"
+#include "core/wfn/wfn_class.h"
+#include "core/tsc/spherical_density.h"
+#include "core/integration/integrator.h"
+#include "core/base/sphere_lebedev_rule.h"
 
 #include <iomanip>
 #include <numeric>

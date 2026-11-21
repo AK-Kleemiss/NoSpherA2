@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/wfn_class.h"
+#include "core/base/convenience.h"
+#include "core/wfn/wfn_class.h"
 
 int QCT(options& opt, std::vector<WFN>& wavy);
 

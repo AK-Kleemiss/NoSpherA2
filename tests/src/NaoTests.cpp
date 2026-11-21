@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "core/nao.h"
-#include "core/wfn_class.h"
+#include "core/nbo/nao.h"
+#include "core/wfn/wfn_class.h"
 
 //NAO/NPA checks.  The numbers come from NBO 7.0.9 run on the same wavefunction.
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "pch.h"
+#include "../pch.h"
 #include "convenience.h"
 #include "constants.h"
 #include "wfn_class.h"

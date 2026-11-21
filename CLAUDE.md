@@ -63,12 +63,12 @@ the ROCm SDK wheels (`NOSPHERA2_BOOTSTRAP_ROCM_VERSION`, default the CI's 10.0.0
 from there. Skipped when a ROCm is already installed (`HIP_PATH`, `ROCM_PATH`, `/opt/rocm`).
 
 Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
-into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
-`Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
+into its own namespace (`Src/core/gpu/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
+`Src/core/gpu/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
 device (CUDA probed first; `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). A function
 added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
 fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
-name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
+name in `Src/core/gpu/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
 `dlopen`s / `LoadLibrary`s `libamdhip64.so.<major>` / `amdhip64_<major>.dll` on the first call
 (`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
 none - the shim rather than delay-loading because clang registers the kernels with the runtime from
@@ -209,14 +209,28 @@ scripts/             Micromamba/bootstrap/GPU-toolkit helper scripts
 Linux/               Linux packaging/build helper scripts
 ```
 
-Key core modules live in `Src/core`:
+`Src/core` is split into subsystem folders. Every folder is on the include path, so sources include a
+core header by its name alone (`#include "wfn_class.h"`) and file names must stay unique across the folders;
+code outside the target writes `core/<folder>/<file>`. The root keeps the CLI front end (`NoSpherA2.cpp/h`,
+`options.h`, `options_parse.cpp`, `help_text.cpp`, `banner.cpp`, `dev_diagnostics.cpp/h`), `pch.h` and the
+`CMakeLists.txt`.
 
-- I/O: `fchk.cpp/h`, `cif.cpp/h`, `wfn_class.cpp/h`
-- Molecular representation: `atoms.cpp/h`, `basis_set.cpp/h`
-- Integration engine: `AtomGrid.cpp/h`, `GridManager.cpp/h`, `integrator.cpp/h`, `integration_params.cpp/h`
-- Math/integrals: `nos_math.cpp/h`, `libCintMain.cpp/h`, `libCintKernels.cpp/h`
-- Analysis/output: `scattering_factors.cpp/h`, `bondwise_analysis.cpp/h`, `isosurface.cpp/h`, `properties.cpp/h`, `cube.cpp/h`, `tsc_block.h`
-- ML density: `SALTED_*.cpp/h`
+- `base/`: typedefs and helpers (`convenience.cpp/h`, `nos_types.h`, `constants.cpp/h`, `nos_math.cpp/h`, `tuning.cpp/h`,
+  `citations.cpp/h`, `sphere_lebedev_rule.cpp/h`, `hkl.h`, ...)
+- `wfn/`: wavefunction and its readers/writers (`wfn_*.cpp`, `wfn_class.h`, `atoms.cpp/h`, `fchk.cpp/h`, `basis_set.cpp/h`,
+  `ccsd_density.cpp/h`, `density_source.h`)
+- `integration/`: grids and integrals (`AtomGrid.cpp/h`, `GridManager.cpp/h`, `integrator.cpp/h`, `integration_params.cpp/h`,
+  `libCintMain.cpp/h`, `libCintKernels.cpp/h`, `aux_density*`)
+- `tsc/`: scattering factors and tables (`scattering_factors.cpp/h`, `sf_*.cpp`, `tsc_block.h`, `tshb_block.h`, `cif.cpp/h`,
+  `spherical_density.cpp/h`, `gaussian_atom.cpp/h`, `ECPs_corrections.cpp/h`, the Thakkar/Slater/GTO tables)
+- `xcw/`: X-ray constrained wavefunctions (`XCW_*`, `SCF_*`, `structure_factors.cpp/h`, `xcw_*`, `cell.cpp/h`, `stored_eri.cpp/h`)
+- `salted/`: ML density (`SALTED_*.cpp/h`)
+- `nbo/`: `nao`, `nbo`, `nrt`, `ibo`
+- `analysis/`: ELI/QTAIM basins and bonding (`eli_*`, `topology`, `b2c`, `basin_*`, `bondwise_analysis`, `rgbi`, `qct`, `eqc`,
+  `crystal_energies`, `geometry_aid`, `ci_rdm2`)
+- `properties/`: grids and cubes (`properties*`, `cube.cpp/h`, `isosurface.cpp/h`, `dipoles.cpp`, `polarizabilities.cpp`)
+- `gpu/`: CUDA/HIP kernels (`*.cu`, `*.cuh`, `*_gpu.h`), `gpu_api.h`, `gpu_backend.h`, `gpu_dispatch.cpp`,
+  `hip_runtime_shim.cpp`, `cublas_dynamic.cpp/h`, `itensor_metal.mm`
 
 ## Dependency and Linking Notes
 
@@ -520,8 +534,8 @@ gtests are ported and the eleven CPU P1 XCW goldens regenerated; `P1_test_XCW_gp
 still needs a device. Visual Studio `Tests`, every test in its own process from `tests/src`:
 1102 passed, 0 failed, 15 skipped and 16 crashed out of 1133 (the 16 all build and run OCC objects in the test itself - StoredEriTests, OccSecondOrderScf, OccHighAngularTests, BondwiseRobyTests, FormatConsistencyTests.OccFchkMatchesBridge, TomlIntegrationTests.AlanineIntegratedOcc - and exit with code 127 before printing anything, with or without OCC_DATA_PATH; the same OCC SCF passes inside the XCW tests of the same binary and the executable runs alanine_integrated_occ to the end, so the locally built Visual Studio test binary is the suspect, root cause not established; a ctest run of the CMake target is still owed). See `UNIT_TESTS_STATUS.md`.
 
-As of 2026-09-24, the in-house NBO analysis (`-nbo`, `Src/core/nbo.cpp` and
-`Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
+As of 2026-09-24, the in-house NBO analysis (`-nbo`, `Src/core/nbo/nbo.cpp` and
+`Src/core/nbo/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
 `NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
 `py -3.12 tests/nbo_reference/compare_nbo.py --all .` against the 22 stored NBO 7.0.9 references,
 which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by label - gennbo
@@ -552,7 +566,7 @@ box - the set cctbx's tsc reader resolves for a measured list, verified with tha
 on seven cases with 0 unresolved indices - and `-ED` ignores the box
 (`HklGenerationTests`). Olex2's `utilities.py` sends both the file box and the file's
 d_min. Earlier that day: 307/307 with the stored
-two-electron integrals over the Schwarz-screened pairs (`Src/core/stored_eri.cpp`,
+two-electron integrals over the Schwarz-screened pairs (`Src/core/xcw/stored_eri.cpp`,
 `StoredEriTests`, three `-xcw_incremental` golden cases), 302/302 (107 s) before that. Earlier baseline, 2026-09-02: 275/275 passing (253 s).
 This baseline covers the pTB cartesian-f fix in `WFN::read_ptb` and the new
 `-no_date_but_gpu` flag. On a machine with a CUDA device, 16 golden-file cases had been
@@ -583,7 +597,7 @@ unrelated access violation in OCC's SOAD initial guess. This was not re-run agai
 
 As of 2026-07-03, `ctest --preset release-windows` reports **201/201 passing** after a full
 rebuild (following the Thakkar cubic-spline interpolation change in
-`Src/core/spherical_density.h` / `Src/core/GridManager.cpp`, Hirshfeld-weight density
+`Src/core/tsc/spherical_density.h` / `Src/core/integration/GridManager.cpp`, Hirshfeld-weight density
 partitioning). A same-day run against a not-fully-rebuilt binary showed 13 `TomlIntegrationTests`
 cases failing with small numeric drift; after rebuilding, all 13 pass against their existing
 `.good` files unchanged — see `UNIT_TESTS_STATUS.md` Known Issues. Only
@@ -592,7 +606,7 @@ you have rerun the current CMake presets in this checkout.
 
 As of 2026-07-03, `ctest --preset release-macos-arm64` reports **202/202 passing**, including
 `TomlIntegrationTests.IntermolecularNCI`, after fixing an off-by-one atomic-number indexing bug
-in `make_thakkar_interpolators()` (`Src/core/properties.cpp`, commit `88f0a9a`) that had been
+in `make_thakkar_interpolators()` (`Src/core/properties/properties.cpp`, commit `88f0a9a`) that had been
 causing undefined-behavior-driven divergence between macOS arm64 and other platforms. Verified
 identical (byte-for-byte) `unit_surrounding_values.dat` output between a from-scratch local
 `release-macos-x86_64` build and the arm64 build. Separately, the 5 `-rgbi_no_sym` RGBI tests

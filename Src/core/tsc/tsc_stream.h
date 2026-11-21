@@ -2,7 +2,7 @@
 // Streamed tscb writer: the file is reflection-major, so each block is written once, never seeking back. Only the
 // drain() thread touches out_; mutex_ guards pending_, next_id_, done_, failed_ and error_. submit() blocks on a
 // full queue, bounding memory at queue_depth * scatterers * reflections-per-block * 16 bytes.
-#include "pch.h"
+#include "../pch.h"
 #include "tsc_block.h"
 
 #include <condition_variable>

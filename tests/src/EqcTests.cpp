@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "core/eqc.h"
+#include "core/analysis/eqc.h"
 
 #include <cmath>
 #include <vector>

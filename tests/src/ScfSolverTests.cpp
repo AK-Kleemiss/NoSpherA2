@@ -3,7 +3,7 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/SCF_solver.h"
+#include "core/xcw/SCF_solver.h"
 #include <occ/io/xyz.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>

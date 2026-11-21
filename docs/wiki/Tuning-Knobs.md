@@ -22,7 +22,7 @@ against its reference, to time one stage, or to make a rare branch testable.
 A knob that changes results says so in the table; a run that sets one is not a
 default run.
 
-The source column names the file that reads the knob (under `Src/core/`).
+The source column names the file that reads the knob (in one of the folders of `Src/core/`, where file names are unique).
 `python scripts/check_tuning_knobs.py` lists any knob in the sources that this
 page does not mention, and any name here that no source reads any more.
 

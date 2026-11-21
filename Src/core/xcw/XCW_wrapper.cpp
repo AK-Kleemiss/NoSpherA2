@@ -25,7 +25,7 @@ XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 //strong reflections (|F_obs|/sigma >= xcw_strong_cutoff), tested against
 //N(0,1) after a global shape/scale rescale. Full reflection set only; the
 //free/working-set cross-validation variant is not implemented.
-//Background: tests/P1_test/XCW_plan.md, Src/core/xcw_halting.h.
+//Background: tests/P1_test/XCW_plan.md, Src/core/xcw/xcw_halting.h.
 void XCW_wrapper::evaluate_gaussian_halting(const double lambda) {
 	sf.ensure_hkl_ordered();
 

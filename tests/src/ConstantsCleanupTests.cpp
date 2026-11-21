@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
 
 #include <array>
 #include <bit>

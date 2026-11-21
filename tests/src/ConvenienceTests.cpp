@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/basis_set.h"
-#include "core/wfn_class.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/basis_set.h"
+#include "core/wfn/wfn_class.h"
 
 #include <complex>
 #include <cstdio>

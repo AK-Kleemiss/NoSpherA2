@@ -125,7 +125,7 @@ jobs:
           # GPU builds: one binary per OS carrying the CUDA kernels, the HIP
           # kernels and the CPU paths (a "fat" build, NOSPHERA2_USE_CUDA and
           # NOSPHERA2_USE_HIP together; how the two backends share one binary
-          # is in Src/core/gpu_api.h). None of the runners has a GPU, so the
+          # is in Src/core/gpu/gpu_api.h). None of the runners has a GPU, so the
           # toolkits are named rather than detected and every kernel is built
           # for every card the vendor still supports (the *_PORTABLE options;
           # the lists are in CMakeLists.txt). The tests run on the same
@@ -133,7 +133,7 @@ jobs:
           # the binary starts and falls back to the CPU when there is no
           # device or no driver. Neither runtime is a load-time dependency:
           # cudart is linked statically and the HIP runtime is opened by name
-          # (Src/core/hip_runtime_shim.cpp), so the artifact needs no CUDA
+          # (Src/core/gpu/hip_runtime_shim.cpp), so the artifact needs no CUDA
           # and no ROCm installation, only a driver for whichever card it
           # finds.
           #

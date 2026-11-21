@@ -1,8 +1,8 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/nos_math.h"
-#include "core/cell.h"
+#include "core/base/convenience.h"
+#include "core/base/nos_math.h"
+#include "core/xcw/cell.h"
 #include <cstring>
 #include <random>
 #include <ranges>

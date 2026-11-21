@@ -11,11 +11,11 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/convenience.h"
-#include "core/XCW_wrapper.h"
-#include "core/basis_set.h"
-#include "core/tsc_block.h"
-#include "core/tuning.h"
+#include "core/base/convenience.h"
+#include "core/xcw/XCW_wrapper.h"
+#include "core/wfn/basis_set.h"
+#include "core/tsc/tsc_block.h"
+#include "core/base/tuning.h"
 
 #include <cmath>
 #include <complex>

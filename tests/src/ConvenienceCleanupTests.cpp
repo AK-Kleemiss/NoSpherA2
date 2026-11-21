@@ -3,8 +3,8 @@
 //moved, unchanged readxyzMinMax_fromCIF with tolerances, not a differential test.
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
 
 #include <bit>
 #include <random>

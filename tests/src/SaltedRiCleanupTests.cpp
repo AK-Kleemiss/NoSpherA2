@@ -1,11 +1,11 @@
 #include "pch.h"
 #include <cstring>
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/basis_set.h"
-#include "core/libCintMain.h"
-#include "core/SALTED_utilities.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/basis_set.h"
+#include "core/integration/libCintMain.h"
+#include "core/salted/SALTED_utilities.h"
 
 double NOS_CINTcommon_fac_sp(int l);
 

@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "pch.h"
+#include "../pch.h"
 #include <bit>
 #include "throughput.h"
 #include "extinction.h"

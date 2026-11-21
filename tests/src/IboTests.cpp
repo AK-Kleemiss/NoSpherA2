@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "core/ibo.h"
-#include "core/wfn_class.h"
+#include "core/nbo/ibo.h"
+#include "core/wfn/wfn_class.h"
 
 //IAO/IBO checks on closed-shell ORCA wavefunctions. parent.molden is orca_2mkl's conversion of parent.gbw
 //(ORCA 6.1.1), so both readers must give the same IBOs.

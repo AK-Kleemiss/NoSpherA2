@@ -1,8 +1,8 @@
 #include "pch.h"
 
-#include "core/wfn_class.h"
-#include "core/nbo.h"
-#include "core/nbo_run.h"
+#include "core/wfn/wfn_class.h"
+#include "core/nbo/nbo.h"
+#include "core/nbo/nbo_run.h"
 
 #include <stdexcept>
 

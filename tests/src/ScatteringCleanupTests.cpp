@@ -2,10 +2,10 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/convenience.h"
-#include "core/scattering_factors.h"
-#include "core/atoms.h"
-#include "core/cell.h"
+#include "core/base/convenience.h"
+#include "core/tsc/scattering_factors.h"
+#include "core/wfn/atoms.h"
+#include "core/xcw/cell.h"
 
 #include <filesystem>
 #include <fstream>

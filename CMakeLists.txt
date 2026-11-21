@@ -141,9 +141,9 @@ if(NOSPHERA2_USE_CUDA)
 endif()
 
 #Both backends at once is a fat binary: each kernel source is compiled twice, once per
-#backend, into its own namespace (Src/core/gpu_api.h), and Src/core/gpu_dispatch.cpp forwards
+#backend, into its own namespace (Src/core/gpu/gpu_api.h), and Src/core/gpu/gpu_dispatch.cpp forwards
 #the global entry points to whichever backend has a device. Neither runtime is linked - CUDA's
-#is static, HIP's is opened by name (Src/core/hip_runtime_shim.cpp) - so the one binary runs
+#is static, HIP's is opened by name (Src/core/gpu/hip_runtime_shim.cpp) - so the one binary runs
 #on an NVIDIA machine, an AMD machine and a machine with no GPU at all. That is what the CI
 #ships (.github/workflows/c-cpp_all.yml).
 
@@ -170,7 +170,7 @@ macro(nosphera2_set_arch lang)
 endmacro()
 
 #Nothing delay-loads a GPU library any more: cuBLAS was the last CUDA one, and the HIP
-#runtime is opened by name (Src/core/hip_runtime_shim.cpp) rather than delay-loaded. Deleting
+#runtime is opened by name (Src/core/gpu/hip_runtime_shim.cpp) rather than delay-loaded. Deleting
 #the code that set these was not enough to stop them being used: they were cached, so a build
 #directory configured before that change kept handing the flag and delayimp to every link.
 #Cleared rather than left to rot, the same way an unusable cached compiler is above.
@@ -345,7 +345,7 @@ if(NOSPHERA2_USE_HIP)
             #carries a HIP object, directly or through a static library (hip-lang::device,
             #CMakeHIPInformation.cmake), and a binary that needs libamdhip64.so to start is
             #a binary that does not start without ROCm. NONE names no runtime library at
-            #all; Src/core/hip_runtime_shim.cpp supplies the entry points and opens the real
+            #all; Src/core/gpu/hip_runtime_shim.cpp supplies the entry points and opens the real
             #library by name when there is one.
             set(CMAKE_HIP_RUNTIME_LIBRARY NONE)
         endif()
@@ -390,7 +390,7 @@ if(NOSPHERA2_USE_HIP)
         #Nothing links the HIP runtime, on either route. ROCm's lib/bin directory is not on
         #the path of a machine that has the card but not the SDK, and a binary whose loader
         #wants libamdhip64.so / amdhip64_7.dll is rejected before main() (measured on the
-        #AMD node as STATUS_DLL_NOT_FOUND). Src/core/hip_runtime_shim.cpp defines the entry
+        #AMD node as STATUS_DLL_NOT_FOUND). Src/core/gpu/hip_runtime_shim.cpp defines the entry
         #points the kernel objects import and opens the library by name on the first call,
         #answering "no device" when it is absent. The name carries the HIP runtime's major
         #version, which is neither the ROCm release nor the clang version (ROCm 6.x ships

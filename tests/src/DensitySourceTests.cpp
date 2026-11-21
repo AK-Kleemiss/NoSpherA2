@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "core/density_source.h"
-#include "core/gaussian_atom.h"
-#include "core/spherical_density.h"
-#include "core/basis_set.h"
-#include "core/SALTED_utilities.h"
-#include "core/properties.h"
+#include "core/wfn/density_source.h"
+#include "core/tsc/gaussian_atom.h"
+#include "core/tsc/spherical_density.h"
+#include "core/wfn/basis_set.h"
+#include "core/salted/SALTED_utilities.h"
+#include "core/properties/properties.h"
 
 #include <numeric>
 

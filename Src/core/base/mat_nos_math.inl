@@ -1,4 +1,4 @@
-#include "pch.h"
+#include "../pch.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "blas_gpu.h"
 #endif

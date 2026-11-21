@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "core/nbo.h"
-#include "core/constants.h"
+#include "core/nbo/nbo.h"
+#include "core/base/constants.h"
 
 //NBO search on densities whose accepted orbital set is known by hand; corner arithmetic and the
 //level-scheduled Gauss-Seidel sweep are equivalences, so results must be exact and thread-independent.

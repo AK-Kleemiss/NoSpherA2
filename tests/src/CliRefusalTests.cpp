@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "core/convenience.h"
+#include "core/base/convenience.h"
 #include "core/NoSpherA2.h"
 
 //An analysis that cannot run, or an option nothing reads, must exit non-zero: exit 0 looks like success

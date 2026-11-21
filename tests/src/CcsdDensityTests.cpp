@@ -5,9 +5,9 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/ccsd_density.h"
-#include "core/convenience.h"
-#include "core/wfn_class.h"
+#include "core/wfn/ccsd_density.h"
+#include "core/base/convenience.h"
+#include "core/wfn/wfn_class.h"
 #include <occ/io/xyz.h>
 #include <occ/qm/cc/ccsd.h>
 #include <occ/qm/cc/integrals.h>

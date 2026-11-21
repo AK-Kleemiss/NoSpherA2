@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/wfn_class.h"
-#include "core/cube.h"
-#include "core/isosurface.h"
-#include "core/npy.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/wfn_class.h"
+#include "core/properties/cube.h"
+#include "core/properties/isosurface.h"
+#include "core/base/npy.h"
 
 #include <atomic>
 #include <complex>

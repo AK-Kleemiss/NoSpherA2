@@ -1,11 +1,11 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/basis_set.h"
-#include "core/stored_eri.h"
-#include "core/tuning.h"
+#include "core/wfn/basis_set.h"
+#include "core/xcw/stored_eri.h"
+#include "core/base/tuning.h"
 #if defined(NOSPHERA2_USE_GPU)
-#include "core/itensor_gpu.h"
+#include "core/gpu/itensor_gpu.h"
 #endif
 #include <occ/io/xyz.h>
 #include <occ/qm/hf.h>

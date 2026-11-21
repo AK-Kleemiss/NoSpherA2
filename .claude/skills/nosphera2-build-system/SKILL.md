@@ -37,7 +37,7 @@ The top-level CMake project configures dependencies and then builds project targ
 
 - `libcint`, `occ`, `mdspan`, and `featomic/featomic` are consumed with `add_subdirectory`.
 - `BasisSetGenerator` builds `BasisSetConverter`, which generates `Src/basis_data.cpp`.
-- `Src/core` builds the static `NoSpherA2Core` target and alias `NoSpherA2::Core`.
+- `Src/core` builds the static `NoSpherA2Core` target and alias `NoSpherA2::Core`. Its sources sit in subsystem folders (`base`, `wfn`, `integration`, `tsc`, `xcw`, `salted`, `nbo`, `analysis`, `properties`, `gpu`), all on the PUBLIC include path (`NOSPHERA2_CORE_INCLUDE_DIRS`, also handed to the MSVC-host HIP compile), so a new folder goes into that list; the sources are ordered by file name, as in the flat folder.
 - `Src/dll` builds the shared library (`NoSpherA2.dll`, `libNoSpherA2.so`, `libNoSpherA2.dylib`) into `bin`; it carries all the code.
 - `app` builds the `NoSpherA2` executable, a launcher that loads that library from its own directory (`nosphera2_main`), so the exe never runs without it. Android links one static exe instead.
 - `tests/src` builds `NoSpherA2_Tests` when `NOSPHERA2_BUILD_TESTS=ON`.

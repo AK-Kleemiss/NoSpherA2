@@ -1,10 +1,10 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/atoms.h"
-#include "core/wfn_class.h"
-#include "core/mo_class.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/atoms.h"
+#include "core/wfn/wfn_class.h"
+#include "core/wfn/mo_class.h"
 
 #include <bit>
 #include <cmath>
@@ -15,7 +15,7 @@
 
 namespace
 {
-//Verbatim copies of master d624d8c4 (Src/core/wfn_density.cpp) with the members they read bound to locals
+//Verbatim copies of master d624d8c4 (Src/core/wfn/wfn_density.cpp) with the members they read bound to locals
 double compute_g_cartesian_master_ref(
 	WFN& w,
 	const d3 &Pos,

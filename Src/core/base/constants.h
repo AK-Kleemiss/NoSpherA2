@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pch.h"
+#include "../pch.h"
 #include "spherical_harmonic.h"
 
 namespace constants

@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "core/tuning.h"
-#include "core/wfn_class.h"
-#include "core/bondwise_analysis.h"
+#include "core/base/tuning.h"
+#include "core/wfn/wfn_class.h"
+#include "core/analysis/bondwise_analysis.h"
 
 #include <occ/core/parallel.h>
 

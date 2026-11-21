@@ -1,5 +1,5 @@
 #pragma once
-#include "pch.h"
+#include "../pch.h"
 
 struct SimplePrimitive {
 	int center;     // Center index

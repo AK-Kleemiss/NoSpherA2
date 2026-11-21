@@ -1,9 +1,9 @@
 #include "pch.h"
-#include "core/convenience.h"
-#include "core/wfn_class.h"
-#include "core/bondwise_analysis.h"
-#include "core/topology.h"
-#include "core/b2c.h"
+#include "core/base/convenience.h"
+#include "core/wfn/wfn_class.h"
+#include "core/analysis/bondwise_analysis.h"
+#include "core/analysis/topology.h"
+#include "core/analysis/b2c.h"
 
 #include <fstream>
 #include <sstream>

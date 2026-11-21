@@ -12,11 +12,11 @@
 #include <string>
 #include <vector>
 
-#include "core/constants.h"
-#include "core/convenience.h"
-#include "core/cell.h"
-#include "core/scattering_factors.h"
-#include "core/XCW_wrapper.h"
+#include "core/base/constants.h"
+#include "core/base/convenience.h"
+#include "core/xcw/cell.h"
+#include "core/tsc/scattering_factors.h"
+#include "core/xcw/XCW_wrapper.h"
 
 namespace {
 

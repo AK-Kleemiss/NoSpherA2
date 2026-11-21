@@ -103,7 +103,7 @@ tests/RGBI_groups/nh3li.47
 *.nbo
 tests/nbo_reference*/**/*.out
 
-# NCI outputs written beside the inputs by Src/core/properties.cpp.
+# NCI outputs written beside the inputs by Src/core/properties/properties.cpp.
 tests/intermolecular_nci/unit_surrounding_values.dat
 tests/intermolecular_nci/unit_surrounding_nci.vmd
 tests/intermolecular_nci/unit_surrounding_plot.py

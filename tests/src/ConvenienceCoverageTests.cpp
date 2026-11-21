@@ -1,16 +1,16 @@
-//Coverage tests for the parts of Src/core/convenience.cpp that ConvenienceTests.cpp leaves untouched:
+//Coverage tests for the parts of Src/core/base/convenience.cpp that ConvenienceTests.cpp leaves untouched:
 //the CIF ADP / U_iso readers, the interactive cube selection, the int Fortran record, the option
 //branches that die or finish, the small helpers with uncovered branches and the process helpers.
 //Every expectation is derived by hand from the input, never from what the code prints.
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/basis_set.h"
-#include "core/wfn_class.h"
-#include "core/cube.h"
-#include "core/cell.h"
-#include "core/throughput.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/basis_set.h"
+#include "core/wfn/wfn_class.h"
+#include "core/properties/cube.h"
+#include "core/xcw/cell.h"
+#include "core/base/throughput.h"
 
 #include <array>
 #include <cfloat>
