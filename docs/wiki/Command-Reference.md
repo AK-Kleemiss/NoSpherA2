@@ -55,7 +55,7 @@ need the virtuals).
 | `-d <dir>` | 1 | Directory the basis-set files are looked up in. |
 | `-coef <file> [aux basis...]` | 1+ | Pre-computed density-fitting coefficient file (`.npy`) and the auxiliary basis set(s) it was fitted in, read as `-ri_fit` reads them (`auto_aux` when none is given). With `-ECP N`, or a wavefunction whose reader found ECPs, the coefficients are taken as the fit of the valence density: the table, the charge table and the `.tshb` add the mode-N core alike. |
 | `-fchk <file>` | 1 | Write a Gaussian-format checkpoint file. |
-| `-wfn_cif` | 0 | With `-gbw2wfn`: write the wavefunction geometry and basis into `<wfn stem>.cif` beside the input. |
+| `-wfn_cif` | 0 | Write the basis set and the wavefunction as CIF loops. With `-gbw2wfn` or `-fchk` into `<wfn stem>.cif` beside the input; in a table run into `test.wfn_cif`, which also carries the form-factor table. `-tshb` then writes the table instead (log: `-tshb: the table is written instead, -cif needs the table`). |
 | `-gbw2wfn` | 0 | Convert the `-wfn` wavefunction into `converted.wfn`, `occupied.wfn` and `converted.wfx`. |
 | `-convert_to_47 <wfn>` | 1 + sub-options | Write an NBO `.47` archive from a contracted-basis wavefunction. |
 | `-cube_convert <in> <out>` | 2 | Text `.cube` <-> binary `.cubeb`. The output format follows the extension of `<out>`. One-shot. |
