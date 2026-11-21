@@ -58,12 +58,17 @@ The rules that follow from that:
 | --- | --- | --- |
 | `-wfn <file>` | `-rho_at_points`, `-calc_dens_1D`, `-SALTED_COEFS`, `-SALTED_Training` | hard error, "No wavefunction specified" |
 | `-ri_fit <basis>` | `-calc_dens_1D`, `-SALTED_Training`, `-interaction_energy` | hard error or an unfitted density |
-| `-acc <n>` | `-eli_analysis`, `-qtaim_eli` | the default accuracy 2 is used |
 | `-radius`, `-resolution` | `-rho_cube` | the defaults 2.0 / 0.1 are used |
 | `-no_gpu_salted` | `-SALTED_COEFS` | the GPU path runs anyway (the globals are set later) |
 | `-old_tsc`, `-tsc_block` | `-merge`, `-tscb` | silently ignored |
 | `-repulsion_exchange`, `-repulsion_overlap`, `-no_gpu_density` | `-interaction_energy` | never read |
 | `-nbo` / `-nbo_external` / `-nbo_parse` / `-convert_to_47` | every `-nbo_*` and `-nrt*` sub-option | the sub-options are ignored, with a warning on stderr |
+
+`-acc` can go anywhere: `-eli_analysis`, `-qtaim` and `-fba` run after the
+whole line is read. They do set the cube grid, though: resolution 0.05 and
+radius 3.0 (for `-eli_analysis` and `-qtaim`, or the two numbers after the
+wavefunction), which overwrites a `-resolution` or `-radius` written before
+them; one written after them wins.
 
 The NBO case is the one that looks most wrong: the sub-options are collected by a
 loop that starts at the position of the parent flag, so `-nrt -nbo x.gbw`

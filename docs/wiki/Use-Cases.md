@@ -88,10 +88,10 @@ refine against the table.
 
 ## 6. Convert a wavefunction between formats
 
-ORCA `.gbw` to `.wfn`:
+ORCA `.gbw` to `converted.wfn`, `occupied.wfn` and `converted.wfx`:
 
 ```powershell
-.\NoSpherA2.exe -gbw2wfn mol.gbw
+.\NoSpherA2.exe -wfn mol.gbw -gbw2wfn
 ```
 
 A `.ffn` plus a named basis set to a Gaussian checkpoint:
@@ -101,10 +101,10 @@ A `.ffn` plus a named basis set to a Gaussian checkpoint:
 ```
 
 Wavefunction geometry and basis into a CIF, for archiving alongside the
-structure:
+structure. It is written as `mol.cif` beside the input, over a CIF of that name:
 
 ```powershell
-.\NoSpherA2.exe -gbw2wfn mol.gbw -wfn_cif mol_wfn.cif
+.\NoSpherA2.exe -wfn mol.gbw -gbw2wfn -wfn_cif
 ```
 
 ## 7. Convert or merge `.tsc` tables
