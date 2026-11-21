@@ -146,6 +146,9 @@ int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, con
 
 //along_path: rho and its Laplacian on the traced bond path from each bond critical point instead of the straight line
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name, const bool along_path = false);
+namespace topology { struct bond_path; }
+//rho and its Laplacian along each traced path to <stem>_bond_path_<a>_<b>.dat, a BPL/GPL line per path to log if given
+void write_bond_path_profiles(const WFN &wavy, const std::vector<topology::bond_path> &paths, const std::string &stem, std::ostream *log);
 void ELI_analysis(const WFN &wavy, options &opt);
 
 // QTAIM-guided ELI masking:
