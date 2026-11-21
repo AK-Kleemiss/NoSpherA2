@@ -142,7 +142,8 @@ const void WFN::computeELIELF(
 	if (Rho > 0)
 	{
 		Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-		Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+		const double g = Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2));
+		Eli = g > 0 ? 0.5 * Rho * pow(48 / g, constants::c_38) : 0.0;
 	}
 };
 
@@ -265,7 +266,8 @@ const double WFN::computeELI(
 			tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
 		}
 	}
-	return 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+	const double g = Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2));
+	return g > 0 ? 0.5 * Rho * pow(48 / g, constants::c_38) : 0.0;
 };
 
 void WFN::computeRhoELI(
@@ -992,7 +994,7 @@ const double WFN::computeELF(
 			tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
 		}
 	}
-	return 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+	return Rho > 0 ? 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2)) : 0.0;
 };
 
 const void WFN::computeLapELIELF(
@@ -1127,8 +1129,9 @@ const void WFN::computeLapELIELF(
 			tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
 		}
 	}
-	Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-	Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+	if (Rho > 0) Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+	const double g = Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2));
+	Eli = g > 0 ? 0.5 * Rho * pow(48 / g, constants::c_38) : 0.0;
 	Lap = Hess[0] + Hess[1] + Hess[2];
 };
 
@@ -1277,7 +1280,8 @@ const void WFN::computeLapELI(
 			tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
 		}
 	}
-	Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+	const double g = Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2));
+	Eli = g > 0 ? 0.5 * Rho * pow(48 / g, constants::c_38) : 0.0;
 	Lap = Hess[0] + Hess[1] + Hess[2];
 };
 

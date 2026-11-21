@@ -255,7 +255,6 @@ static const int gaussian_f_order[10] = { 0, 1, 2, 4, 5, 8, 3, 6, 7, 9 };
 static const int molden_g_order[15] = { 2, 8, 11, 6, 1, 7, 14, 13, 5, 10, 12, 9, 4, 3, 0 };
 static const int tonto_f_order[10] = { 0, 1, 2, 3, 4, 6, 5, 7, 8, 9 };
 static const int* const molden_order[5] = { nullptr, nullptr, nullptr, gaussian_f_order, molden_g_order };
-static const double tonto_scale[5] = { 1.0, 1.0, 1.0 / sqrt(1.5), 1.0 / sqrt(5.0), 1.0 / sqrt(13.125) };
 //shell[cart][s] in the source order; order[cart] picks the source column of WFN type first_type[l] + cart, scale[cart] its normalisation
 void WFN::push_back_cartesian_shell(const int mo, const int l, const vec2& shell, const std::vector<primitive>& prims, const int start, const int size, const int* order, const double* scale)
 {
@@ -838,8 +837,7 @@ __________________________________
 			do {
 				const double exponent = stod(line_digest[line_digest.size() == 2 ? 0 : 2]);
 				const double coefficient = stod(line_digest[line_digest.size() == 2 ? 1 : 3]);
-				const double norm_fac = pow(pow(2, 3 + 4 * angul) * pow(exponent, 2 * angul + 3) / constants::PI3 / pow(constants::double_ft[angul], 2), 0.25);
-				temp_at.push_back_basis_set(exponent, coefficient * norm_fac, angul + 1, s);
+				temp_at.push_back_basis_set(exponent, coefficient * constants::axial_prim_norm(angul, exponent), angul + 1, s);
 				getline_universal(rf, line);
 				line_digest = split_string<string>(line, " ");
 				remove_empty_elements(line_digest);
@@ -964,7 +962,7 @@ __________________________________
 				if (run == 0)
 					shell.assign(constants::n_cart(l), vec(size));
 				for (int s = 0; s < size; s++)
-					shell[run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() * tonto_scale[l];
+					shell[run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
 				if (++run < constants::n_cart(l))
 					continue;
 				push_back_cartesian_shell(mo, l, shell, prims, basis_run, size, l == 3 ? tonto_f_order : nullptr);

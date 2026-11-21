@@ -163,7 +163,7 @@ public:
 			for (int i = 0; i < 3; i++)
 			{
 				for (int j = 0; j < 3; j++)
-					file << std::setw(10) << std::fixed << get_rcm(i, j) / constants::TWO_PI / 0.529177249 << ' ';
+					file << std::setw(10) << std::fixed << constants::ang2bohr(get_rcm(i, j) / constants::TWO_PI) << ' ';
 				file << "\n";
 			}
 			file << "CM in 2*PI bohr:" << std::endl;

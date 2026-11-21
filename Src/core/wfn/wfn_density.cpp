@@ -1591,7 +1591,8 @@ const void WFN::computeValues(
 	{
 		normGrad = constants::alpha_coef * sqrt(Grad[0] * Grad[0] + Grad[1] * Grad[1] + Grad[2] * Grad[2]) / pow(Rho, constants::c_43);
 		Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-		Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+		const double g = Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2));
+		Eli = g > 0 ? 0.5 * Rho * pow(48 / g, constants::c_38) : 0.0;
 	}
 	Lap = Hess[0] + Hess[4] + Hess[8];
 };

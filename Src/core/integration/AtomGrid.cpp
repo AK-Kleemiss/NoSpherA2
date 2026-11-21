@@ -1001,119 +1001,6 @@ std::pair<vec, vec> get_shsig_shpop(const int &atom_type) {
 	return std::make_pair(shsig, shpop);
 }
 
-std::pair<vec2, vec> get_shalpha_shpop(const int &atom_type) {
-	// Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
-	vec2 shalpha(constants::MBIS_function[atom_type], vec(6, 0.0));
-	vec shpop(constants::MBIS_function[atom_type], 0.0);
-
-	switch (constants::MBIS_function[atom_type]) {
-	case 0:
-		err_not_impl_f("MBIS does not work with ghost atoms. Please dont do that to me!", std::cout);
-		break;
-	case 1:
-		shalpha[0][0] = pow(2.0 * atom_type, 2);
-		shalpha[0][3] = pow(2.0 * atom_type, 2);
-		shalpha[0][5] = pow(2.0 * atom_type, 2);
-		shpop[0] = atom_type;
-		break;
-	case 2:
-		shalpha[0][0] = pow(2.0 * atom_type, 2);
-		shalpha[0][3] = pow(2.0 * atom_type, 2);
-		shalpha[0][5] = pow(2.0 * atom_type, 2);
-		shpop[0] = 2;
-		shalpha[1][0] = 4.0;
-		shalpha[1][3] = 4.0;
-		shalpha[1][5] = 4.0;
-		shpop[1] = atom_type - 2;
-		break;
-	case 3:
-		shalpha[0][0] = pow(2.0 * atom_type, 2);
-		shalpha[0][3] = pow(2.0 * atom_type, 2);
-		shalpha[0][5] = pow(2.0 * atom_type, 2);
-		shpop[0] = 2;
-		shalpha[1][0] = pow(2.0 * sqrt(atom_type), 2);
-		shalpha[1][3] = pow(2.0 * sqrt(atom_type), 2);
-		shalpha[1][5] = pow(2.0 * sqrt(atom_type), 2);
-		shpop[1] = 8;
-		shalpha[2][0] = 4.0;
-		shalpha[2][3] = 4.0;
-		shalpha[2][5] = 4.0;
-		shpop[2] = atom_type - 10;
-		break;
-	case 4:
-		shalpha[0][0] = pow(2.0 * atom_type, 2);
-		shalpha[0][3] = pow(2.0 * atom_type, 2);
-		shalpha[0][5] = pow(2.0 * atom_type, 2);
-		shpop[0] = 2;
-		shalpha[1][0] = pow(2 * pow(atom_type, constants::c_23), 2);
-		shalpha[1][3] = pow(2 * pow(atom_type, constants::c_23), 2);
-		shalpha[1][5] = pow(2 * pow(atom_type, constants::c_23), 2);
-		shpop[1] = 8;
-		shalpha[2][0] = pow(2 * pow(atom_type, constants::c_13), 2);
-		shalpha[2][3] = pow(2 * pow(atom_type, constants::c_13), 2);
-		shalpha[2][5] = pow(2 * pow(atom_type, constants::c_13), 2);
-		shpop[2] = 8;
-		shalpha[3][0] = 4.0;
-		shalpha[3][3] = 4.0;
-		shalpha[3][5] = 4.0;
-		shpop[3] = atom_type - 18;
-		break;
-	case 5:
-		shalpha[0][0] = pow(2.0 * atom_type, 2);
-		shalpha[0][3] = pow(2.0 * atom_type, 2);
-		shalpha[0][5] = pow(2.0 * atom_type, 2);
-		shpop[0] = 2;
-		shalpha[1][0] = pow(2 * pow(atom_type, 0.25), 2);
-		shalpha[1][3] = pow(2 * pow(atom_type, 0.25), 2);
-		shalpha[1][5] = pow(2 * pow(atom_type, 0.25), 2);
-		shpop[1] = 8;
-		shalpha[2][0] = pow(2 * pow(atom_type, 0.5), 2);
-		shalpha[2][3] = pow(2 * pow(atom_type, 0.5), 2);
-		shalpha[2][5] = pow(2 * pow(atom_type, 0.5), 2);
-		shpop[2] = 8;
-		shalpha[3][0] = pow(2 * pow(atom_type, 0.75), 2);
-		shalpha[3][3] = pow(2 * pow(atom_type, 0.75), 2);
-		shalpha[3][5] = pow(2 * pow(atom_type, 0.75), 2);
-		shpop[3] = 18;
-		shalpha[4][0] = 4.0;
-		shalpha[4][3] = 4.0;
-		shalpha[4][5] = 4.0;
-		shpop[4] = atom_type - 36;
-		break;
-	case 6:
-		shalpha[0][0] = pow(2.0 * atom_type, 2);
-		shalpha[0][3] = pow(2.0 * atom_type, 2);
-		shalpha[0][5] = pow(2.0 * atom_type, 2);
-		shpop[0] = 2;
-		shalpha[1][0] = pow(2 * pow(atom_type, 0.2), 2);
-		shalpha[1][3] = pow(2 * pow(atom_type, 0.2), 2);
-		shalpha[1][5] = pow(2 * pow(atom_type, 0.2), 2);
-		shpop[1] = 8;
-		shalpha[2][0] = pow(2 * pow(atom_type, 0.4), 2);
-		shalpha[2][3] = pow(2 * pow(atom_type, 0.4), 2);
-		shalpha[2][5] = pow(2 * pow(atom_type, 0.4), 2);
-		shpop[2] = 8;
-		shalpha[3][0] = pow(2 * pow(atom_type, 0.6), 2);
-		shalpha[3][3] = pow(2 * pow(atom_type, 0.6), 2);
-		shalpha[3][5] = pow(2 * pow(atom_type, 0.6), 2);
-		shpop[3] = 18;
-		shalpha[4][0] = pow(2 * pow(atom_type, 0.8), 2);
-		shalpha[4][3] = pow(2 * pow(atom_type, 0.8), 2);
-		shalpha[4][5] = pow(2 * pow(atom_type, 0.8), 2);
-		shpop[4] = 18;
-		shalpha[5][0] = 4.0;
-		shalpha[5][3] = 4.0;
-		shalpha[5][5] = 4.0;
-		shpop[5] = atom_type - 54;
-		break;
-	default:
-		err_not_impl_f("MBIS does not work with more than 6 shells. Please dont do that to me!", std::cout);
-		break;
-	}
-
-	return std::make_pair(shalpha, shpop);
-}
-
 vec2 sigma_to_alpha(const std::pair<vec, vec> &sigma) {
 	// Order here is 11, 12, 13, 21, 22, 23, 31, 32, 33
 	vec2 shalpha(sigma.first.size(), vec(6, 0.0));
@@ -1385,7 +1272,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	sp_vec tens1, tens2;
 	if (start.empty() && MBIS_vectors.size() == 0) {
 		for (auto &atom : atoms) {
-			sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
+			const auto sp = get_shsig_shpop(atom.get_charge());
+			sig_pop_vector.emplace_back(std::make_pair(sigma_to_alpha(sp), sp.second));
 		}
 	}
 	else if (start.empty()) {
