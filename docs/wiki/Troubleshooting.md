@@ -16,10 +16,15 @@ Get-Content .\NoSpherA2.log -Tail 40
 first, because their entire output is meant to be read: `-h`, `-topology`,
 `-eli_family`, `-fukui_analysis`.
 
+Warnings about the command line itself, an unknown option or an NBO option
+nothing reads, are written to the console on stderr as well; an unknown option
+comes with the nearest spelling `-h` lists (`-hkll (did you mean -hkl?)`).
+
 ## "Did not understand the task to perform!"
 
 The parser accepted every flag but nothing on the line selected a job, so
-NoSpherA2 fell through to printing the help text. The two common causes:
+NoSpherA2 fell through to printing the help text into the log and exits 0; the
+console gets one line saying so on stderr. The two common causes:
 
 * The job flag was consumed as the **argument** of an earlier flag that takes
   one more value than you thought.
@@ -36,7 +41,8 @@ If the flag is not in that output, rebuild before you debug the command line.
 
 Most flags only set a field and can go anywhere. But a number of them **do their
 work inside the option parser** and then stop parsing, so anything written after
-them is read by nobody. There is no warning.
+them is read by nobody. The log does not say so; the console (stderr) names
+them: `WARNING: ignored after -merge, which runs its job and ends the command line: -old_tsc`.
 
 **One-shot options** (they finish the run): `-topology`, `-eli_family`,
 `-qtaim_eli`, `-merge`, `-merge_nocheck`, `-tscb`, `-tsc_labels <table> <cif>`,
@@ -52,17 +58,22 @@ The rules that follow from that:
 | --- | --- | --- |
 | `-wfn <file>` | `-rho_at_points`, `-calc_dens_1D`, `-SALTED_COEFS`, `-SALTED_Training` | hard error, "No wavefunction specified" |
 | `-ri_fit <basis>` | `-calc_dens_1D`, `-SALTED_Training`, `-interaction_energy` | hard error or an unfitted density |
-| `-acc <n>` | `-eli_analysis`, `-qtaim_eli` | the default accuracy 2 is used |
 | `-radius`, `-resolution` | `-rho_cube` | the defaults 2.0 / 0.1 are used |
 | `-no_gpu_salted` | `-SALTED_COEFS` | the GPU path runs anyway (the globals are set later) |
 | `-old_tsc`, `-tsc_block` | `-merge`, `-tscb` | silently ignored |
 | `-repulsion_exchange`, `-repulsion_overlap`, `-no_gpu_density` | `-interaction_energy` | never read |
-| `-nbo` / `-nbo_external` / `-nbo_parse` / `-convert_to_47` | every `-nbo_*` and `-nrt*` sub-option | the sub-options are silently ignored |
+| `-nbo` / `-nbo_external` / `-nbo_parse` / `-convert_to_47` | every `-nbo_*` and `-nrt*` sub-option | the sub-options are ignored, with a warning on stderr |
+
+`-acc` can go anywhere: `-eli_analysis`, `-qtaim` and `-fba` run after the
+whole line is read. They do set the cube grid, though: resolution 0.05 and
+radius 3.0 (for `-eli_analysis` and `-qtaim`, or the two numbers after the
+wavefunction), which overwrites a `-resolution` or `-radius` written before
+them; one written after them wins.
 
 The NBO case is the one that looks most wrong: the sub-options are collected by a
 loop that starts at the position of the parent flag, so `-nrt -nbo x.gbw`
-runs an NBO analysis with no NRT and says nothing about it. Always write the
-parent flag first.
+runs an NBO analysis with no NRT; the console says `WARNING: ignoring -nrt`, the
+log does not. Always write the parent flag first.
 
 `-mtc` and `-cmtc` are the mirror image: they swallow tokens *forwards* until one
 begins with `-`, in pairs (`wfn parts`) or triples (`wfn cif parts`). Two

@@ -136,7 +136,8 @@ std::string help_message =
  "                                    stored-integral Fock build. Single\n"
  "                                    precision by default, which moves the total\n"
  "                                    energy in the tenth significant figure.\n"
- "  -no_cpu_itensor_fp32               XCW's grid block products on the CPU in\n"
+ "  -cpu_itensor_fp32 / -no_cpu_itensor_fp32\n"
+ "                                    XCW's grid block products on the CPU in\n"
  "                                    double; single precision, as the device\n"
  "                                    path runs, is the default.\n"
  "  -gpu_salted / -no_gpu_salted       The SALTED descriptor combination\n"
@@ -155,7 +156,7 @@ std::string help_message =
  "  -gpu_blas                          Offer large dense matrix products to the\n"
  "                                    device. Small ones stay on the CPU, where\n"
  "                                    they beat what the transfers would allow.\n"
- "  -no_gpu_cublas                     Keep the XCW grid GEMMs off cuBLAS. By\n"
+ "  -gpu_cublas / -no_gpu_cublas       Keep the XCW grid GEMMs off cuBLAS. By\n"
  "                                    default cuBLAS is used when the machine has\n"
  "                                    it, being the fastest of the three, and the\n"
  "                                    built-in kernels otherwise - CUTLASS in\n"
@@ -245,6 +246,13 @@ std::string help_message =
  "                                    analytic potential, Laplacian and the\n"
  "                                    PC07 orbital-free ELI come from the ML\n"
  "                                    prediction, no wavefunction needed.\n"
+ "  -s_rho                             Spin density cube.\n"
+ "  -rho_at_points <points>            Density at the points of the file (a\n"
+ "                                    count, then x y z in bohr per line) to\n"
+ "                                    <points>.rho. Needs -wfn before it.\n"
+ "  -cubeb                             Write cubes in the binary .cubeb format.\n"
+ "  -cube_convert <in> <out>           Text .cube <-> binary .cubeb; the format\n"
+ "                                    follows the extension of <out>.\n"
  "  -def  -HDEF                        Request deformation density or HDEF.\n"
  "  -MO <number|all>                   Generate a molecular-orbital property.\n"
  "  -fukui                             Fukui functions f+/f-/f0 and the dual\n"
@@ -436,6 +444,7 @@ std::string help_message =
  "  -no_adaptive_step                  Every ascent step at the validated step\n"
  "                                    length. The default, and the reference the\n"
  "                                    equivalence check compares against.\n"
+ "  -beta_spheres                      The default; undoes -no_beta_spheres.\n"
  "  -no_beta_spheres                   Climb every quadrature point the whole way\n"
  "                                    instead of stopping it at the radius around\n"
  "                                    an attractor that no ascent path can leave.\n"
@@ -555,6 +564,8 @@ std::string help_message =
  "                                    images, refitting in between. Default off:\n"
  "                                    it can miss structures (SF6 at 0.2: D(w)\n"
  "                                    0.23 % higher); about 2.5 times faster.\n"
+ "  -nrt_mirror                        The default since 2026-10-14; accepted for\n"
+ "                                    older command lines.\n"
  "  -nrt_no_mirror                     Treat a single move that adds no formal-\n"
  "                                    charge separation (the allyl cation's bond\n"
  "                                    shift) as half an arrow, complete symmetry\n"
@@ -686,15 +697,19 @@ std::string help_message =
  "                                    natural orbitals see wiki\n"
  "                                    Correlated-Wavefunctions.\n"
  "  -cmos1 <MO ...>  -cmos2 <MO ...>   MO selections for -combine_mos.\n"
- "  -QCT                               Enter the legacy QCT workflow.\n\n"
+ "  -QCT | -qct                        Enter the legacy QCT workflow.\n\n"
  "DIAGNOSTICS AND INTERNAL TOOLS\n"
  "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
+ "  -out <file>                        Write the log to <file> instead of\n"
+ "                                    NoSpherA2.log.\n"
+ "  -rkpts / -skpts                    Read / save the k-point set.\n"
  "  -profiling [tests-root]            Run the internal profiling suite\n"
  "                                    [./tests]. Alias: -profile.\n"
  "  -tune NAME[=VALUE]                 Set a developer knob, repeatable; a bare NAME\n"
  "                                    is 1. Diagnostics and cut-offs such as\n"
  "                                    NOSPHERA2_GPU_BACKEND=hip or NOS_RGBI_DEBUG,\n"
  "                                    formerly environment variables.\n"
+ "  -tune list                         Print every knob with its default and stop.\n"
  "  -no_date                           Suppress date information and the GPU notes, so\n"
  "                                    output does not depend on the machine it ran on.\n"
  "  -no_date_but_gpu                   As -no_date, but keeps the GPU notes. For the\n"
@@ -757,12 +772,16 @@ std::string help_message =
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
  "  -do_XCW                             XCW mode; anomalous dispersion is read from the CIF.\n"
+ "  -mask <file.fab>                   Solvent-mask contribution for an XCW\n"
+ "                                    settings file with the mask keyword.\n"
  "  -print_F                           Write the F_calc table of every converged\n"
  "                                    lambda step, NA2_<lambda>_Fcalc.txt.\n"
- "  -no_xcw_extrapolate                Seed each lambda step from the last one\n"
- "                                    alone instead of the density extrapolated\n"
- "                                    through the two previous steps.\n"
- "  -xcw_incremental                   Two-electron Fock build from the change of\n"
+ "  -xcw_extrapolate / -no_xcw_extrapolate\n"
+ "                                    Seed each lambda step from the density\n"
+ "                                    extrapolated through the two previous steps\n"
+ "                                    (the default) / from the last one alone.\n"
+ "  -xcw_incremental / -no_xcw_incremental\n"
+ "                                    Two-electron Fock build from the change of\n"
  "                                    the density each iteration, from the stored\n"
  "                                    integrals when they fit in memory; the\n"
  "                                    direct build needs -xcw_int_precision 1e-12.\n"
@@ -832,7 +851,9 @@ std::string help_message =
  "                                    Internal spherical-atom diagnostics.\n"
  "  -test                               Enable test mode.\n\n"
  "HELP\n"
- "  -h, --h, -help, --help              Show this message.\n\n"
+ "  -h, --h, -help, --help              Show this message.\n"
+ "  -h <word>                           Only the sections whose title contains\n"
+ "                                    <word>, e.g. -h gpu or -h bonding.\n\n"
  "EXAMPLES\n"
  "  Normal HAR\n"
  "    NoSpherA2 -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
@@ -856,3 +877,24 @@ std::string help_message =
  "  Twin law\n"
  "    NoSpherA2 -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 \\\n"
  "      -twin -1 0 0 0 -1 0 0 0 -1\n");
+
+//-h <word>: the sections whose upper-case header contains the word
+std::string help_section(const std::string &want)
+{
+	std::string key = want, line, out, names;
+	for (int i = 0; i < key.size(); i++)
+		key[i] = toupper(static_cast<unsigned char>(key[i]));
+	std::istringstream in(help_message);
+	bool keep = false;
+	while (std::getline(in, line))
+	{
+		if (!line.empty() && isupper(static_cast<unsigned char>(line[0])) && std::none_of(line.begin(), line.end(), [](unsigned char c) { return islower(c); }))
+		{
+			keep = line.find(key) != std::string::npos;
+			names += "  " + line + "\n";
+		}
+		if (keep)
+			out += line + "\n";
+	}
+	return out.empty() ? "No help section matches \"" + want + "\"; the sections are:\n" + names : "\n" + out;
+}

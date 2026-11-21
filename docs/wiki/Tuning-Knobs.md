@@ -8,6 +8,9 @@ They are set on the command line:
 ```
 
 * `-tune` is repeatable; a bare `NAME` means `NAME=1`.
+* `-tune list` prints every knob below with its default and stops. A name
+  that is not below is still set, and the console (stderr) says it is no
+  knob this build documents.
 * Knobs are applied before any other option is parsed, live only in the
   process, and are restored when the run ends, so one in-process run (the DLL,
   the test binary) never leaks a knob into the next. They used to be environment
@@ -24,7 +27,9 @@ default run.
 
 The source column names the file that reads the knob (in one of the folders of `Src/core/`, where file names are unique).
 `python scripts/check_tuning_knobs.py` lists any knob in the sources that this
-page does not mention, and any name here that no source reads any more.
+page does not mention, and any name here that no source reads any more. The
+first two columns are also the table `-tune list` prints (`documented_knobs` in
+`Src/core/base/tuning.cpp`), and the script checks that the two agree.
 
 ## XCW (X-ray constrained wavefunctions)
 

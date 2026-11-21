@@ -45,6 +45,7 @@ double vec_dot(const d3& a, const d3& b);
 constexpr const std::complex<double> c_one(0, 1.0);
 
 extern std::string help_message;
+std::string help_section(const std::string &want);
 std::string NoSpherA2_message(bool no_date = false);
 std::string WAEmpiRe_message();
 extern std::string build_date;

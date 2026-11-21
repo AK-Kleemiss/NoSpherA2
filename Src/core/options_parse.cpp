@@ -143,6 +143,36 @@ const std::set<std::string> &nbo_family_suboptions()
 }
 
 namespace {
+	//" (did you mean -x?)" for the flag of the help text, every one the parser reads, nearest in edit
+	//distance (case ignored; at most 1 for a flag of four characters or fewer, else 2), or ""
+	std::string did_you_mean(const std::string &flag)
+	{
+		auto lower = [](std::string s) { for (int i = 0; i < s.size(); i++) s[i] = tolower(static_cast<unsigned char>(s[i])); return s; };
+		const std::string a = lower(flag);
+		const std::regex word("(^|[^A-Za-z0-9_])(-[A-Za-z][A-Za-z0-9_-]*)");
+		std::string best;
+		int best_d = a.size() > 4 ? 3 : 2;
+		ivec row(a.size() + 1), prev(a.size() + 1);
+		for (std::sregex_iterator m(help_message.begin(), help_message.end(), word), end; m != end; ++m)
+		{
+			std::string b = (*m)[2].str();
+			std::replace(b.begin() + 1, b.end(), '-', '_');
+			const std::string lb = lower(b);
+			for (int i = 0; i <= a.size(); i++)
+				prev[i] = i;
+			for (int j = 1; j <= lb.size(); j++)
+			{
+				row[0] = j;
+				for (int i = 1; i <= a.size(); i++)
+					row[i] = std::min({prev[i] + 1, row[i - 1] + 1, prev[i - 1] + (a[i - 1] != lb[j - 1])});
+				std::swap(row, prev);
+			}
+			if (b != flag && prev[a.size()] < best_d)
+				best_d = prev[a.size()], best = b;
+		}
+		return best.empty() ? "" : " (did you mean " + best + "?)";
+	}
+
 	//No digester sees these tokens, so an unknown one would otherwise be dropped silently.
 	void refuse_unknown_nbo_suboption(const std::vector<std::string> &arguments, int from,
 									  const std::string &after)
@@ -152,7 +182,7 @@ namespace {
 			const std::string &o = arguments[j];
 			if ((o.rfind("-nbo", 0) == 0 || o.rfind("-nrt", 0) == 0) &&
 				nbo_family_suboptions().count(o) == 0)
-				err_checkf(false, "Unknown option " + o + " after " + after +
+				err_checkf(false, "Unknown option " + o + did_you_mean(o) + " after " + after +
 									  ": it names no NBO/NRT option this build has. Check the "
 									  "spelling, -h lists them; running on with it ignored would "
 									  "give you a default you did not ask for",
@@ -183,13 +213,13 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	{
 		coef_file = arguments[i + 1];
 		aux_basis = get_aux_basis(argc, arguments, i + 1);
-		err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(coef_file), "-coef: coefficient file doesn't exist: " + coef_file.string(), std::cout);
 		SALTED = true;
 	}
 	else if (temp == "-cif")
 	{
 		cif = arguments[i + 1];
-		err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(cif), "-cif: CIF doesn't exist: " + cif.string(), std::cout);
 	}
 	else if (temp == "-convert_to_47") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
@@ -364,12 +394,12 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	else if (temp == "-hkl")
 	{
 		hkl = arguments[i + 1];
-		err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(hkl), "-hkl: hkl file doesn't exist: " + hkl.string(), std::cout);
 	}
 	else if (temp == "-wfn")
 	{
 		wfn = arguments[i + 1];
-		err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!", std::cout);
+		err_checkf(std::filesystem::exists(wfn), "-wfn: wavefunction does not exist: " + wfn.string(), std::cout);
 	}
 	else if (temp == "-wfn_cif")
 	{
@@ -609,7 +639,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		wfn = arguments[i + 1];
 		wfn2 = arguments[i + 2];
-		err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(wfn), "-atom_sfac: wavefunction doesn't exist: " + wfn.string(), std::cout);
 		WFN wavy(e_origin::NOT_YET_DEFINED);
 		wavy.read_known_wavefunction_format(wfn, std::cout, debug);
 		wavy.delete_unoccupied_MOs();
@@ -881,8 +911,8 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		lap("write coefficients");
 	}
 	else if (temp == "-SALTED_Training") {
-		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -test_RI to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -test_RI to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_Training to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -SALTED_Training to specify an auxiliary basis set.", std::cout);
 
 		WFN wavy(wfn);
 		WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
@@ -928,7 +958,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			blocky.write_tscb_file(name, name);
 		}
 		else
-			err_checkf(false, "Wrong file ending!", std::cout);
+			err_checkf(false, "-tscb takes a .tsc or .tscb file, not " + name.string(), std::cout);
 		finished = true; return true;
 	}
 	else if (temp == "-tsc_labels")
@@ -955,7 +985,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	else if (temp == "-occ")
 	{
 		occ = arguments[i + 1];
-		err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!", std::cout);
+		err_checkf(std::filesystem::exists(occ), "-occ: OCC input doesn't exist: " + occ, std::cout);
 
 	}
 	else
@@ -985,7 +1015,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	else if (temp == "-atom_dens")
 	{
 		wfn = arguments[i + 1];
-		err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(wfn), "-atom_dens: wavefunction doesn't exist: " + wfn.string(), std::cout);
 		ivec val_MOs;
 		ivec val_MOs_beta;
 		if (argc > i + 3 && arguments[i + 2][0] != '-')
@@ -1479,7 +1509,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	else if (temp == "-cube_density" || temp == "-cube")
 	{
 		cube_density = arguments[i + 1];
-		err_checkf(std::filesystem::exists(cube_density), "Cube density file does not exist!", std::cout);
+		err_checkf(std::filesystem::exists(cube_density), temp + ": cube file does not exist: " + cube_density.string(), std::cout);
 	}
 	else if (temp == "-cubeb")
 		cube::binary_output = true;
@@ -1752,8 +1782,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-RI_CUBE" || temp == "-ri_cube")
 	{
-		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -test_RI to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -RI_CUBE to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -RI_CUBE to specify an auxiliary basis set.", std::cout);
 		std::string coef_file = arguments[i + 1];
 		std::vector<unsigned long> shape{};
 		bool fortran_order;
@@ -1921,7 +1951,7 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 	else if (temp == "-lukas_test")
 	{
 		//Check that wfn is not empty
-		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -lukas_test to specify a wavefunction.", std::cout);
 		err_checkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
 
 		WFN wavy(wfn);
@@ -2046,9 +2076,20 @@ void options::digest_options()
 			const std::string &knob = arguments[++i];
 			const size_t eq = knob.find('=');
 			const std::string name = knob.substr(0, eq);
+			if (!tuning_known(name))
+				std::cerr << "WARNING: -tune " << name << " is no knob this build documents; -tune list shows them" << endl;
 			const char *old = tuning(name.c_str());
 			run_tuned.emplace_back(name, old ? std::optional<std::string>(old) : std::nullopt);
 			set_tuning(name, eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
+		}
+	//the NBO handlers compare raw tokens, so -nbo-json is spelled -nbo_json for them here
+	for (int i = 0; i < arguments.size(); i++)
+		if (arguments[i].size() > 1 && arguments[i][0] == '-' && isalpha(static_cast<unsigned char>(arguments[i][1])))
+		{
+			string o = arguments[i];
+			replace(o.begin() + 1, o.end(), '-', '_');
+			if (nbo_family_suboptions().count(o))
+				arguments[i] = o;
 		}
 	// This loop figures out command line options
 	for (int i = 0; i < arguments.size(); i++)
@@ -2087,6 +2128,26 @@ void options::digest_options()
 		{
 			err_checkf(false, "Option " + temp + ": " + e.what() + " - check the value(s) that follow it", log_file);
 		}
+		//a one-shot option ran its job and ends the loop: the flags after it that neither its handler nor the
+		//position-independent readers (-tune, -out, -no_date, -v, look_for_debug) take are read by nobody
+		if (claimed && finished)
+		{
+			const bool nbo = temp == "-nbo" || temp == "-nbo_native" || temp == "-nbo_external" || temp == "-nbo_parse" || temp == "-convert_to_47";
+			string ignored;
+			for (int j = i + 1; j < arguments.size(); j++)
+			{
+				string o = arguments[j];
+				if (!(o.size() > 1 && o[0] == '-' && isalpha(static_cast<unsigned char>(o[1]))))
+					continue;
+				replace(o.begin() + 1, o.end(), '-', '_');
+				if (o == "-tune" || o == "-out" || o == "-no_date" || o == "-no_date_but_gpu" || o == "-v" || o == "-v2" || o == "-debug" ||
+					(nbo && (nbo_family_suboptions().count(o) || o == "-cpus")) || (temp.rfind("-merge", 0) == 0 && o == "-cif"))
+					continue;
+				ignored += " " + arguments[j];
+			}
+			if (!ignored.empty())
+				std::cerr << "WARNING: ignored after " << temp << ", which runs its job and ends the command line:" << ignored << endl;
+		}
 		if (claimed)
 			continue;
 		//An inline handler that ran and failed returns false with finished set; not an unknown option.
@@ -2099,18 +2160,22 @@ void options::digest_options()
 		if (temp == "-v" || temp == "-v2" || temp == "-debug" || temp == "-h" || temp == "--h" ||
 			temp == "-help" || temp == "--help")
 			continue;
-		//consumed by the -nbo/-nbo_external handler itself, in whichever order they were written
+		//the -nbo/-nbo_external handlers finish the line and read only the tokens after their wavefunction,
+		//so one reaching here is read by nothing
 		if (nbo_family_suboptions().count(temp))
+		{
+			std::cerr << "WARNING: ignoring " << temp << ": NBO/NRT options are read only after -nbo <wavefunction>, -nbo_external, -nbo_parse or -convert_to_47" << endl;
 			continue;
+		}
 		if (const char *family = owning_analysis(temp))
-			err_checkf(false, "Unknown option " + temp + ": it names no " + family +
+			err_checkf(false, "Unknown option " + temp + did_you_mean(temp) + ": it names no " + family +
 								  " option this build has. Check the spelling, -h lists them; "
 								  "running on with it ignored would give you a default you did "
 								  "not ask for",
 					   log_file);
 		log_file << "WARNING: ignoring unknown option " << temp << endl;
-		if (log_file.rdbuf() != std::cout.rdbuf())
-			std::cout << "WARNING: ignoring unknown option " << temp << endl;
+		//run_app_impl has pointed cout at the log, so stderr is the console
+		std::cerr << "WARNING: ignoring unknown option " << temp << did_you_mean(temp) << endl;
 	}
 
 	// SALTED predicts a density from atom positions.  Historically its

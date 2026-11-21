@@ -12,13 +12,13 @@ Notation: `<x>` is required, `[x]` optional, `x|y` alternatives. Angstrom is
 the unit unless stated otherwise.
 
 Either separator works in every flag: `-rgbi_groups` and `-rgbi-groups` are the
-same option, and the spelling in the tables is the canonical one. Case is not
+same option (the `-nbo_*`/`-nrt_*` sub-options too), and the spelling in the tables is the canonical one. Case is not
 normalised, so where a flag has an upper-case form it is listed separately.
 
 **Before you compose a long command line, read
 [flag order matters](Troubleshooting.md#flag-order-matters).** Several options
-run inside the parser and stop it, so options placed after them are silently
-ignored.
+run inside the parser and stop it, so options placed after them are ignored
+(the console names them on stderr, the log does not).
 
 ## Contents
 
@@ -55,8 +55,8 @@ need the virtuals).
 | `-d <dir>` | 1 | Directory the basis-set files are looked up in. |
 | `-coef <file> [aux basis...]` | 1+ | Pre-computed density-fitting coefficient file (`.npy`) and the auxiliary basis set(s) it was fitted in, read as `-ri_fit` reads them (`auto_aux` when none is given). With `-ECP N`, or a wavefunction whose reader found ECPs, the coefficients are taken as the fit of the valence density: the table, the charge table and the `.tshb` add the mode-N core alike. |
 | `-fchk <file>` | 1 | Write a Gaussian-format checkpoint file. |
-| `-wfn_cif <file>` | 1 | Write the wavefunction geometry and basis into a CIF. |
-| `-gbw2wfn <file>` | 1 | Convert an ORCA `.gbw` into a `.wfn`. |
+| `-wfn_cif` | 0 | Write the basis set and the wavefunction as CIF loops. With `-gbw2wfn` or `-fchk` into `<wfn stem>.cif` beside the input; in a table run into `test.wfn_cif`, which also carries the form-factor table. `-tshb` then writes the table instead (log: `-tshb: the table is written instead, -cif needs the table`). |
+| `-gbw2wfn` | 0 | Convert the `-wfn` wavefunction into `converted.wfn`, `occupied.wfn` and `converted.wfx`. |
 | `-convert_to_47 <wfn>` | 1 + sub-options | Write an NBO `.47` archive from a contracted-basis wavefunction. |
 | `-cube_convert <in> <out>` | 2 | Text `.cube` <-> binary `.cubeb`. The output format follows the extension of `<out>`. One-shot. |
 | `-combine_mos <a> <b>` | 2 | Combine the MO sets of two wavefunctions; select with `-cmos1`/`-cmos2`. One-shot. |
@@ -273,7 +273,7 @@ delocalisation indices (LI/DI).
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
 | `-topology <wfn>` | 1 | | Every critical point of rho — nuclear, bond, ring, cage — with the Poincare-Hopf check. Console output. One-shot. |
-| `-eli_analysis <wfn> <resolution> <radius>` | 3 | | QTAIM + ELI-D basins, populations, LI/DI. |
+| `-eli_analysis <wfn> [<resolution> <radius>]` | 1 or 3 | `0.05` / `3.0` | QTAIM + ELI-D basins, populations, LI/DI. Sets `-resolution` and `-radius`, overwriting ones written before it. |
 | `-eli_contributions` | 0 | off (on in `-fba`) | With `-eli_analysis`, always in `-fba`: split every ELI-D basin population into its contributors, as a table with one column each for QTAIM atoms (Raub-Jansen: each ELI-D integration point goes to the QTAIM basin it lies in), Pipek-Mezey IBOs, Boys IBOs and NLMOs. For a single determinant an orbital's share is n_i ∫_Ω \|φ_i\|², so each column sums to the basin population. The orbital columns need a closed-shell wavefunction with occupations 0/2 (an open shell prints QTAIM only); the IBO columns need ORCA phases and MINAO for every element, the NLMO column a spherical basis on every atom. A skipped column says why. All columns number atoms from 0, as the QTAIM and ELI-D tables do; repeated LP/BD labels carry (1), (2), ... |
 | `-eli_family <wfn> [points]` | 1-2 | | ELI-D alpha/beta/triplet and ELI-q as point values. Console output. One-shot. ELIA and ELI-q_s,2 need the 2-RDM: an ORCA CAS/CI `.gbw` with its `PrintWF det` output as `<stem>.out` beside it; see [Correlated wavefunctions](Correlated-Wavefunctions.md#6-what-is-exact-what-is-approximate-what-is-refused). |
 | `-fba <wfn>` | 1 | | Full bonding analysis in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT, plus the `-eli_contributions` table. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; the exact DI/λ needs an ORCA CAS/CI `PrintWF det` output as `<stem>.out` beside the `.gbw`. See [Correlated wavefunctions](Correlated-Wavefunctions.md). |
@@ -597,7 +597,7 @@ interface and can change without notice.
 | --- | --- |
 | `-test` | Run the built-in test suite. |
 | `-profiling [root]` | Profiling run; `root` defaults to `tests`. Also `-profile`. |
-| `-tune NAME[=VALUE]` | Set a developer knob for this run; a bare `NAME` means `1`. Every knob is listed in [Tuning knobs](Tuning-Knobs.md). |
+| `-tune NAME[=VALUE]` | Set a developer knob for this run; a bare `NAME` means `1`. Every knob is listed in [Tuning knobs](Tuning-Knobs.md); `-tune list` prints them with their defaults and stops. |
 | `-partitioning_test` | Partitioning regression test. |
 | `-test_RI` | RI-fitting regression test. |
 | `-RI_WFN_DIFF` | Compare a fitted density against the wavefunction it came from. |
@@ -605,3 +605,6 @@ interface and can change without notice.
 | `-lahvatest`, `-lukas_test` | Ad-hoc development tests. |
 | `-rkpts`, `-skpts` | Read / save the k-point set. |
 | `-out <file>` | Rename the log file (read before the parser, so position-independent). |
+| `-h [word]` | The help, or only its sections whose title contains `word` (`-h gpu`, `-h bonding`); also `--h`, `-help`, `--help`. Printed to the console. |
+| `-mask <file.fab>` | Solvent-mask contribution read when the XCW settings file has the `mask` keyword. |
+| `-beta_spheres` | The default; undoes `-no_beta_spheres`. |
