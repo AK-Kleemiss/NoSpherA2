@@ -575,7 +575,7 @@ bool options::digest_run_options(const std::string &temp, int &i)
 	else if (temp == "-resolution")
 		properties.resolution = stod(arguments[i + 1]);
 	else if (temp == "-refine")
-		argc > i + 1 ? properties.integral_accuracy = stod(arguments[i + 1]) : properties.integral_accuracy = 0.1;
+		properties.integral_accuracy = i + 1 < argc && arguments[i + 1][0] != '-' ? stod(arguments[i + 1]) : 0.1;
 	else if (temp.find("-rkpts") < 1)
 		read_k_pts = true;
 	else if (temp == "-skpts")
@@ -662,7 +662,6 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		cif_based_combined_tsc_calc = true;
 		int n = 1;
-		string delimiter = ",";
 		groups.pop_back();
 		while (i + n < argc && string(arguments[i + n]).find("-") > 0)
 		{
@@ -671,11 +670,9 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			combined_tsc_calc_cifs.push_back(arguments[i + n]);
 			n++;
 			const string _temp = arguments[i + n];
-			if (_temp.find(delimiter) == string::npos) {
-				if (debug)
-					std::cout << "--Delimiter not found, using ." << endl;
-				delimiter = ".";
-			}
+			const string delimiter = _temp.find(',') == string::npos ? "." : ",";
+			if (debug && delimiter == ".")
+				std::cout << "--Delimiter not found, using ." << endl;
 			groups.push_back(split_string<int>(_temp, delimiter));
 			if (debug)
 			{
@@ -762,18 +759,15 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		combined_tsc_calc = true;
 		int n = 1;
-		string delimiter = ",";
 		groups.pop_back();
 		while (i + n < argc && string(arguments[i + n]).find("-") > 0)
 		{
 			combined_tsc_calc_files.push_back(arguments[i + n]);
 			n++;
 			const string _temp = arguments[i + n];
-			if (_temp.find(delimiter) == string::npos) {
-				if (debug)
-					std::cout << "--Delimiter not found, using ." << endl;
-				delimiter = ".";
-			}
+			const string delimiter = _temp.find(',') == string::npos ? "." : ",";
+			if (debug && delimiter == ".")
+				std::cout << "--Delimiter not found, using ." << endl;
 			groups.push_back(split_string<int>(_temp, delimiter));
 			if (debug)
 			{
@@ -879,6 +873,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
 		npy::write_npy("SALTED_COEFS.npy", np_coeffs);
 		lap("write coefficients");
+		finished = true; return true;
 	}
 	else if (temp == "-SALTED_Training") {
 		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -test_RI to specify a wavefunction.", std::cout);
@@ -1917,6 +1912,7 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 	else if (temp == "-partitioning_test")
 	{
 		calc_partition_densities();
+		finished = true; return true;
 	}
 	else if (temp == "-lukas_test")
 	{
@@ -1942,6 +1938,7 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 			atom_cube = calc_cube_ML(coefs, SP.wavy, atm_idx);
 			atom_cube.write_file("DBA_atom_" + std::to_string(atm_idx) + ".cube");
 		}
+		finished = true; return true;
 	}
 	else
 		return false;
