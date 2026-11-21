@@ -1,7 +1,5 @@
 #include "pch.h"
 #include "cell.h"
-#include "convenience.h"
-#include "nos_math.h"
 #include <bit>
 #include <cctype>
 #include <Eigen/Dense>
@@ -229,30 +227,6 @@ void cell::resolve_internal_symmetry(std::vector<asym_atom>& asym_atoms) {
 			}
 		}
 	}
-}
-
-void cell::eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list) {
-	const int total_atoms = asym_atoms.size();
-	auto frac_pos = [&](int i) -> vec {
-		return { asym_atoms[i].frac_pos[0], asym_atoms[i].frac_pos[1], asym_atoms[i].frac_pos[2] };
-		};
-	linking_list.resize(asymmetric_atoms);
-	const int num_sym_ops = sym[0][0].size();
-	int idx1 = 0;
-	for (int idx1 = 0; idx1 < asymmetric_atoms; idx1++) {
-		linking_list[idx1].resize(total_atoms);
-		for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
-			const vec pos1 = apply_symmetry(frac_pos(idx1), sym_op);
-			for (int idx2 = 0; idx2 < total_atoms; idx2++) {
-				const vec pos2 = frac_pos(idx2);
-				if (check_special(pos1, pos2, 1e-4)) {
-					linking_list[idx1][idx2].push_back(sym_op);
-					break;
-				}
-			}
-		}
-	}
-	// Closing function
 }
 
 bool cell::check_special(const vec& pos1, const vec& pos2, const double& tolerance) {
@@ -633,8 +607,6 @@ void cell::keep_operations(const ivec& kept, ivec& applied_symmetry, hkl_list& h
 				static_cast<double>(sym[2][2][sym_op])} });
 	}
 
-	const int nr = hkl.size();
-	std::vector<i3> hkl_vec(hkl.begin(), hkl.end());
 	hkl_list new_enlarged;
 	for (const auto& h : hkl) {
 		vec hkl_temp = { static_cast<double>(h[0]), static_cast<double>(h[1]), static_cast<double>(h[2]) };

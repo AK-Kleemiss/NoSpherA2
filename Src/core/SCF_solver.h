@@ -87,7 +87,6 @@ private:
 	std::unique_ptr<occ::qm::HartreeFock> hessian_df_;
 
 	occ::core::Molecule mol_;
-	occ::qm::AOBasis basis_;
 
 	// The SCF loop of one run
 	bool do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess);

@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "structure_factors.h"
-#include "constants.h"
 #include "basis_set.h"
 #include "integrator.h"
 #include "tuning.h"
