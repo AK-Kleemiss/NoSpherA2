@@ -6,12 +6,6 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cxx"
 )
 
-list(
-    FILTER NOSPHERA2_CORE_SOURCES
-    EXCLUDE
-    REGEX "[/\\\\](vec_nos_math|mat_nos_math)\\.cpp$"
-)
-
 #The two GPU host files are for particular builds only. The shim stands in for the HIP
 #runtime wherever HIP kernels are compiled in; the dispatcher exists only when both backends
 #are, since it defines the global entry points that a single backend's objects define
