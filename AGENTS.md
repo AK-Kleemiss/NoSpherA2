@@ -297,6 +297,8 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-21 (command-line usability, branch `usability/cli`), the console (stderr) names unknown options with the nearest spelling, NBO options nothing reads, flags after a one-shot option and undocumented `-tune` names; `-h <word>` and `-tune list` are new, and logs and outputs of valid command lines are unchanged. `ctest` on a CUDA `release-windows-tests` build (GPU present): **1466 passed, 0 failed, 12 skipped** (2 disabled) of 1480; the result-equivalence gate (150 cases at `-cpus` 8 and 1 against master) finds no difference beyond master's own run-to-run noise. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (merge of the equicomb branch at `814e9a9c` into `salted-relpower-norm`), the rel_power normalisation and the
 symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index of `plan_norms`. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1418 passed, 0 failed, 12 skipped** (2 disabled) of 1432; on Linux (AKL006,
