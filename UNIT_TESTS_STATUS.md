@@ -1,5 +1,7 @@
 # Unit Test Status
 
+**2026-11-21 Bohr radius (branch `alt/behaviour-changes`, optional):** `CubeIoTests.FractalDimensionOfAStep` takes the fractal plot's volumes in A^3 from `constants::a0` instead of the literal 0.529177249.
+
 **2026-11-21 CLI fixes (branch `alt/behaviour-changes`, optional):** `-refine` followed by another flag takes 0.1 instead of dying in stod, `-mtc`/`-cmtc` choose the group delimiter per group, and `-SALTED_COEFS`, `-lukas_test`, `-partitioning_test` finish the run. New: `ConvenienceCoverageOptionTests.RefineWithoutAValueTakesTheDefault`, `.MtcChoosesTheDelimiterPerGroup`, `.PartitioningTestFinishes`, `.SaltedCoefsFinishes` (`-lukas_test` writes 15 full-resolution cubes and has no gtest). `TomlIntegrationTests.SALTED_write_coefs` fails by design: its golden still holds the tsc pass over the electron-less xyz that used to follow the coefficients; regenerate it if this change is taken.
 
 **2026-11-21 Src/core in subsystem folders (branch `restructure/layout`):** the flat `Src/core` is split into `base`, `wfn`, `integration`, `tsc`, `xcw`, `salted`, `nbo`, `analysis`, `properties` and `gpu` (git mv; the CLI front end, `pch.h` and the `CMakeLists.txt` stay at the root, `options_parse.cpp` because `CliRefusalTests` reads it by path). In `tests/src` only the `#include "core/x.h"` lines change, to `core/<folder>/x.h`; no test is added, removed or changed, so the count is unchanged. A core header in a folder includes `../pch.h`: as plain `pch.h` it found `tests/src/pch.h` first when a test included it.

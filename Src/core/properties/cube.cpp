@@ -614,8 +614,8 @@ bool cube::fractal_dimension(const double stepsize) const
 		of << setw(8) << scientific << setprecision(8) << steps
 			<< setw(16) << scientific << setprecision(8) << map_min
 			<< setw(16) << scientific << setprecision(8) << map_max
-			<< setw(16) << scientific << setprecision(8) << e[0] * pow(0.529177249, 3)
-			<< setw(16) << scientific << setprecision(8) << e[1] * pow(0.529177249, 3) << "\n";
+			<< setw(16) << scientific << setprecision(8) << constants::bohr2ang_p(e[0], 3)
+			<< setw(16) << scientific << setprecision(8) << constants::bohr2ang_p(e[1], 3) << "\n";
 		for (int i = 0; i < steps; i++)
 			of << setw(16) << scientific << setprecision(8) << iso[i] << setw(16) << scientific << setprecision(8) << df[i] << "\n";
 		of.flush();

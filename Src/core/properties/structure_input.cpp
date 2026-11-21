@@ -68,8 +68,8 @@ void readxyzMinMax_fromCIF(
 	opts.MinMax[1] = 0.0;
 	opts.MinMax[2] = 0.0;
 
-	opts.MinMax[3] = (cell.get_a() + cell.get_b() * cell.get_cg() + cell.get_c() * cell.get_cb()) / 0.529177249;
-	opts.MinMax[4] = (cell.get_b() * cell.get_sg() + cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg()) / 0.529177249;
+	opts.MinMax[3] = constants::ang2bohr(cell.get_a() + cell.get_b() * cell.get_cg() + cell.get_c() * cell.get_cb());
+	opts.MinMax[4] = constants::ang2bohr(cell.get_b() * cell.get_sg() + cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg());
 	opts.MinMax[5] = cm[2][2];
 
 	opts.NbSteps[0] = (int)ceil(cell.get_a() / opts.resolution);
