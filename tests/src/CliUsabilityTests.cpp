@@ -48,6 +48,22 @@ TEST(CliUsability, MissingInputFileIsNamed)
 	EXPECT_EXIT(die_on({"-tscb", "table.txt"}), code, "-tscb takes a .tsc or .tscb file, not table.txt");
 }
 
+//-nbo-json is -nbo_json, as -no-date is -no_date: the run gets past the sub-option check to the missing file
+TEST(CliUsability, NboSubOptionsTakeDashesLikeEveryFlag)
+{
+	EXPECT_EXIT(die_on({"-nbo", "no_such_file.gbw", "-nrt-max", "5", "-nbo-json", "x.json"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "wavefunction doesn't exist: no_such_file.gbw");
+}
+
+//the -nbo handler reads only what follows its wavefunction; one written before it is dropped, and says so
+TEST(CliUsability, NboSubOptionBeforeItsParentIsReported)
+{
+	const Parsed p = digest({"-nrt", "-nbo_threads", "2"});
+	EXPECT_NE(p.err.find("WARNING: ignoring -nrt:"), std::string::npos) << p.err;
+	EXPECT_NE(p.err.find("WARNING: ignoring -nbo_threads:"), std::string::npos) << p.err;
+	EXPECT_EQ(p.log.find("WARNING"), std::string::npos) << p.log;
+}
+
 //The hint names the option that asked, not the one its text was copied from
 TEST(CliUsability, MissingPrerequisiteNamesTheOptionThatNeedsIt)
 {

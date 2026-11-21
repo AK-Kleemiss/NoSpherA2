@@ -2050,6 +2050,15 @@ void options::digest_options()
 			run_tuned.emplace_back(name, old ? std::optional<std::string>(old) : std::nullopt);
 			set_tuning(name, eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
 		}
+	//the NBO handlers compare raw tokens, so -nbo-json is spelled -nbo_json for them here
+	for (int i = 0; i < arguments.size(); i++)
+		if (arguments[i].size() > 1 && arguments[i][0] == '-' && isalpha(static_cast<unsigned char>(arguments[i][1])))
+		{
+			string o = arguments[i];
+			replace(o.begin() + 1, o.end(), '-', '_');
+			if (nbo_family_suboptions().count(o))
+				arguments[i] = o;
+		}
 	// This loop figures out command line options
 	for (int i = 0; i < arguments.size(); i++)
 	{
@@ -2099,9 +2108,13 @@ void options::digest_options()
 		if (temp == "-v" || temp == "-v2" || temp == "-debug" || temp == "-h" || temp == "--h" ||
 			temp == "-help" || temp == "--help")
 			continue;
-		//consumed by the -nbo/-nbo_external handler itself, in whichever order they were written
+		//the -nbo/-nbo_external handlers finish the line and read only the tokens after their wavefunction,
+		//so one reaching here is read by nothing
 		if (nbo_family_suboptions().count(temp))
+		{
+			std::cerr << "WARNING: ignoring " << temp << ": NBO/NRT options are read only after -nbo <wavefunction>, -nbo_external, -nbo_parse or -convert_to_47" << endl;
 			continue;
+		}
 		if (const char *family = owning_analysis(temp))
 			err_checkf(false, "Unknown option " + temp + ": it names no " + family +
 								  " option this build has. Check the spelling, -h lists them; "

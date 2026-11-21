@@ -16,6 +16,9 @@ Get-Content .\NoSpherA2.log -Tail 40
 first, because their entire output is meant to be read: `-h`, `-topology`,
 `-eli_family`, `-fukui_analysis`.
 
+Warnings about the command line itself, an unknown option or an NBO option
+nothing reads, are written to the console on stderr as well.
+
 ## "Did not understand the task to perform!"
 
 The parser accepted every flag but nothing on the line selected a job, so
@@ -57,12 +60,12 @@ The rules that follow from that:
 | `-no_gpu_salted` | `-SALTED_COEFS` | the GPU path runs anyway (the globals are set later) |
 | `-old_tsc`, `-tsc_block` | `-merge`, `-tscb` | silently ignored |
 | `-repulsion_exchange`, `-repulsion_overlap`, `-no_gpu_density` | `-interaction_energy` | never read |
-| `-nbo` / `-nbo_external` / `-nbo_parse` / `-convert_to_47` | every `-nbo_*` and `-nrt*` sub-option | the sub-options are silently ignored |
+| `-nbo` / `-nbo_external` / `-nbo_parse` / `-convert_to_47` | every `-nbo_*` and `-nrt*` sub-option | the sub-options are ignored, with a warning on stderr |
 
 The NBO case is the one that looks most wrong: the sub-options are collected by a
 loop that starts at the position of the parent flag, so `-nrt -nbo x.gbw`
-runs an NBO analysis with no NRT and says nothing about it. Always write the
-parent flag first.
+runs an NBO analysis with no NRT; the console says `WARNING: ignoring -nrt`, the
+log does not. Always write the parent flag first.
 
 `-mtc` and `-cmtc` are the mirror image: they swallow tokens *forwards* until one
 begins with `-`, in pairs (`wfn parts`) or triples (`wfn cif parts`). Two

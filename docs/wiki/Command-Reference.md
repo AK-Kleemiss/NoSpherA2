@@ -12,7 +12,7 @@ Notation: `<x>` is required, `[x]` optional, `x|y` alternatives. Angstrom is
 the unit unless stated otherwise.
 
 Either separator works in every flag: `-rgbi_groups` and `-rgbi-groups` are the
-same option, and the spelling in the tables is the canonical one. Case is not
+same option (the `-nbo_*`/`-nrt_*` sub-options too), and the spelling in the tables is the canonical one. Case is not
 normalised, so where a flag has an upper-case form it is listed separately.
 
 **Before you compose a long command line, read
