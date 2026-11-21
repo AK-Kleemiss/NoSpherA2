@@ -17,7 +17,8 @@ first, because their entire output is meant to be read: `-h`, `-topology`,
 `-eli_family`, `-fukui_analysis`.
 
 Warnings about the command line itself, an unknown option or an NBO option
-nothing reads, are written to the console on stderr as well.
+nothing reads, are written to the console on stderr as well; an unknown option
+comes with the nearest spelling `-h` lists (`-hkll (did you mean -hkl?)`).
 
 ## "Did not understand the task to perform!"
 

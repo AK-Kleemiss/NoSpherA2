@@ -80,6 +80,19 @@ TEST(CliUsability, UnknownOptionReachesTheConsoleAndTheLog)
 	EXPECT_NE(p.err.find("WARNING: ignoring unknown option -hkll"), std::string::npos) << p.err;
 }
 
+//the nearest spelling -h lists; the log line stays as it was
+TEST(CliUsability, UnknownOptionGetsTheNearestSpelling)
+{
+	Parsed p = digest({"-hkll", "x.hkl"});
+	EXPECT_NE(p.err.find("-hkll (did you mean -hkl?)"), std::string::npos) << p.err;
+	EXPECT_EQ(p.log.find("did you mean"), std::string::npos) << p.log;
+	p = digest({"-Cif", "x.cif"});
+	EXPECT_NE(p.err.find("(did you mean -cif?)"), std::string::npos) << p.err;
+	p = digest({"-completely_unrelated"});
+	EXPECT_EQ(p.err.find("did you mean"), std::string::npos) << p.err;
+	EXPECT_EXIT(die_on({"-rgbi_gruops", "0,1"}), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "did you mean -rgbi_groups");
+}
+
 TEST(CliUsability, KnownOptionsPrintNothingToTheConsole)
 {
 	const Parsed p = digest({"-acc", "1", "-no_date", "-all_charges"});

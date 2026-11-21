@@ -143,6 +143,36 @@ const std::set<std::string> &nbo_family_suboptions()
 }
 
 namespace {
+	//" (did you mean -x?)" for the flag of the help text, every one the parser reads, nearest in edit
+	//distance (case ignored; at most 1 for a flag of four characters or fewer, else 2), or ""
+	std::string did_you_mean(const std::string &flag)
+	{
+		auto lower = [](std::string s) { for (int i = 0; i < s.size(); i++) s[i] = tolower(static_cast<unsigned char>(s[i])); return s; };
+		const std::string a = lower(flag);
+		const std::regex word("(^|[^A-Za-z0-9_])(-[A-Za-z][A-Za-z0-9_-]*)");
+		std::string best;
+		int best_d = a.size() > 4 ? 3 : 2;
+		ivec row(a.size() + 1), prev(a.size() + 1);
+		for (std::sregex_iterator m(help_message.begin(), help_message.end(), word), end; m != end; ++m)
+		{
+			std::string b = (*m)[2].str();
+			std::replace(b.begin() + 1, b.end(), '-', '_');
+			const std::string lb = lower(b);
+			for (int i = 0; i <= a.size(); i++)
+				prev[i] = i;
+			for (int j = 1; j <= lb.size(); j++)
+			{
+				row[0] = j;
+				for (int i = 1; i <= a.size(); i++)
+					row[i] = std::min({prev[i] + 1, row[i - 1] + 1, prev[i - 1] + (a[i - 1] != lb[j - 1])});
+				std::swap(row, prev);
+			}
+			if (b != flag && prev[a.size()] < best_d)
+				best_d = prev[a.size()], best = b;
+		}
+		return best.empty() ? "" : " (did you mean " + best + "?)";
+	}
+
 	//No digester sees these tokens, so an unknown one would otherwise be dropped silently.
 	void refuse_unknown_nbo_suboption(const std::vector<std::string> &arguments, int from,
 									  const std::string &after)
@@ -152,7 +182,7 @@ namespace {
 			const std::string &o = arguments[j];
 			if ((o.rfind("-nbo", 0) == 0 || o.rfind("-nrt", 0) == 0) &&
 				nbo_family_suboptions().count(o) == 0)
-				err_checkf(false, "Unknown option " + o + " after " + after +
+				err_checkf(false, "Unknown option " + o + did_you_mean(o) + " after " + after +
 									  ": it names no NBO/NRT option this build has. Check the "
 									  "spelling, -h lists them; running on with it ignored would "
 									  "give you a default you did not ask for",
@@ -2116,14 +2146,14 @@ void options::digest_options()
 			continue;
 		}
 		if (const char *family = owning_analysis(temp))
-			err_checkf(false, "Unknown option " + temp + ": it names no " + family +
+			err_checkf(false, "Unknown option " + temp + did_you_mean(temp) + ": it names no " + family +
 								  " option this build has. Check the spelling, -h lists them; "
 								  "running on with it ignored would give you a default you did "
 								  "not ask for",
 					   log_file);
 		log_file << "WARNING: ignoring unknown option " << temp << endl;
 		//run_app_impl has pointed cout at the log, so stderr is the console
-		std::cerr << "WARNING: ignoring unknown option " << temp << endl;
+		std::cerr << "WARNING: ignoring unknown option " << temp << did_you_mean(temp) << endl;
 	}
 
 	// SALTED predicts a density from atom positions.  Historically its
