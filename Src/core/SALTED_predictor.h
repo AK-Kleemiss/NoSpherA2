@@ -4,6 +4,7 @@
 #include "convenience.h"
 #include "SALTED_io.h"
 #include "SALTED_utilities.h"
+#include "SALTED_descriptors.h"
 #include "wfn_class.h"
 
 using salted_block = std::shared_ptr<const dMatrix2>;

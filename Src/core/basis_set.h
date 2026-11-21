@@ -37,9 +37,7 @@ public:
 
 	void set_name(const std::string& name) { _name = name; }
 	const std::string& get_name() const { return _name; }
-	void set_primitive_count(uint32_t count) { _primitiveCount = count; }
 	uint32_t get_primitive_count() const { return _primitiveCount; }
-	void set_element_ranges(const std::array<int, 118>& counts) { _elementCounts = counts; }
 	void set_count_for_element(int element, int count) {
 		_elementCounts[element] = count;
 		_elementOffsets[element] = _primitiveCount;
@@ -57,10 +55,6 @@ public:
 
 	const size_t get_owned_primitive_count() const {
 		return _ownedPrimitives.size();
-	}
-
-	const SimplePrimitive* get_primitives() const {
-		return _primitives;
 	}
 
 	void gen_auto_aux(const WFN& orbital_wfn);
