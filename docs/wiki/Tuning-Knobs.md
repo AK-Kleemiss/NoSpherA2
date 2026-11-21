@@ -89,10 +89,10 @@ page does not mention, and any name here that no source reads any more.
 
 | Knob | Default | Effect | Source |
 | --- | --- | --- | --- |
-| `NOS_SF_DIRECT` | off | Direct sum for every atom instead of Fourier-Bessel on the prototype shells. | `scattering_factors.cpp` |
-| `NOS_SF_FB_L=<L>` | D/2 | Fourier-Bessel expansion order instead of half the prototype's largest Lebedev degree; forces every atom onto Fourier-Bessel. | `scattering_factors.cpp` |
-| `NOS_SF_FB_EXACT` | off | Fourier-Bessel without the \|k\| interpolation table; forces every atom onto Fourier-Bessel. | `scattering_factors.cpp` |
-| `NOS_SF_FB_FORCE` | off | Fourier-Bessel for every atom, also where the direct sum would be faster. | `scattering_factors.cpp` |
+| `NOS_SF_DIRECT` | off | Direct sum for every atom instead of Fourier-Bessel on the prototype shells. | `sf_kernels.cpp` |
+| `NOS_SF_FB_L=<L>` | D/2 | Fourier-Bessel expansion order instead of half the prototype's largest Lebedev degree; forces every atom onto Fourier-Bessel. | `sf_kernels.cpp` |
+| `NOS_SF_FB_EXACT` | off | Fourier-Bessel without the \|k\| interpolation table; forces every atom onto Fourier-Bessel. | `sf_kernels.cpp` |
+| `NOS_SF_FB_FORCE` | off | Fourier-Bessel for every atom, also where the direct sum would be faster. | `sf_kernels.cpp` |
 | `NOS_GRID_OLD_FLOOR` | off | `lebedev_low` as the innermost angular floor for every element, not only from K on. | `AtomGrid.cpp` |
 | `NOS_MBIS_BECKE` | off | MBIS/EMBIS moments summed over every grid with Becke weights instead of each atom's own grid with the atom weights. | `AtomGrid.cpp`, `GridManager.cpp` |
 | `NOS_EXP_CRT` | off | The CRT `exp` in MBIS/EMBIS instead of the four-wide `exp_kernel` (within 1 ulp). | `AtomGrid.cpp` |
