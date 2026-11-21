@@ -17,7 +17,6 @@
 
 //The MBIS shell tables live in AtomGrid.cpp without a header
 std::pair<vec, vec> get_shsig_shpop(const int &atom_type);
-std::pair<vec2, vec> get_shalpha_shpop(const int &atom_type);
 vec2 sigma_to_alpha(const std::pair<vec, vec> &sigma);
 
 namespace
@@ -243,13 +242,10 @@ TEST(GridAtomGridTests, ShellTablesPopulationsSumToZ)
 {
 	for (int Z : { 1, 6, 11, 20, 40, 60 }) {
 		const auto sp = get_shsig_shpop(Z);
-		const auto ap = get_shalpha_shpop(Z);
 		const size_t shells = constants::MBIS_function[Z];
 		EXPECT_EQ(sp.first.size(), shells) << "Z " << Z;
 		EXPECT_EQ(sp.second.size(), shells) << "Z " << Z;
-		EXPECT_EQ(ap.first.size(), shells) << "Z " << Z;
 		EXPECT_NEAR(std::accumulate(sp.second.begin(), sp.second.end(), 0.0), Z, 1e-9) << "Z " << Z;
-		EXPECT_NEAR(std::accumulate(ap.second.begin(), ap.second.end(), 0.0), Z, 1e-9) << "Z " << Z;
 		const vec2 alpha = sigma_to_alpha(sp);
 		for (size_t m = 0; m < shells; m++) {
 			EXPECT_GT(sp.first[m], 0.0);
@@ -258,8 +254,6 @@ TEST(GridAtomGridTests, ShellTablesPopulationsSumToZ)
 				EXPECT_NEAR(alpha[m][k], 1.0 / (sp.first[m] * sp.first[m]), 1e-9 * alpha[m][k]) << "Z " << Z;
 			for (int k : { 1, 2, 4 })
 				EXPECT_EQ(alpha[m][k], 0.0);
-			for (int k = 0; k < 6; k++)
-				EXPECT_NEAR(ap.first[m][k], alpha[m][k], 1e-9 * std::abs(alpha[m][k]) + 1e-12) << "Z " << Z;
 		}
 	}
 }

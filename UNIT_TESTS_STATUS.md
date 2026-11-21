@@ -1,5 +1,7 @@
 # Unit Test Status
 
+**2026-11-21 EMBIS start (branch `alt/behaviour-changes`, optional):** `get_shalpha_shpop` is gone, so `GridAtomGridTests.ShellTablesPopulationsSumToZ` checks `sigma_to_alpha` of the sigma table only.
+
 **2026-11-21 Bohr radius (branch `alt/behaviour-changes`, optional):** `CubeIoTests.FractalDimensionOfAStep` takes the fractal plot's volumes in A^3 from `constants::a0` instead of the literal 0.529177249.
 
 **2026-11-21 CLI fixes (branch `alt/behaviour-changes`, optional):** `-refine` followed by another flag takes 0.1 instead of dying in stod, `-mtc`/`-cmtc` choose the group delimiter per group, and `-SALTED_COEFS`, `-lukas_test`, `-partitioning_test` finish the run. New: `ConvenienceCoverageOptionTests.RefineWithoutAValueTakesTheDefault`, `.MtcChoosesTheDelimiterPerGroup`, `.PartitioningTestFinishes`, `.SaltedCoefsFinishes` (`-lukas_test` writes 15 full-resolution cubes and has no gtest). `TomlIntegrationTests.SALTED_write_coefs` fails by design: its golden still holds the tsc pass over the electron-less xyz that used to follow the coefficients; regenerate it if this change is taken.
