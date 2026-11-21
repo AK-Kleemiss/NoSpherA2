@@ -58,7 +58,7 @@ log.
 
 `.\NoSpherA2.exe -h` prints a self-contained help text with the same
 information in a single screenful-per-section form. It is generated from the
-same source tree as this wiki (`Src/core/convenience.cpp`), so when the two
+same source tree as this wiki (`Src/core/help_text.cpp`), so when the two
 disagree, trust `-h` on the binary you are running.
 
 ## Verbosity
