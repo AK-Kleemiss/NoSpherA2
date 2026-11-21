@@ -297,6 +297,8 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-21 (cleanup, branch `cleanup/integration`: nine file-disjoint cleanup branches merged on master `d624d8c4`), dead code is removed (the Rys/Jacobi tables of `constants.h`, `CUDA_utilities.h`, `molecule.*`, the file dialogs, unused diagnostics) and the god files are split by topic (`convenience.*` into `options_parse.cpp`, `help_text.cpp`, `platform.cpp` and topic headers; `bondwise_analysis.cpp`, `b2c.cpp`, `properties.cpp`, `scattering_factors.cpp`, `wfn_*`); every function whose body changed is pinned bit for bit against a frozen copy of master's code (`*CleanupTests`). `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1453 passed, 0 failed, 12 skipped** (2 disabled) of 1467, against 1434 of 1448 for master on the same machine on 2026-11-20. Every output file, log and console line of the 90 `tests.toml` cases and 60 extra cases is byte-identical to master's at `-cpus 8` and `-cpus 1` (files master does not reproduce itself were rerun and matched one of master's values). See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (merge of the equicomb branch at `814e9a9c` into `salted-relpower-norm`), the rel_power normalisation and the
 symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index of `plan_norms`. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1418 passed, 0 failed, 12 skipped** (2 disabled) of 1432; on Linux (AKL006,
