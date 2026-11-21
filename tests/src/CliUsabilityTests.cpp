@@ -27,11 +27,17 @@ Parsed digest(const std::vector<std::string>& args)
 	return {log.str(), err.str()};
 }
 
-//err_checkf writes to cout and exits; a death test matches stderr only
+//err_checkf writes to cout or the log and exits; a death test matches stderr only
 void die_on(const std::vector<std::string>& args)
 {
+	std::vector<std::string> owned{"NoSpherA2"};
+	owned.insert(owned.end(), args.begin(), args.end());
+	std::vector<char*> argv;
+	for (auto& a : owned) argv.push_back(a.data());
+	int argc = static_cast<int>(argv.size());
 	std::cout.rdbuf(std::cerr.rdbuf());
-	digest(args);
+	options opt(argc, argv.data(), std::cerr);
+	opt.digest_options();
 }
 
 } // namespace
