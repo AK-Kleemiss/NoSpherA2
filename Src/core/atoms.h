@@ -492,8 +492,6 @@ public:
 	bool operator==(const atom& other) const;
 };
 
-atomID get_atom_ID(const int Z, const d3& frac_coords, const int dat = 0);
-
 struct scatterer_id_masks_d5 {
 	const static uint64_t
 		z_mask = 0x00000000000000FF,
