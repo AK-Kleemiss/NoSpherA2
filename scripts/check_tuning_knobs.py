@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Check that docs/wiki/Tuning-Knobs.md lists every -tune knob the sources read, and nothing else.
 
-A knob is a literal name passed to tuning() or to one of its wrappers (tuning_double in b2c.cpp,
-read_threshold in bondwise_analysis.cpp, nao_knob in nao.cpp). A knob read through a variable or a
+A knob is a literal name passed to tuning() or to one of its wrappers (tuning_double in basin_integration.cpp,
+read_threshold in rgbi.cpp, nao_knob in nao.cpp). A knob read through a variable or a
 new wrapper is invisible here: add the wrapper to CALL. Exit status 1 when the two sets differ.
 """
 import io
