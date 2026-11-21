@@ -183,13 +183,13 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	{
 		coef_file = arguments[i + 1];
 		aux_basis = get_aux_basis(argc, arguments, i + 1);
-		err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(coef_file), "-coef: coefficient file doesn't exist: " + coef_file.string(), std::cout);
 		SALTED = true;
 	}
 	else if (temp == "-cif")
 	{
 		cif = arguments[i + 1];
-		err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(cif), "-cif: CIF doesn't exist: " + cif.string(), std::cout);
 	}
 	else if (temp == "-convert_to_47") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
@@ -364,12 +364,12 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	else if (temp == "-hkl")
 	{
 		hkl = arguments[i + 1];
-		err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(hkl), "-hkl: hkl file doesn't exist: " + hkl.string(), std::cout);
 	}
 	else if (temp == "-wfn")
 	{
 		wfn = arguments[i + 1];
-		err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!", std::cout);
+		err_checkf(std::filesystem::exists(wfn), "-wfn: wavefunction does not exist: " + wfn.string(), std::cout);
 	}
 	else if (temp == "-wfn_cif")
 	{
@@ -609,7 +609,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		wfn = arguments[i + 1];
 		wfn2 = arguments[i + 2];
-		err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(wfn), "-atom_sfac: wavefunction doesn't exist: " + wfn.string(), std::cout);
 		WFN wavy(e_origin::NOT_YET_DEFINED);
 		wavy.read_known_wavefunction_format(wfn, std::cout, debug);
 		wavy.delete_unoccupied_MOs();
@@ -881,8 +881,8 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		lap("write coefficients");
 	}
 	else if (temp == "-SALTED_Training") {
-		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -test_RI to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -test_RI to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_Training to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -SALTED_Training to specify an auxiliary basis set.", std::cout);
 
 		WFN wavy(wfn);
 		WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
@@ -928,7 +928,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			blocky.write_tscb_file(name, name);
 		}
 		else
-			err_checkf(false, "Wrong file ending!", std::cout);
+			err_checkf(false, "-tscb takes a .tsc or .tscb file, not " + name.string(), std::cout);
 		finished = true; return true;
 	}
 	else if (temp == "-tsc_labels")
@@ -955,7 +955,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	else if (temp == "-occ")
 	{
 		occ = arguments[i + 1];
-		err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!", std::cout);
+		err_checkf(std::filesystem::exists(occ), "-occ: OCC input doesn't exist: " + occ, std::cout);
 
 	}
 	else
@@ -985,7 +985,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	else if (temp == "-atom_dens")
 	{
 		wfn = arguments[i + 1];
-		err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
+		err_checkf(std::filesystem::exists(wfn), "-atom_dens: wavefunction doesn't exist: " + wfn.string(), std::cout);
 		ivec val_MOs;
 		ivec val_MOs_beta;
 		if (argc > i + 3 && arguments[i + 2][0] != '-')
@@ -1479,7 +1479,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	else if (temp == "-cube_density" || temp == "-cube")
 	{
 		cube_density = arguments[i + 1];
-		err_checkf(std::filesystem::exists(cube_density), "Cube density file does not exist!", std::cout);
+		err_checkf(std::filesystem::exists(cube_density), temp + ": cube file does not exist: " + cube_density.string(), std::cout);
 	}
 	else if (temp == "-cubeb")
 		cube::binary_output = true;
@@ -1752,8 +1752,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-RI_CUBE" || temp == "-ri_cube")
 	{
-		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -test_RI to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -RI_CUBE to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -RI_CUBE to specify an auxiliary basis set.", std::cout);
 		std::string coef_file = arguments[i + 1];
 		std::vector<unsigned long> shape{};
 		bool fortran_order;
@@ -1921,7 +1921,7 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 	else if (temp == "-lukas_test")
 	{
 		//Check that wfn is not empty
-		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -lukas_test to specify a wavefunction.", std::cout);
 		err_checkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
 
 		WFN wavy(wfn);
