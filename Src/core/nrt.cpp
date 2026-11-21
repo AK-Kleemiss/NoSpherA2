@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "nbo.h"
+#include "nao_eigen.h"
 #include "constants.h"
 #include "wfn_class.h"
 
@@ -21,16 +22,6 @@ namespace
 {
 	//Per-slot candidate budget
 	constexpr int NRT_PER_SLOT = 64;
-
-	MatrixXd to_eigen(const dMatrix2& m)
-	{
-		const int r = static_cast<int>(m.extent(0)), c = static_cast<int>(m.extent(1));
-		MatrixXd out(r, c);
-		for (int i = 0; i < r; i++)
-			for (int j = 0; j < c; j++)
-				out(i, j) = m(i, j);
-		return out;
-	}
 
 	//Leading eigenpair on block idx by warm-started power iteration; where that stalls or meets a negative dominant
 	//eigenvalue, inverse iteration from the warm vector, and the full symmetric solve without one

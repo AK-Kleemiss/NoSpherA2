@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "tuning.h"
 #include "nbo.h"
+#include "nao_eigen.h"
 #include "wfn_class.h"
 #include "constants.h"
 #include "convenience.h"
@@ -15,26 +16,6 @@ using Eigen::VectorXd;
 
 namespace
 {
-	//copies of the helpers in nao.cpp's anonymous namespace
-	MatrixXd to_eigen(const dMatrix2& m)
-	{
-		const int r = static_cast<int>(m.extent(0)), c = static_cast<int>(m.extent(1));
-		MatrixXd out(r, c);
-		for (int i = 0; i < r; i++)
-			for (int j = 0; j < c; j++)
-				out(i, j) = m(i, j);
-		return out;
-	}
-
-	dMatrix2 to_dmatrix(const MatrixXd& m)
-	{
-		dMatrix2 out(m.rows(), m.cols());
-		for (int i = 0; i < m.rows(); i++)
-			for (int j = 0; j < m.cols(); j++)
-				out(i, j) = m(i, j);
-		return out;
-	}
-
 	MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
 	{
 		//an empty spin channel
@@ -143,7 +124,7 @@ namespace
 
 	std::string pad(const int v, const size_t w) { return pad(std::to_string(v), w); }
 
-	//compare_nbo_results() matches orbitals on nbo_run.cpp's whitespace-collapsed description,
+	//compare_nbo.py matches orbitals on nbo_run.cpp's whitespace-collapsed description,
 	//so the native side must produce exactly that string
 	std::string collapse(const std::string& s)
 	{
