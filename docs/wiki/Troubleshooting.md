@@ -41,7 +41,8 @@ If the flag is not in that output, rebuild before you debug the command line.
 
 Most flags only set a field and can go anywhere. But a number of them **do their
 work inside the option parser** and then stop parsing, so anything written after
-them is read by nobody. There is no warning.
+them is read by nobody. The log does not say so; the console (stderr) names
+them: `WARNING: ignored after -merge, which runs its job and ends the command line: -old_tsc`.
 
 **One-shot options** (they finish the run): `-topology`, `-eli_family`,
 `-qtaim_eli`, `-merge`, `-merge_nocheck`, `-tscb`, `-tsc_labels <table> <cif>`,

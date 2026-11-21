@@ -182,3 +182,19 @@ TEST(CliUsability, TuneListPrintsTheKnobsAndStops)
 	EXPECT_NE(out.str().find("NOSPHERA2_GPU_BACKEND=cuda|hip"), std::string::npos) << out.str();
 	EXPECT_EXIT(digest({"-tune", "list", "-cif", "no_such_file.cif"}), ::testing::ExitedWithCode(0), "");
 }
+
+//a one-shot option ends the command line: what follows is named, except what is read wherever it stands
+TEST(CliUsability, FlagsAfterAOneShotOptionAreReported)
+{
+	const Parsed p = digest({"-acc", "1", "-lahvatest", "-cif", "x.cif", "-tune", "NOSPHERA2_ERI_DYNAMIC", "-no_date", "-cpus", "2"});
+	tuning_end_run();
+	const size_t at = p.err.find("WARNING: ignored after -lahvatest");
+	ASSERT_NE(at, std::string::npos) << p.err;
+	const std::string line = p.err.substr(at, p.err.find('\n', at) - at);
+	EXPECT_NE(line.find(": -cif -cpus"), std::string::npos) << line;
+	EXPECT_EQ(line.find("-tune"), std::string::npos) << line;
+	EXPECT_EQ(line.find("-no_date"), std::string::npos) << line;
+	EXPECT_EQ(line.find("-acc"), std::string::npos) << line;
+	EXPECT_EQ(p.log.find("ignored after"), std::string::npos) << p.log;
+	EXPECT_TRUE(digest({"-acc", "1", "-lahvatest"}).err.empty());
+}

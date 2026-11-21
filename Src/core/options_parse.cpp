@@ -2128,6 +2128,26 @@ void options::digest_options()
 		{
 			err_checkf(false, "Option " + temp + ": " + e.what() + " - check the value(s) that follow it", log_file);
 		}
+		//a one-shot option ran its job and ends the loop: the flags after it that neither its handler nor the
+		//position-independent readers (-tune, -out, -no_date, -v, look_for_debug) take are read by nobody
+		if (claimed && finished)
+		{
+			const bool nbo = temp == "-nbo" || temp == "-nbo_native" || temp == "-nbo_external" || temp == "-nbo_parse" || temp == "-convert_to_47";
+			string ignored;
+			for (int j = i + 1; j < arguments.size(); j++)
+			{
+				string o = arguments[j];
+				if (!(o.size() > 1 && o[0] == '-' && isalpha(static_cast<unsigned char>(o[1]))))
+					continue;
+				replace(o.begin() + 1, o.end(), '-', '_');
+				if (o == "-tune" || o == "-out" || o == "-no_date" || o == "-no_date_but_gpu" || o == "-v" || o == "-v2" || o == "-debug" ||
+					(nbo && (nbo_family_suboptions().count(o) || o == "-cpus")) || (temp.rfind("-merge", 0) == 0 && o == "-cif"))
+					continue;
+				ignored += " " + arguments[j];
+			}
+			if (!ignored.empty())
+				std::cerr << "WARNING: ignored after " << temp << ", which runs its job and ends the command line:" << ignored << endl;
+		}
 		if (claimed)
 			continue;
 		//An inline handler that ran and failed returns false with finished set; not an unknown option.

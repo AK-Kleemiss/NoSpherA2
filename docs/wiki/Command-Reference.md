@@ -17,8 +17,8 @@ normalised, so where a flag has an upper-case form it is listed separately.
 
 **Before you compose a long command line, read
 [flag order matters](Troubleshooting.md#flag-order-matters).** Several options
-run inside the parser and stop it, so options placed after them are silently
-ignored.
+run inside the parser and stop it, so options placed after them are ignored
+(the console names them on stderr, the log does not).
 
 ## Contents
 
