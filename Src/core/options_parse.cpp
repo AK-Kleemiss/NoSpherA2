@@ -2109,8 +2109,8 @@ void options::digest_options()
 								  "not ask for",
 					   log_file);
 		log_file << "WARNING: ignoring unknown option " << temp << endl;
-		if (log_file.rdbuf() != std::cout.rdbuf())
-			std::cout << "WARNING: ignoring unknown option " << temp << endl;
+		//run_app_impl has pointed cout at the log, so stderr is the console
+		std::cerr << "WARNING: ignoring unknown option " << temp << endl;
 	}
 
 	// SALTED predicts a density from atom positions.  Historically its
