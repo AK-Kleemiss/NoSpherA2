@@ -1,5 +1,6 @@
-//Differential tests for the convenience/NoSpherA2 cleanup: master's code, copied verbatim, against the production one,
-//compared bit for bit
+//Tests for the convenience/NoSpherA2 cleanup. PrimitiveConstructorsMatchMaster is differential: master's code, copied
+//verbatim, against the production one, compared bit for bit. CellBoxFromCifHasTheCellsAxes is a geometry check of the
+//moved, unchanged readxyzMinMax_fromCIF with tolerances, not a differential test.
 #include "pch.h"
 
 #include "core/convenience.h"
