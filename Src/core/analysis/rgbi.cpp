@@ -963,8 +963,7 @@ void clear_rgbi_free_atom_cache() {
 }
 
 std::string rgbi_supported_input_phrase(const std::string &refused_extension) {
-	std::string ext = refused_extension;
-	std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+	std::string ext = to_lower(refused_extension);
 	if (!ext.empty() && ext.front() != '.')
 		ext.insert(ext.begin(), '.');
 	std::vector<std::string> works;

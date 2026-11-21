@@ -23,7 +23,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		std::cout);
 	const auto nbo_start_time = std::chrono::high_resolution_clock::now();
 	auto progress_elapsed_seconds = [&]() {
-		return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - nbo_start_time).count();
+		return get_sec(nbo_start_time, get_time());
 	};
 	auto progress = [&](const std::string& message) {
 		if (progress_log != nullptr) {

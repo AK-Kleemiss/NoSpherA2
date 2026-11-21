@@ -815,6 +815,13 @@ char asciitolower(char in)
 	return in;
 }
 
+std::string to_lower(std::string s)
+{
+	for (int i = 0; i < s.size(); i++)
+		s[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
+	return s;
+}
+
 int vec_sum(const bvec &in)
 {
 	int sum = 0;

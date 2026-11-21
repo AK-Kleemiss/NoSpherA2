@@ -87,12 +87,6 @@ double read_CIF(std::istream& cif_input, const cell& unit_cell, int& ncen,
 	if (!cif_input)
 		throw std::runtime_error("Could not open CIF file.");
 	const double eight_pi2 = 78.95683520871486; // B -> U
-
-	auto to_lower = [](std::string s) {
-		for (char& c : s)
-			c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-		return s;
-		};
 	auto is_space = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
 	// Number without its s.u. "(n)"; '.', '?' and text give false. The classic locale keeps
 	// a decimal-comma locale from breaking the parse.

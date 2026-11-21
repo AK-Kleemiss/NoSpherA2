@@ -60,6 +60,7 @@ bool is_similar_abs(const double& first, const double& second, const double& tol
 std::filesystem::path get_home_path(void);
 bool ensure_occ_data_path(const char* argv0);
 char asciitolower(char in);
+std::string to_lower(std::string s);
 
 bool generate_cart2sph_mat(vec2& d, vec2& f, vec2& g, vec2& h);
 std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);

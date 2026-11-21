@@ -318,7 +318,7 @@ void structure_factors::U_star2U_cart() {
 template <int N>
 static const std::vector<structure_factors::gc_term>& gc_terms() {
 	static const std::vector<structure_factors::gc_term> terms = [] {
-		const int fact[5] = { 1, 1, 2, 6, 24 };
+		using constants::ft;
 		int total = 1;
 		for (int i = 0; i < N; i++) total *= 3;
 		std::vector<structure_factors::gc_term> t;
@@ -332,7 +332,7 @@ static const std::vector<structure_factors::gc_term>& gc_terms() {
 				if (i > 0 && idx[i] < idx[i - 1]) sorted = false;
 			}
 			if (!sorted) continue;
-			g.mult = static_cast<double>(fact[N]) / (fact[g.e[0]] * fact[g.e[1]] * fact[g.e[2]]);
+			g.mult = static_cast<double>(ft[N]) / (ft[g.e[0]] * ft[g.e[1]] * ft[g.e[2]]);
 			t.push_back(g);
 		}
 		return t;

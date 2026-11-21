@@ -1562,8 +1562,7 @@ std::string read_lewis_structure(const std::filesystem::path& file, const NAORes
 		a = std::stoi(s.substr(d)) - 1;
 		if (a < 0 || a >= na) return "atom " + x.dump() + " is outside 1.." + std::to_string(na);
 		const std::string el = constants::atnr2letter(nao.atoms[a].Z), given = s.substr(0, d);
-		const auto same = [](char p, char q) { return std::tolower(p) == std::tolower(q); };
-		if (d > 0 && (el.size() != d || !std::equal(el.begin(), el.end(), given.begin(), same)))
+		if (d > 0 && to_lower(el) != to_lower(given))
 			return "atom " + x.dump() + ": atom " + std::to_string(a + 1) + " is " + el + ", not " + given;
 		return "";
 	};

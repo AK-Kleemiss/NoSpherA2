@@ -99,3 +99,81 @@ TEST(ConvenienceCleanup, CellBoxFromCifHasTheCellsAxes)
 		}
 	}
 }
+
+//cleanup/shared-helpers: to_lower replaces these lambdas, copied verbatim from cleanup/final c2378f4b
+TEST(ConvenienceCleanup, ToLowerMatchesTheLambdasItReplaces)
+{
+	//options_parse.cpp did_you_mean
+	auto lower = [](std::string s) { for (int i = 0; i < s.size(); i++) s[i] = tolower(static_cast<unsigned char>(s[i])); return s; };
+	//options_parse.cpp loadXCWsettings, -rgbi_ref is_xyz
+	auto lowercase = [](std::string s) {
+		std::transform(s.begin(), s.end(), s.begin(),
+			[](unsigned char c) { return std::tolower(c); });
+		return s;
+		};
+	//options_parse.cpp read_weight_scheme word, -rgbi_basis, -multipole_moments; basis_set.cpp normalize_basis_name; rgbi.cpp
+	auto transformed = [](std::string w) { std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); }); return w; };
+	//structure_input.cpp read_cif_structure
+	auto to_lower_si = [](std::string s) {
+		for (char& c : s)
+			c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		return s;
+		};
+	std::vector<std::string> in = { "", "XCW", "Hirshfeld", "-RGBI_Basis", ".XYZ", "def2_TZVP", "MiXeD 123 _-[]@`{" };
+	std::string all;
+	for (int c = 0; c < 256; c++) all.push_back(static_cast<char>(c));
+	in.push_back(all);
+	for (int c = 0; c < 256; c++) in.push_back(std::string(1, static_cast<char>(c)));
+	for (const std::string &s : in)
+	{
+		const std::string l = to_lower(s);
+		EXPECT_EQ(l, lower(s));
+		EXPECT_EQ(l, lowercase(s));
+		EXPECT_EQ(l, transformed(s));
+		EXPECT_EQ(l, to_lower_si(s));
+		std::string a = s;
+		transform(a.begin(), a.end(), a.begin(), asciitolower);
+		EXPECT_EQ(l, a);
+	}
+	//nbo.cpp parse_bond_topology: element of atom a against the label's letters (ASCII, d <= 2)
+	const auto same = [](char p, char q) { return std::tolower(p) == std::tolower(q); };
+	for (int z = 1; z <= 103; z++)
+	{
+		const std::string el = constants::atnr2letter(z);
+		for (int d = 1; d <= 2; d++)
+			for (int c0 = 1; c0 < 128; c0++)
+				for (int c1 = (d == 2 ? 1 : 0); c1 < (d == 2 ? 128 : 1); c1++)
+				{
+					std::string given(1, static_cast<char>(c0));
+					if (d == 2) given.push_back(static_cast<char>(c1));
+					const bool old_bad = el.size() != d || !std::equal(el.begin(), el.end(), given.begin(), same);
+					ASSERT_EQ(old_bad, to_lower(el) != to_lower(given)) << el << " " << given;
+				}
+	}
+}
+
+//structure_factors.cpp gc_terms: the Gram-Charlier multiplicities from fact[5] and from constants::ft
+TEST(ConvenienceCleanup, GramCharlierFactorialsMatch)
+{
+	const int fact[5] = { 1, 1, 2, 6, 24 };
+	using constants::ft;
+	for (int n = 0; n < 5; n++)
+		for (int a = 0; a <= n; a++)
+			for (int b = 0; a + b <= n; b++)
+			{
+				const int c = n - a - b;
+				EXPECT_EQ(bits(static_cast<double>(fact[n]) / (fact[a] * fact[b] * fact[c])), bits(static_cast<double>(ft[n]) / (ft[a] * ft[b] * ft[c])));
+			}
+}
+
+//wfn_nbo47.cpp write_nbo47 progress_elapsed_seconds: get_sec against the duration_cast it replaces
+TEST(ConvenienceCleanup, GetSecMatchesDurationCast)
+{
+	const auto t0 = get_time();
+	const long long d[] = { 0, 1, 999999, 1000000000, 59999999999, 3600000000123 };
+	for (const long long ns : d)
+	{
+		const auto t1 = t0 + std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(std::chrono::nanoseconds(ns));
+		EXPECT_EQ(get_sec(t0, t1), std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count());
+	}
+}

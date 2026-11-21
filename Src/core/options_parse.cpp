@@ -147,8 +147,7 @@ namespace {
 	//distance (case ignored; at most 1 for a flag of four characters or fewer, else 2), or ""
 	std::string did_you_mean(const std::string &flag)
 	{
-		auto lower = [](std::string s) { for (int i = 0; i < s.size(); i++) s[i] = tolower(static_cast<unsigned char>(s[i])); return s; };
-		const std::string a = lower(flag);
+		const std::string a = to_lower(flag);
 		const std::regex word("(^|[^A-Za-z0-9_])(-[A-Za-z][A-Za-z0-9_-]*)");
 		std::string best;
 		int best_d = a.size() > 4 ? 3 : 2;
@@ -157,7 +156,7 @@ namespace {
 		{
 			std::string b = (*m)[2].str();
 			std::replace(b.begin() + 1, b.end(), '-', '_');
-			const std::string lb = lower(b);
+			const std::string lb = to_lower(b);
 			for (int i = 0; i <= a.size(); i++)
 				prev[i] = i;
 			for (int j = 1; j <= lb.size(); j++)
@@ -1383,8 +1382,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		int n_xyz = 0;
 		auto is_xyz = [](const std::string &a) {
 			std::string ext = std::filesystem::path(a).extension().string();
-			std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
-			return ext == ".xyz";
+			return to_lower(ext) == ".xyz";
 		};
 		while (i + 1 + n_xyz < argc && is_xyz(arguments[i + 1 + n_xyz]))
 		{
@@ -1666,9 +1664,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	else if (temp == "-rgbi_basis") {
 		err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
 		rgbi = true;
-		std::string basis = arguments[i + 1];
-		std::transform(basis.begin(), basis.end(), basis.begin(),
-			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+		const std::string basis = to_lower(arguments[i + 1]);
 		if (basis == "nao")
 			rgbi_orbital_basis = RGBIOrbitalBasis::NAO;
 		else if (basis == "ano")
@@ -1698,9 +1694,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-multipole_moments") {
 		err_checkf(i + 1 < argc, "-multipole_moments needs a scheme, e.g. -multipole_moments Hirshfeld 2", std::cout);
-		std::string scheme = arguments[++i];
-		std::transform(scheme.begin(), scheme.end(), scheme.begin(),
-			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+		const std::string scheme = to_lower(arguments[++i]);
 		if (scheme == "hirshfeld" || scheme == "hirsh")
 			multipole_scheme = MultipoleScheme::HIRSHFELD;
 		else if (scheme == "tfvc")
@@ -1856,7 +1850,7 @@ static void read_xcw_weight(std::istream& is, options::XCW_settings& s)
 	static const std::map<std::string, std::pair<ws, int>> schemes = { { "sigma", { ws::sigma, 0 } }, { "unit", { ws::unit, 0 } },
 		{ "stl", { ws::stl, 1 } }, { "shelx", { ws::shelx, 2 } }, { "shelx_opt", { ws::shelx_opt, 2 } },
 		{ "chebyshev", { ws::chebyshev, -1 } }, { "chebyshev_opt", { ws::chebyshev_opt, 1 } } };
-	const auto word = [&is]() { std::string w; is >> w; std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); }); return w; };
+	const auto word = [&is]() { std::string w; is >> w; return to_lower(w); };
 	std::string scheme = word();
 	const bool robust = scheme == "robust";
 	if (robust) scheme = word();
@@ -2198,12 +2192,6 @@ void options::digest_options()
 };
 
 void options::loadXCWsettings() {
-	auto lowercase = [](std::string s) {
-		std::transform(s.begin(), s.end(), s.begin(),
-			[](unsigned char c) { return std::tolower(c); });
-		return s;
-		};
-
 	std::string conv_preset = "normal";
 	bool check_hessian = false;
 	std::string speed_preset = "normal_conv";
@@ -2243,7 +2231,7 @@ void options::loadXCWsettings() {
 			std::string token, next;
 			vec starts;
 			while (is >> token) {
-				const std::string low = lowercase(token);
+				const std::string low = to_lower(token);
 				if (low == "aniso" || low == "anisotropic") extinction_aniso = true;
 				else if (low == "iso" || low == "isotropic") extinction_aniso = false;
 				else if (low == "fixed" || low == "fix") extinction_refine = false;
@@ -2353,7 +2341,7 @@ void options::loadXCWsettings() {
 		handlers["weight_rescale"] = [&](std::istream& is) {
 			std::string v;
 			is >> v;
-			v = lowercase(v);
+			v = to_lower(v);
 			if (v == "off" || v == "0") xcw_settings.weight_rescale = false;
 			else if (v == "on" || v == "1") xcw_settings.weight_rescale = true;
 			else throw std::runtime_error("Expected on or off after 'weight_rescale'");
@@ -2490,7 +2478,7 @@ void options::loadXCWsettings() {
 
 		while (input >> keyword)
 		{
-			keyword = lowercase(keyword);
+			keyword = to_lower(keyword);
 
 			auto it = handlers.find(keyword);
 			if (it == handlers.end()) {

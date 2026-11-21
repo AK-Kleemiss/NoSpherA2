@@ -471,9 +471,7 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 namespace {
 	std::string normalize_basis_name(std::string basis_name) {
 		std::replace(basis_name.begin(), basis_name.end(), '_', '-');
-		std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(),
-			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-		return basis_name;
+		return to_lower(basis_name);
 	}
 
 	// Stored names carry their file suffix ("def2-tzvp-basis", "def2-tzvp-rifit"), so a substring search is ambiguous:
