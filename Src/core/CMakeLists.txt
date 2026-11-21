@@ -154,7 +154,7 @@ add_library(
 
 nosphera2_enable_optimizations(NoSpherA2Core)
 
-#The commit goes into the build-date line (convenience.cpp); read at every build, not at configure,
+#The commit goes into the build-date line (banner.cpp); read at every build, not at configure,
 #so a tree built again after a commit or checkout cannot carry the old hash.
 find_package(Git QUIET)
 set(NOSPHERA2_GIT_COMMIT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/git_commit.h")

@@ -1,11 +1,12 @@
 # Command reference
 
 Every flag below was read out of the option parser in
-`Src/core/convenience.cpp` (`options::digest_io_options`,
+`Src/core/options_parse.cpp` (`options::digest_io_options`,
 `digest_run_options`, `digest_partition_options`, `digest_property_options`,
-`digest_ri_options`, `digest_xcw_options`, `digest_dev_options` and
-`options::look_for_debug`). Defaults come from `struct options` and
-`struct properties_options` in `Src/core/convenience.h`.
+`digest_ri_options`, `digest_xcw_options`, `digest_dev_options`) and
+`options::look_for_debug` in `Src/core/convenience.cpp`. Defaults come from
+`struct options` in `Src/core/options.h` and `struct properties_options` in
+`Src/core/properties_options.h`.
 
 Notation: `<x>` is required, `[x]` optional, `x|y` alternatives. Angstrom is
 the unit unless stated otherwise.
