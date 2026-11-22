@@ -152,7 +152,7 @@ namespace {
 		std::string best;
 		int best_d = a.size() > 4 ? 3 : 2;
 		ivec row(a.size() + 1), prev(a.size() + 1);
-		for (std::sregex_iterator m(help_message.begin(), help_message.end(), word), end; m != end; ++m)
+		for (std::sregex_iterator m(help_text().begin(), help_text().end(), word), end; m != end; ++m)
 		{
 			std::string b = (*m)[2].str();
 			std::replace(b.begin() + 1, b.end(), '-', '_');

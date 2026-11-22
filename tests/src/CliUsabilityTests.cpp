@@ -129,14 +129,26 @@ TEST(CliUsability, KnownOptionsPrintNothingToTheConsole)
 //-h <word> prints the sections whose title holds the word, and names the sections when none does
 TEST(CliUsability, HelpSectionPrintsOnlyThatSection)
 {
-	const std::string gpu = help_section("gpu");
+	const std::string gpu = help_lookup("gpu");
 	EXPECT_NE(gpu.find("GPU ACCELERATION"), std::string::npos) << gpu;
 	EXPECT_NE(gpu.find("-gpu_cublas"), std::string::npos) << gpu;
 	EXPECT_EQ(gpu.find("BONDING ANALYSIS"), std::string::npos) << gpu;
-	EXPECT_LT(gpu.size(), help_message.size() / 4);
-	const std::string none = help_section("no_such_section");
+	EXPECT_LT(gpu.size(), help_text().size() / 4);
+	const std::string none = help_lookup("no_such_section");
 	EXPECT_NE(none.find("No help section matches"), std::string::npos) << none;
 	EXPECT_NE(none.find("BONDING ANALYSIS"), std::string::npos) << none;
+	const std::string nbo = help_lookup("nbo");
+	EXPECT_NE(nbo.find("BONDING ANALYSIS"), std::string::npos) << nbo;
+	EXPECT_NE(nbo.find("-convert_to_47"), std::string::npos) << nbo;
+	EXPECT_EQ(nbo.find("-qtaim"), std::string::npos) << nbo;
+	const std::string eqc = help_lookup("-EQC");
+	EXPECT_NE(eqc.find("  -eqc "), std::string::npos) << eqc;
+	EXPECT_EQ(eqc.find("-eqc_method"), std::string::npos) << eqc;
+	EXPECT_NE(help_lookup("-rgbi-groups").find("-rgbi_groups"), std::string::npos);
+	EXPECT_NE(help_lookup("-eli").find("-elf"), std::string::npos);
+	EXPECT_NE(help_lookup("topics").find("BONDING ANALYSIS: topology fba qtaim eli nbo nrt"), std::string::npos) << help_lookup("topics");
+	EXPECT_EQ(help_lookup(""), help_text());
+	EXPECT_NE(help_text().find("-mtc/-cmtc parts"), std::string::npos);
 }
 
 //every flag a digester compares against is in -h; case variants and old names count as listed
@@ -147,7 +159,7 @@ TEST(CliUsability, EveryParsedFlagIsInTheHelp)
 	ASSERT_TRUE(in.good()) << src;
 	const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	auto lower = [](std::string s) { for (char& c : s) c = (char)tolower((unsigned char)c); return s; };
-	const std::string help = lower(help_message);
+	const std::string help = lower(help_text());
 	const std::set<std::string> aliases = {"-cube", "-nbo_native", "-lahvatest"};
 	std::vector<std::string> missing;
 	int found = 0;
