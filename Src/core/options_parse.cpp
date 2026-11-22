@@ -36,6 +36,7 @@
 #include "citations.h"
 #include "b2c.h"
 #include "section_log.h"
+#include "analyses.h"
 
 namespace {
 	ivec parse_rgbi_group_indices(const std::string &spec)
@@ -2016,14 +2017,13 @@ const char *owning_analysis(const std::string &flag)
 
 namespace {
 	//Mirrors run_app_impl's chain of analyses that return before the RGBI/NPA block is reached;
-	//an analysis added to that chain needs a line here.
+	//an analysis added to that chain needs a line here, one in analyses() is covered by the loop.
 	const char *quit_early_analysis(const options &o)
 	{
 		if (o.qct) return "-qct";
-		if (o.fukui_analysis_run) return "-fukui_analysis";
-		if (o.eqc) return "-eqc";
-		if (o.fba) return "-fba";
-		if (o.eli_analysis_run) return o.qtaim_only ? "-qtaim" : "-eli_analysis";
+		for (int i = 0; i < analyses().size(); i++)
+			if (const char *f = analyses()[i].asked(o))
+				return f;
 		if (o.fract) return "-fractal";
 		if (o.promol_nci) return "-promol_nci";
 		if (!o.interaction_energies_job.empty()) return "-interaction_energy";
