@@ -4,8 +4,6 @@
 
 **2026-11-21 shared helpers (branch `cleanup/shared-helpers`):** `to_lower` in convenience replaces ten inline lowercase conversions (options_parse, structure_input, basis_set, rgbi, the nbo label compare), `gc_terms` takes `constants::ft` and `write_nbo47` `get_sec`. New differential tests against the replaced code: `ConvenienceCleanup.ToLowerMatchesTheLambdasItReplaces` (all 256 bytes, every element against every one- and two-letter ASCII label), `ConvenienceCleanup.GramCharlierFactorialsMatch` and `ConvenienceCleanup.GetSecMatchesDurationCast`. qct.cpp keeps its own `trim`: it strips only space, tab, CR and LF, convenience's `trim` also vertical tab and form feed.
 
-**2026-11-21 read_tonto norm (branch `alt/behaviour-changes`, optional):** `RgbiRobustnessTests.TontoWaterRobyGouldNumbersAreReproduced` fails with this change: the atoms' basis set of a tonto file now carries the true axial norm, and the Roby populations of Tonto's water move from 9.45/1.49 (Tonto's own) to 9.41/1.47. The double_ft[l] norm the reader used is what the libcint-side analyses of a tonto file reproduce Tonto with.
-
 **2026-11-21 EMBIS start (branch `alt/behaviour-changes`, optional):** `get_shalpha_shpop` is gone, so `GridAtomGridTests.ShellTablesPopulationsSumToZ` checks `sigma_to_alpha` of the sigma table only.
 
 **2026-11-21 Bohr radius (branch `alt/behaviour-changes`, optional):** `CubeIoTests.FractalDimensionOfAStep` takes the fractal plot's volumes in A^3 from `constants::a0` instead of the literal 0.529177249.
