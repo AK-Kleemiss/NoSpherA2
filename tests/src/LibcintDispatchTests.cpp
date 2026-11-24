@@ -770,5 +770,5 @@ TEST(LibcintDispatchIoTests, NoJobWritesHelpToTheRequestedLog)
 	const std::string text = read_file(log);
 	std::filesystem::remove(log);
 	EXPECT_NE(text.find("Did not understand the task to perform!"), std::string::npos);
-	EXPECT_NE(text.find("-h, --h, -help, --help"), std::string::npos);
+	EXPECT_NE(text.find("also --h, -help, --help"), std::string::npos);
 }
