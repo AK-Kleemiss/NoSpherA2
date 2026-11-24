@@ -75,8 +75,8 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
     elseif(NOS_USE_AVX)
         add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/arch:AVX>)
     else()
-        #the Linux baseline above; MSVC's own default is SSE2
-        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/arch:SSE4.2>)
+        #the Linux baseline above; MSVC's own default is SSE2. clang-cl ignores /arch:SSE4.2 with a warning
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:$<IF:$<CXX_COMPILER_ID:MSVC>,/arch:SSE4.2,-msse4.2>>)
     endif()
 endif()
 

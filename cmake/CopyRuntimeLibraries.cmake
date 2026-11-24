@@ -43,7 +43,7 @@ function(nosphera2_copy_runtime_libraries target)
             "$<TARGET_FILE_NAME:TBB::tbb>"
         )
     elseif(UNIX AND NOSPHERA2_OPENBLAS)
-        # aarch64: libgomp is the system's; ship OpenBLAS and the gfortran runtime its LAPACK needs
+        # aarch64: ship OpenBLAS and the gfortran runtime its LAPACK needs (clang's libomp below)
         set(_openmp_source
             "${MICROMAMBA_ENV_PREFIX}/lib/libopenblas.so.0"
         )
@@ -82,7 +82,7 @@ function(nosphera2_copy_runtime_libraries target)
         )
     endif()
 
-    # ArmPL is linked statically and OpenMP is the system's (libgomp, vcomp): only TBB to ship, so
+    # ArmPL is linked statically and OpenMP is the compiler's (libomp, vcomp): only TBB to ship, so
     # the OpenMP copy below repeats the TBB one, which copy_if_different skips
     if(NOSPHERA2_ARMPL)
         set(_openmp_source "$<TARGET_FILE:TBB::tbb>")
@@ -149,9 +149,20 @@ function(nosphera2_copy_runtime_libraries target)
         VERBATIM
     )
 
-    if(DEFINED _extra_runtime_source)
-        get_filename_component(_extra_destination_name "${_extra_runtime_source}" NAME)
-        file(REAL_PATH "${_extra_runtime_source}" _extra_real_source)
+    # clang's -fopenmp links LLVM's libomp where gcc's linked the system libgomp, and no distribution
+    # installs libomp by default: it travels with the binary
+    if(UNIX AND NOT APPLE AND NOSPHERA2_OPENBLAS AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libomp.so.5
+            OUTPUT_VARIABLE _libomp OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(NOT IS_ABSOLUTE "${_libomp}")
+            message(FATAL_ERROR "clang's libomp.so.5 not found (apt install libomp-dev)")
+        endif()
+        list(APPEND _extra_runtime_source "${_libomp}")
+    endif()
+
+    foreach(_extra IN LISTS _extra_runtime_source)
+        get_filename_component(_extra_destination_name "${_extra}" NAME)
+        file(REAL_PATH "${_extra}" _extra_real_source)
         add_custom_command(
             TARGET "${target}"
             POST_BUILD
@@ -161,7 +172,7 @@ function(nosphera2_copy_runtime_libraries target)
                 "$<TARGET_FILE_DIR:${target}>/${_extra_destination_name}"
             VERBATIM
         )
-    endif()
+    endforeach()
 
     # No CUDA or ROCm runtime is copied. cuBLAS was the only one that ever needed to be, and
     # shipping it cost half a gigabyte for two GEMM calls; gemm_gpu.cuh replaced it.

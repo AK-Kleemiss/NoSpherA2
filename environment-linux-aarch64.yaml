@@ -8,6 +8,6 @@ dependencies:
    - ninja
    - rust
 
-   # oneMKL has no aarch64 build. pthreads OpenBLAS, as on Windows ARM64: gcc's libgomp stays
+   # oneMKL has no aarch64 build. pthreads OpenBLAS, as on Windows ARM64: clang's libomp stays
    # the only OpenMP runtime and pch.h keeps BLAS serial inside the OpenMP regions.
    - openblas=*=pthreads*

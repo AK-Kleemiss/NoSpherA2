@@ -55,8 +55,25 @@ jobs:
             build-directory: build/release-linux
             architecture: x86_64
             shell: bash
+            compiler: clang
+            compiler-flags: >-
+              -DCMAKE_C_COMPILER=clang
+              -DCMAKE_CXX_COMPILER=clang++
+              -DCMAKE_LINKER_TYPE=LLD
             artifact-path: artifacts/NoSpherA2-linux-x86_64.tar.gz
             artifact-name: NoSpherA2-linux-x86_64
+
+          # Every artifact is built by the clang family (clang, clang-cl, AppleClang); gcc
+          # stays as a second compiler for the tests and ships nothing
+          - name: Linux GCC Release (tests only)
+            os: ubuntu-24.04
+            configure-preset: release-linux
+            build-preset: release-linux
+            test-preset: release-linux
+            build-directory: build/release-linux
+            architecture: x86_64
+            shell: bash
+            compiler: gcc
 
           - name: Windows Release
             os: windows-2022
@@ -66,13 +83,17 @@ jobs:
             build-directory: build/release-windows
             architecture: x86_64
             shell: pwsh
+            compiler: clang-cl
+            compiler-flags: >-
+              -DCMAKE_C_COMPILER=clang-cl
+              -DCMAKE_CXX_COMPILER=clang-cl
             artifact-path: artifacts/NoSpherA2-windows-x64.zip
             artifact-name: NoSpherA2-windows-x64
 
           # The only job that runs all of the code behind the __aarch64__ gates
           # (NEON sincos, phase recurrence, Becke pairs, to_mo batch); Apple's
           # arm64 build leaves the recurrence and the NEON Becke out. conda-forge
-          # pthreads OpenBLAS (environment-linux-aarch64.yaml), libgomp.
+          # pthreads OpenBLAS (environment-linux-aarch64.yaml), LLVM libomp.
           - name: Linux aarch64 Release
             os: ubuntu-24.04-arm
             configure-preset: release-linux
@@ -81,6 +102,11 @@ jobs:
             build-directory: build/release-linux
             architecture: aarch64
             shell: bash
+            compiler: clang
+            compiler-flags: >-
+              -DCMAKE_C_COMPILER=clang
+              -DCMAKE_CXX_COMPILER=clang++
+              -DCMAKE_LINKER_TYPE=LLD
             artifact-path: artifacts/NoSpherA2-linux-aarch64.tar.gz
             artifact-name: NoSpherA2-linux-aarch64
 
@@ -108,6 +134,7 @@ jobs:
             build-directory: build/release-macos-arm64
             architecture: arm64
             shell: bash
+            compiler: appleclang
             artifact-path: artifacts/NoSpherA2-macos-arm64.tar.gz
             artifact-name: NoSpherA2-macos-arm64
 
@@ -119,6 +146,7 @@ jobs:
             build-directory: build/release-macos-x86_64
             architecture: x86_64
             shell: bash
+            compiler: appleclang
             artifact-path: artifacts/NoSpherA2-macos-x86_64.tar.gz
             artifact-name: NoSpherA2-macos-x86_64
 
@@ -154,6 +182,11 @@ jobs:
             build-directory: build/release-linux
             architecture: x86_64
             shell: bash
+            compiler: clang
+            compiler-flags: >-
+              -DCMAKE_C_COMPILER=clang
+              -DCMAKE_CXX_COMPILER=clang++
+              -DCMAKE_LINKER_TYPE=LLD
             gpu: cuda+hip
             bootstrap-flags: >-
               -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
@@ -180,6 +213,10 @@ jobs:
             build-directory: build/release-windows
             architecture: x86_64
             shell: pwsh
+            compiler: clang-cl
+            compiler-flags: >-
+              -DCMAKE_C_COMPILER=clang-cl
+              -DCMAKE_CXX_COMPILER=clang-cl
             gpu: cuda+hip
             bootstrap-flags: >-
               -DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA
@@ -280,11 +317,23 @@ jobs:
         # windows-11-arm may not ship ninja; the build takes it from the micromamba env
         continue-on-error: true
 
-      - name: Show MSVC compiler
-        if: runner.os == 'Windows'
+      # clang, lld and libomp from the distribution; libomp ships beside the aarch64 binary
+      # (cmake/CopyRuntimeLibraries.cmake), x86_64 keeps MKL's libiomp5
+      - name: Install clang
+        if: runner.os == 'Linux' && matrix.compiler == 'clang'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang lld llvm libomp-dev
+
+      # clang-cl comes from the VS installation msvc-dev-cmd put on PATH; lld-link has to be
+      # its own, or ThinLTO reads bitcode of a different LLVM version
+      - name: Show compiler
+        shell: bash
         run: |
-          where.exe cl
-          cl
+          case "${{ matrix.compiler }}" in
+            clang-cl) where clang-cl lld-link; clang-cl --version ;;
+            clang) clang++ --version; ld.lld --version ;;
+            *) c++ --version ;;
+          esac
         continue-on-error: true
 
       # Kept out of the micromamba environment: conda-forge has no ROCm for
@@ -352,7 +401,7 @@ jobs:
           # reads all zeros; the real numbers are in that step's log
           disable_annotations: true
 
-      # One cache family per OS and architecture: the CPU and GPU jobs share
+      # One cache family per OS, architecture and compiler: the CPU and GPU jobs share
       # the preset, build directory and flags, so every dependency object is
       # interchangeable between them. Cache keys are immutable, hence the
       # run-unique key, and every run saves - also pull requests, failed and
@@ -365,12 +414,12 @@ jobs:
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: >-
-            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/${{
+            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.compiler }}/${{
             steps.dependency-fingerprint.outputs.value }}/${{ github.run_id }}-${{
-            github.run_attempt }}-${{ matrix.artifact-name }}
+            github.run_attempt }}-${{ matrix.artifact-name || matrix.compiler }}
           restore-keys: |
-            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/${{ steps.dependency-fingerprint.outputs.value }}/
-            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/
+            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.compiler }}/${{ steps.dependency-fingerprint.outputs.value }}/
+            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.compiler }}/
 
       # Configure a fresh build tree. sccache reuses individual compilation
       # results, so the CMake/Ninja tree itself does not need to be cached.
@@ -381,6 +430,7 @@ jobs:
           -DNOSPHERA2_DEPENDENCIES_ONLY=OFF
           -DCMAKE_C_COMPILER_LAUNCHER=sccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          ${{ matrix.compiler-flags }}
           ${{ matrix.configure-flags }}
           ${{ env.NOSPHERA2_HIP_CONFIGURE_FLAGS }}
 
@@ -422,11 +472,22 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          FAMILY: sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/
+          FAMILY: sccache-v4/${{ runner.os }}-${{ matrix.architecture }}-${{ matrix.compiler }}/
         run: >-
           gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$FAMILY"
           --sort created_at --order desc --limit 100 --json id --jq '.[1:][].id'
           | xargs -r -n1 gh cache delete --repo "$GITHUB_REPOSITORY"
+
+      # x86_64 runs on MKL's libiomp5, which also serves the __kmpc_*/GOMP_* calls the
+      # compilers emit; a second runtime in the list means -fopenmp reached the link line
+      - name: Check for a second OpenMP runtime
+        if: runner.os != 'macOS' && matrix.architecture == 'x86_64'
+        shell: bash
+        run: |
+          bin="${{ matrix.build-directory }}/bin"
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then deps="$(dumpbin -nologo -dependents "${bin}/NoSpherA2.exe")"; else deps="$(ldd "${bin}/NoSpherA2")"; fi
+          echo "${deps}"
+          ! grep -iE 'libgomp|libomp|vcomp' <<< "${deps}"
 
       - name: Run tests
         # The pthreads OpenBLAS does not notice it is called inside an OpenMP region, as MKL does,
@@ -436,7 +497,7 @@ jobs:
         run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
 
       - name: Package Unix artifacts
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.artifact-name
         run: |
           mkdir -p artifacts
 
@@ -449,7 +510,7 @@ jobs:
           ls -lah artifacts
 
       - name: Package Windows artifacts
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.artifact-name
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null
 
@@ -462,6 +523,7 @@ jobs:
           Get-ChildItem artifacts
 
       - name: Upload Artifacts
+        if: matrix.artifact-name
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact-name }}
@@ -474,7 +536,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: test-logs-${{ matrix.artifact-name }}
+          name: test-logs-${{ matrix.artifact-name || format('linux-x86_64-{0}', matrix.compiler) }}
           if-no-files-found: ignore
           path: |
             ${{ matrix.build-directory }}/Testing/Temporary

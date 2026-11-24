@@ -37,9 +37,10 @@ function(nosphera2_enable_optimizations target_name)
                 $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:
                     /fp:fast
                     /fp:except-
-                    /Qpar
                     /Zc:inline
                 >
+                #clang-cl: /openmp:experimental emits __kmpc_* calls that MKL's libiomp5md serves, /Qpar it ignores
+                $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/Qpar>
                 $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
                 # unoptimised Debug objects outgrow the COFF section limit (C1128)
                 $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/bigobj>
