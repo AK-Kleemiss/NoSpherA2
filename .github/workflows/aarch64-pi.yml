@@ -23,7 +23,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: 2
     steps:
       # clean: false keeps build/ and .mambaenv/ between runs, so a run only rebuilds what changed
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           clean: false
           submodules: recursive
