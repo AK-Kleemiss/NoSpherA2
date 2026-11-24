@@ -356,6 +356,35 @@ TEST(FittingIoCoverageIntegratorTests, CoulombFitOfOrcaFAndGShellsKeepsTheElectr
 	EXPECT_NEAR(fitted_electrons(population_rows(aux), c), 10.0, 1e-3);
 }
 
+//ORCA stores g primitives over sqrt(3) (constants::sph2cart_norm2); Int_Params must undo that, or every libcint g function
+//has self-overlap 1/3 and the RI fit of a def2-QZVPP molecule loses 0.02-0.05 e (TZVPP transition metals carry one g shell).
+TEST(FittingIoCoverageIntegratorTests, GbwShellsUpToGAreNormalisedForLibcint)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "eqc_water_fg" / "water.gbw";
+	if (!std::filesystem::exists(p)) GTEST_SKIP() << "tests/eqc_water_fg/water.gbw not found";
+	WFN wave(p);
+	Int_Params np(wave);
+	const ivec bas = np.get_bas();
+	int lmax = 0;
+	for (size_t s = 0; s < np.get_nbas(); s++) lmax = std::max(lmax, bas[s * 8 + 1]); // BAS_SLOTS 8, ANG_OF 1
+	ASSERT_EQ(lmax, 4) << "the fixture must carry a g shell";
+	vec S;
+	compute2C<Overlap2C_SPH>(np, S);
+	const size_t n = (size_t)np.get_nao();
+	ASSERT_EQ(S.size(), n * n);
+	for (size_t i = 0; i < n; i++)
+		EXPECT_NEAR(S[i * n + i], 1.0, 1e-8) << "AO " << i;
+	//The diagonal alone cannot see a wrong g-other overlap; the ORCA density in this overlap must hold the 10 electrons.
+	const std::filesystem::path out = std::filesystem::temp_directory_path() / "nos_gnorm_water.47";
+	std::ostringstream log;
+	ASSERT_TRUE(wave.write_nbo(out, false, &log));
+	std::filesystem::remove(out);
+	const std::string text = log.str();
+	const size_t at = text.find("Tr(P*S)=");
+	ASSERT_NE(at, std::string::npos) << text;
+	EXPECT_NEAR(std::stod(text.substr(at + 8)), 10.0, 2e-6);
+}
+
 //Tikhonov with lambda = 1 solves (H + I) c = g exactly.
 TEST(FittingIoCoverageIntegratorTests, TikhonovShiftsTheDiagonal)
 {
