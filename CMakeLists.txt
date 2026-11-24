@@ -337,6 +337,12 @@ if(NOSPHERA2_USE_HIP)
         nosphera2_arch_managed(HIP)
         check_language(HIP)
         if(CMAKE_HIP_COMPILER)
+            #CMake has no LINKER_TYPE LLD for HIP and fails enable_language's own try-compile on it;
+            #ROCm's clang takes the same flag as the host clang
+            if(CMAKE_LINKER_TYPE STREQUAL "LLD" AND NOT DEFINED CMAKE_HIP_USING_LINKER_LLD)
+                set(CMAKE_HIP_USING_LINKER_LLD "-fuse-ld=lld")
+                list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_HIP_USING_LINKER_LLD)
+            endif()
             enable_language(HIP)
             set(CMAKE_HIP_STANDARD 17)
             set(CMAKE_HIP_STANDARD_REQUIRED ON)
