@@ -378,6 +378,8 @@ struct options
 	bool eli_analysis_run = false;
 	//-fba: RGBI, native NBO/NPA with NRT, bondwise Laplacian, QTAIM and ELI-D on one wavefunction
 	bool fba = false;
+	//-partition: charges and atomic dipoles of the selected partition, written to <stem>.xyzq
+	bool partition_run = false;
 	bool profiling = false;
 	bool promol_nci = false;
 	bool get_g = false;

@@ -125,6 +125,77 @@ static int run_fba(options& opt, const char*, std::ostream& log)
 	return 0;
 }
 
+//Charges and atomic dipoles of the selected grid partition, table to the console, atoms to <stem>.xyzq
+static int run_partition(options& opt, const char*, std::ostream&)
+{
+	using namespace std;
+	err_checkf(opt.partition_type != PartitionType::RI, "-partition takes a grid partition: -Becke, -TFVC, -mbis, -embis or the Hirshfeld default", cout);
+	WFN w(opt.wfn);
+	if (opt.ECP) w.set_has_ECPs(true, true, opt.ECP_mode);
+	w.delete_unoccupied_MOs();
+	GridConfiguration config;
+	config.accuracy = opt.accuracy;
+	config.partition_type = opt.partition_type;
+	config.debug = opt.debug;
+	GridManager grids(config);
+	ivec atoms(w.get_ncen());
+	iota(atoms.begin(), atoms.end(), 0);
+	grids.setup3DGridsForMolecule(w, atoms);
+	const PartitionResults charges = grids.calculatePartitionedCharges(w);
+	const vec2 Q = grids.calculatePartitionedMultipoles(w, 2);
+	int s = PartitionResults::S_HIRSH;
+	switch (opt.partition_type) {
+	case PartitionType::Becke: s = PartitionResults::S_BECKE; break;
+	case PartitionType::TFVC:  s = PartitionResults::S_TFVC; break;
+	case PartitionType::MBIS:  s = PartitionResults::S_MBIS; break;
+	case PartitionType::EMBIS: s = PartitionResults::S_EMBIS; break;
+	default: break;
+	}
+	svec labels(atoms.size());
+	for (int a : atoms) {
+		labels[a] = w.get_atom_label(a);
+		if (labels[a].find_first_of("0123456789") == string::npos) labels[a] += to_string(a + 1);
+	}
+	grids.printChargeTable(labels, w, atoms, cout, charges);
+	ostringstream rows;
+	double D[3] = { 0, 0, 0 };
+	cout << "\nAtomic dipoles [e bohr] and traceless quadrupoles 1/2 sum q (3 r_i r_j - r^2 delta_ij) [e bohr^2]\n" << setw(10) << "Atom";
+	for (const char* h : { "mu_x", "mu_y", "mu_z", "|mu|", "Q_xx", "Q_yy", "Q_zz", "Q_xy", "Q_xz", "Q_yz" }) cout << setw(10) << h;
+	cout << "\n";
+	for (int a : atoms) {
+		//Q_lm = sum rho w r^l Y_lm about the nucleus; Y_1m is c (y, z, x), Y_2m is c (xy, yz, 3z^2-r^2, xz, x^2-y^2); the electrons are negative
+		const double q = w.get_atom_charge(a) - charges.atom_charges[s][a];
+		const double mu[3] = { -Q[a][3] / constants::c_3_4p, -Q[a][1] / constants::c_3_4p, -Q[a][2] / constants::c_3_4p };
+		const double zz = -0.5 * Q[a][6] / constants::c_5_16p, xmy = -1.5 * Q[a][8] / constants::c_15_16p;
+		const double th[6] = { 0.5 * (xmy - zz), -0.5 * (xmy + zz), zz, -1.5 * Q[a][4] / constants::c_15_4p, -1.5 * Q[a][7] / constants::c_15_4p, -1.5 * Q[a][5] / constants::c_15_4p };
+		rows << left << setw(8) << labels[a] << right << fixed << setprecision(6);
+		for (int x = 0; x < 3; x++) {
+			rows << setw(14) << constants::bohr2ang(w.get_atom_coordinate(a, x));
+			D[x] += q * w.get_atom_coordinate(a, x) + mu[x];
+		}
+		rows << setw(12) << q;
+		for (int x = 0; x < 3; x++) rows << setw(12) << mu[x];
+		for (int x = 0; x < 6; x++) rows << setw(12) << th[x];
+		rows << "\n";
+		cout << setw(10) << labels[a] << fixed << setprecision(4);
+		for (int x = 0; x < 3; x++) cout << setw(10) << mu[x];
+		cout << setw(10) << sqrt(mu[0] * mu[0] + mu[1] * mu[1] + mu[2] * mu[2]);
+		for (int x = 0; x < 6; x++) cout << setw(10) << th[x];
+		cout << "\n";
+	}
+	const double Dn = sqrt(D[0] * D[0] + D[1] * D[1] + D[2] * D[2]), debye = constants::bohr2ang(1.0) / constants::e_A2Debye;
+	cout << "\nMolecular dipole sum(q R + mu) [e bohr]: " << setw(10) << D[0] << setw(10) << D[1] << setw(10) << D[2]
+		<< "  |D| = " << Dn << " e bohr = " << Dn * debye << " Debye\n";
+	const filesystem::path out = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".xyzq");
+	ofstream xyzq(out);
+	err_checkf(xyzq.good(), "-partition: cannot write " + out.string(), cout);
+	xyzq << atoms.size() << "\n" << config.getPartitionName() << " partition of " << opt.wfn.filename().string()
+		<< ": label, x y z [Angstrom], charge [e], dipole x y z [e bohr], quadrupole xx yy zz xy xz yz [e bohr^2]; molecular dipole "
+		<< fixed << setprecision(6) << D[0] << " " << D[1] << " " << D[2] << " [e bohr], " << Dn * debye << " Debye\n" << rows.str();
+	cout << "wrote " << out.string() << endl;
+	return 0;
+}
+
 //Basin analysis; the tables stay in the log, which is what the golden test reads
 static int run_basins(options& opt, const char*, std::ostream&)
 {
@@ -146,6 +217,7 @@ const std::vector<analysis>& analyses()
 		{[](const options& o) -> const char* { return o.fukui_analysis_run ? "-fukui_analysis" : nullptr; }, true, run_fukui},
 		{[](const options& o) -> const char* { return o.eqc ? "-eqc" : nullptr; }, true, run_eqc},
 		{[](const options& o) -> const char* { return o.fba ? "-fba" : nullptr; }, false, run_fba},
+		{[](const options& o) -> const char* { return o.partition_run ? "-partition" : nullptr; }, true, run_partition},
 		{[](const options& o) -> const char* { return !o.eli_analysis_run ? nullptr : o.qtaim_only ? "-qtaim" : "-eli_analysis"; }, false, run_basins}};
 	return list;
 }

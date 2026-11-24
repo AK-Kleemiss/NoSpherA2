@@ -1143,6 +1143,15 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		fba = true;
 		eli_contributions = true;
 	}
+	else if (temp == "-partition") {
+		if (i + 1 < argc && arguments[i + 1][0] != '-') {
+			wfn = arguments[++i];
+			err_checkf(std::filesystem::exists(wfn), "-partition: wavefunction does not exist: " + wfn.string(), std::cout);
+		}
+		else
+			line_wfn(temp, i);
+		partition_run = true;
+	}
 	//Runs inline rather than setting a flag: it has no cube or basin output to schedule
 	else if (temp == "-eli_family") {
 		//-wfn x -eli_family points.txt: an existing file the reader does not know is the points file
