@@ -485,7 +485,8 @@ jobs:
         shell: bash
         run: |
           bin="${{ matrix.build-directory }}/bin"
-          if [[ "${RUNNER_OS}" == "Windows" ]]; then deps="$(dumpbin -nologo -dependents "${bin}/NoSpherA2.exe")"; else deps="$(ldd "${bin}/NoSpherA2")"; fi
+          # the exe is only a launcher; OpenMP is linked by the library it loads
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then deps="$(dumpbin -nologo -dependents "${bin}/NoSpherA2.dll")"; else deps="$(ldd "${bin}/libNoSpherA2.so")"; fi
           echo "${deps}"
           ! grep -iE 'libgomp|libomp|vcomp' <<< "${deps}"
 

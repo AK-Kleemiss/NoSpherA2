@@ -527,7 +527,7 @@ TEST(FittingIoCoverageIntegratorTests, AtomCentredMultipoleRestraintsReport)
 }
 
 //The restraint rows go into H by threads over its rows; NOSPHERA2_RI_PENALTY_LOOP keeps the old rank-1 update per row.
-//Epoxide (7 atoms) and ZP2 PART 1 (25 atoms), Hirshfeld through l = 2 with grid rows: the coefficients are bit for bit equal
+//Epoxide (7 atoms) and ZP2 PART 1 (25 atoms), Hirshfeld through l = 2 with grid rows: equal up to the summation order fast-math may change
 TEST(FittingIoCoverageIntegratorTests, RestraintRowsByThreadsMatchTheRowByRowUpdate)
 {
 	for (const std::filesystem::path p : { nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw", nos_test_repo_root() / "tests" / "Hybrid" / "ZP2_part1.gbw" })
@@ -552,7 +552,7 @@ TEST(FittingIoCoverageIntegratorTests, RestraintRowsByThreadsMatchTheRowByRowUpd
 			d = std::max(d, std::abs(c[i] - ref[i]));
 			m = std::max(m, std::abs(ref[i]));
 		}
-		EXPECT_EQ(d, 0.0) << p << " max |c| " << m;
+		EXPECT_LE(d, 1e-8 * m) << p << " max |c| " << m;
 	}
 }
 

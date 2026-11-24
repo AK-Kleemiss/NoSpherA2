@@ -39,8 +39,10 @@ function(nosphera2_enable_optimizations target_name)
                     /fp:except-
                     /Zc:inline
                 >
-                #clang-cl: /openmp:experimental emits __kmpc_* calls that MKL's libiomp5md serves, /Qpar it ignores
+                #clang-cl: /openmp:experimental emits __kmpc_* calls that MKL's libiomp5md serves, /Qpar it ignores.
+                #its /fp:fast is -ffast-math, whose finite-math-only folds every isnan/isfinite away; MSVC's keeps them
                 $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/Qpar>
+                $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,Clang>>:/clang:-fno-finite-math-only>
                 $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
                 # unoptimised Debug objects outgrow the COFF section limit (C1128)
                 $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/bigobj>
@@ -85,6 +87,12 @@ function(nosphera2_enable_optimizations target_name)
                 $<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:
                     -ffunction-sections
                     -fdata-sections
+                >
+                #MSVC's /fp:fast without the NaN/Inf folding; compile only, so no crtfastmath.o sets FTZ/DAZ
+                #process-wide in a host that loads the library. gcc, the test-only build, stays strict IEEE
+                $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:
+                    -ffast-math
+                    -fno-finite-math-only
                 >
         )
 

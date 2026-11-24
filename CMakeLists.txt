@@ -609,6 +609,12 @@ endif()
 if(ANDROID AND CMAKE_SIZEOF_VOID_P EQUAL 4 AND TARGET libecpint_static)
     target_compile_options(libecpint_static PRIVATE -O1)
 endif()
+#scnlib hands clang-cl a bare PUBLIC /EHsc, which nvcc takes for a second input file
+if(MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND TARGET scn)
+    get_target_property(_scn_opts scn INTERFACE_COMPILE_OPTIONS)
+    list(TRANSFORM _scn_opts REPLACE "^/EHsc$" "$<$<COMPILE_LANGUAGE:CXX>:/EHsc>")
+    set_target_properties(scn PROPERTIES INTERFACE_COMPILE_OPTIONS "${_scn_opts}")
+endif()
 
 # ---------------------------------------------------------------------------
 # mdspan
