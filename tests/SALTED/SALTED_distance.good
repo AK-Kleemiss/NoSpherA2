@@ -1,0 +1,64 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Descriptor sets identical: sharing one copy
+[              Calculating descriptors for l = 0              ]
+[#############################################################] 100% 
+SALTED kernel novelty at lambda = 0, eigcut 1e-10: nov0 is 0 inside the span of the model's reference environments and 1 outside it
+Atom  Label   El  Model                           Role             kmax0    cosine      nov0  status
+1     S       S   Model/model.salted              assigned      0.754045  0.981133  0.011780  ok
+      from: H-H 35 % of nov0 (6.1 % of the descriptor, 5.8x), O-S 21 % (1.6 %, 13x), its other channels 44 %
+      elements: H 46 % of nov0 (14 % of the descriptor, 3.2x), O 16 % (1 %, 16x), its other elements 38 %
+2     O       O   Model/model.salted              assigned      0.774496  0.986242  0.004537  ok
+      from: H-H 41 % of nov0 (2.3 % of the descriptor, 18x), H-C 27 % (1.8 %, 15x), its other channels 32 %
+      elements: H 58 % of nov0 (7.4 % of the descriptor, 7.9x), C 18 % (7.4 %, 2.4x), its other elements 24 %
+3     O       O   Model/model.salted              assigned      0.739953  0.985901  0.008702  ok
+      from: H-H 48 % of nov0 (4.9 % of the descriptor, 9.7x), O-S 16 % (0.46 %, 36x), its other channels 36 %
+      elements: H 61 % of nov0 (13 % of the descriptor, 4.7x), S 10 % (0.26 %, 40x), its other elements 29 %
+4     N       N   Model/model.salted              assigned      0.645009  0.984040  0.014097  ok
+      from: H-H 51 % of nov0 (28 % of the descriptor, 1.8x), H-O 17 % (0.85 %, 20x), its other channels 32 %
+      elements: H 73 % of nov0 (45 % of the descriptor, 1.6x), O 9.4 % (0.83 %, 11x), its other elements 18 %
+5     C       C   Model/model.salted              assigned      0.642696  0.990358  0.013645  ok
+      from: H-H 58 % of nov0 (16 % of the descriptor, 3.6x), H-O 19 % (1.9 %, 10x), its other channels 22 %
+      elements: H 77 % of nov0 (32 % of the descriptor, 2.4x), O 11 % (2.7 %, 4.2x), its other elements 12 %
+6     C       C   Model/model.salted              assigned      0.655478  0.983517  0.011260  ok
+      from: H-H 34 % of nov0 (8.6 % of the descriptor, 3.9x), H-O 11 % (4 %, 2.9x), its other channels 55 %
+      elements: H 53 % of nov0 (20 % of the descriptor, 2.6x), S 5.3 % (0.24 %, 22x), its other elements 42 %
+7     C       C   Model/model.salted              assigned      0.659873  0.982646  0.008983  ok
+      from: H-H 49 % of nov0 (17 % of the descriptor, 2.9x), H-O 17 % (1 %, 16x), its other channels 35 %
+      elements: H 68 % of nov0 (32 % of the descriptor, 2.1x), O 13 % (1.3 %, 9.7x), its other elements 20 %
+8     H       H   Model/model.salted              assigned      0.677864  0.982631  0.002272  ok
+      from: H-S 13 % of nov0 (0.34 % of the descriptor, 38x), H-C 23 % (13 %, 1.7x), its other channels 64 %
+      elements: C 25 % of nov0 (11 % of the descriptor, 2.3x), O 11 % (1.6 %, 7.1x), its other elements 64 %
+9     H       H   Model/model.salted              assigned      0.726286  0.985096  0.001774  ok
+      from: H-C 23 % of nov0 (9.9 % of the descriptor, 2.4x), H-N 9.3 % (1.2 %, 8.1x), its other channels 48 %; missing neighbours: H-O 12 %, C-O 4.9 %, others 1.7 %
+      elements: C 22 % of nov0 (7.7 % of the descriptor, 2.9x), N 5.3 % (0.62 %, 8.7x), its other elements 63 %; missing: O 9.9 %
+10    H       H   Model/model.salted              assigned      0.734167  0.984519  0.001923  ok
+      from: H-C 31 % of nov0 (12 % of the descriptor, 2.6x), H-O 18 % (1.4 %, 12x), its other channels 52 %
+      elements: C 26 % of nov0 (9.4 % of the descriptor, 2.8x), O 15 % (0.87 %, 17x), its other elements 58 %
+11    H       H   Model/model.salted              assigned      0.777846  0.982365  0.001875  ok
+      from: H-O 22 % of nov0 (2.5 % of the descriptor, 8.8x), H-C 19 % (6.7 %, 2.8x), its other channels 59 %
+      elements: C 23 % of nov0 (5.1 % of the descriptor, 4.6x), O 19 % (1.3 %, 14x), its other elements 57 %
+12    H       H   Model/model.salted              assigned      0.732884  0.989432  0.001369  ok
+      from: H-O 33 % of nov0 (1.4 % of the descriptor, 24x), H-C 13 % (5.2 %, 2.5x), its other channels 46 %; missing neighbours: H-S 6.9 %, O-S 0.59 %, others 0.57 %
+      elements: O 21 % of nov0 (0.87 % of the descriptor, 24x), C 15 % (4.1 %, 3.6x), its other elements 61 %; missing: S 4.1 %
+13    H       H   Model/model.salted              assigned      0.706837  0.982296  0.001952  ok
+      from: H-C 20 % of nov0 (8.2 % of the descriptor, 2.4x), H-O 12 % (0.99 %, 12x), its other channels 68 %
+      elements: C 19 % of nov0 (6.9 % of the descriptor, 2.7x), O 9.4 % (0.66 %, 14x), its other elements 72 %
+14    H       H   Model/model.salted              assigned      0.717943  0.986270  0.001004  ok
+      from: H-C 22 % of nov0 (5.4 % of the descriptor, 4.1x), H-O 16 % (0.47 %, 35x), its other channels 62 %
+      elements: C 17 % of nov0 (3.9 % of the descriptor, 4.2x), O 9.8 % (0.26 %, 38x), its other elements 73 %
+nov0 per element, assigned models:
+  C  n = 3, median 0.011260, max 0.013645 (atom 5, C)
+  H  n = 7, median 0.001875, max 0.002272 (atom 8, H)
+  N  n = 1, median 0.014097, max 0.014097 (atom 4, N)
+  O  n = 2, median 0.006620, max 0.008702 (atom 3, O)
+  S  n = 1, median 0.011780, max 0.011780 (atom 1, S)
+Channels absent from the kept features of the model's references: none
+Wrote test_cysteine_salted_distance.csv and test_cysteine_salted_distance.json
