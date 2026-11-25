@@ -297,6 +297,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-25 (libcint g-shell norm), `Int_Params` undoes ORCA's g-over-sqrt(3) convention for gbw, molden and fchk
+shells, so their libcint g, h and i functions have self-overlap 1 instead of 1/3, 1/945, 1/10395; `FittingIoCoverageIntegratorTests.GbwShellsUpToGAreNormalisedForLibcint`
+and `GbwShellsUpToIAreNormalisedForLibcint` (h and i, `tests/water_pv6z`) are new. `ctest` on a CUDA `release-windows-tests` build (GPU present)
+reports **1436 passed, 0 failed, 12 skipped** (2 disabled) of 1450. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-16 (merge of the equicomb branch at `814e9a9c` into `salted-relpower-norm`), the rel_power normalisation and the
 symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index of `plan_norms`. `ctest` on a CUDA
 `release-windows-tests` build (GPU present) reports **1418 passed, 0 failed, 12 skipped** (2 disabled) of 1432; on Linux (AKL006,
