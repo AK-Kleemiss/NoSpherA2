@@ -365,6 +365,20 @@ if(NOSPHERA2_USE_HIP)
                 set(CMAKE_HIP_USING_LINKER_LLD "-fuse-ld=lld")
                 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_HIP_USING_LINKER_LLD)
             endif()
+            #ROCm's clang takes the host's glibc and libstdc++; the objects it writes must match the sysroot
+            #and GCC the host clang links against (the bootstrap's glibc 2.28), or lld cannot resolve
+            #__isoc23_strtol and the GLIBC_2.34 references of the system libstdc++.so
+            if(LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+                execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -v "-###" -c -x c++ /dev/null
+                    ERROR_VARIABLE _nos_cxx_driver OUTPUT_QUIET)
+                if(_nos_cxx_driver MATCHES "\"-isysroot\" \"([^\"]+)\"")
+                    string(APPEND CMAKE_HIP_FLAGS_INIT " --sysroot=${CMAKE_MATCH_1}")
+                    if(_nos_cxx_driver MATCHES "Selected GCC installation: ([^\n]+)")
+                        string(APPEND CMAKE_HIP_FLAGS_INIT " --gcc-install-dir=${CMAKE_MATCH_1}")
+                    endif()
+                    message(STATUS "HIP compiles against the host clang's sysroot and GCC:${CMAKE_HIP_FLAGS_INIT}")
+                endif()
+            endif()
             enable_language(HIP)
             set(CMAKE_HIP_STANDARD 17)
             set(CMAKE_HIP_STANDARD_REQUIRED ON)
