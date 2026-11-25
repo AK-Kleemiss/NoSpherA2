@@ -1584,12 +1584,68 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(identity, 3);
 		EXPECT_EQ(inversion, 5);
 		EXPECT_EQ(ns, std::set<std::string>({ "000", "001", "010", "011", "101" }));
+		for (const crystal_energies::pair& p : pairs) EXPECT_EQ(p.w, p.op == 0 ? 2 : 1);
+		//the lattice weights count every image within the radius once: translations come in +-n pairs, inversions alone
+		int w = 0, n = 0;
+		for (const crystal_energies::pair& p : crystal_energies::contacts(c, { mol }, 1.0, 25.0)) {
+			EXPECT_FALSE(p.contact);
+			EXPECT_LT(p.distance, 25.0);
+			w += p.w;
+		}
+		for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) for (int z = -3; z <= 3; z++) {
+			const double t = 10.0 * std::sqrt(x * x + y * y + z * z), i = std::sqrt(std::pow(10.0 * x - 2, 2) + std::pow(10.0 * y - 4, 2) + std::pow(10.0 * z - 6, 2));
+			n += (t > 0 && t < 25.0) + (i < 25.0);
+		}
+		EXPECT_EQ(w, n);
 		cell c3(cif3, std::cout, false, true);
 		const std::vector<crystal_energies::symop> ops = crystal_energies::symops(c3);
 		ASSERT_EQ(ops.size(), 2);
 		EXPECT_EQ(ops[1].rot, ivec2({ { 0, -1, 0 }, { 1, -1, 0 }, { 0, 0, 1 } }));
 		EXPECT_EQ(crystal_energies::symop_string(ops[1], { 0, 1, -1 }), "-y,x-y+1,z-1");
 		std::filesystem::remove(cif), std::filesystem::remove(cif3);
+	}
+
+	TEST(CrystalEnergyTests, CellDipoleSumsTheImagesAndVanishesOutsidePolarGroups)
+	{
+		const std::filesystem::path dir = geometry_aid_tmp("crystal_dipole"), cif = dir / "c.cif";
+		std::filesystem::create_directories(dir);
+		std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("combo_basis_fit") };
+		//one O with only the first p shell set, m = -1 (y) and m = 1 (x): electrons pushed to +x +y
+		auto molecule = [&](const std::string& pos) {
+			const std::filesystem::path xyz = dir / "o.xyz";
+			{ std::ofstream out(xyz); out << "1\ntest\nO " << pos << "\n"; }
+			const WFN aux = generate_aux_wfn(WFN(xyz), basis);
+			vec coef(aux_size(aux), 0.0);
+			const atom O = aux.get_atoms()[0];
+			for (int shell = 0, prim = 0, offset = 0; shell < (int)O.get_shellcount_size(); shell++) {
+				const int l = O.get_basis_set_entry(prim).get_type();
+				if (l == 1) { coef[offset] = 0.2, coef[offset + 2] = 0.3; break; }
+				offset += 2 * l + 1, prim += O.get_shellcount(shell);
+			}
+			return std::vector<Gaussian_Molecule>{ Gaussian_Molecule(aux, coef) };
+		};
+		auto dipole = [&](const std::vector<Gaussian_Molecule>& m, const std::string& op) {
+			write_p1bar_cif(cif, op);
+			return crystal_energies::cell_dipole(cell(cif, std::cout, false, true), m);
+		};
+		const std::vector<Gaussian_Molecule> general = molecule("1.0 2.0 3.0"), axis = molecule("0.0 2.0 0.0");
+		const Multipoles q = general[0].electrical_moments(1)[0];
+		ASSERT_GT(q(1, -1), 0.0);
+		ASSERT_GT(q(1, 1), 0.0);
+		const double V = std::pow(constants::ang2bohr(10.0), 3);
+		const crystal_energies::dipole P1bar = dipole(general, "-x, -y, -z"), P2 = dipole(general, "-x, y, -z"), P2_axis = dipole(axis, "-x, y, -z");
+		EXPECT_EQ(P1bar.Z, 2);
+		for (int x = 0; x < 3; x++) EXPECT_NEAR(P1bar.M[x], 0.0, 1e-12);
+		EXPECT_NEAR(P1bar.E, 0.0, 1e-15);
+		EXPECT_EQ(P2.Z, 2);
+		EXPECT_NEAR(P2.M[0], 0.0, 1e-12);
+		EXPECT_NEAR(P2.M[1], -2.0 * q(1, -1), 1e-12);
+		EXPECT_NEAR(P2.M[2], 0.0, 1e-12);
+		EXPECT_NEAR(P2.volume, V, 1e-6 * V);
+		EXPECT_NEAR(P2.E, -2.0 * constants::PI * std::pow(2.0 * q(1, -1), 2) / (3.0 * V * 2), 1e-12);
+		EXPECT_EQ(P2_axis.Z, 1);
+		EXPECT_NEAR(P2_axis.M[0], -q(1, 1), 1e-12);
+		std::filesystem::remove_all(dir);
 	}
 
 	TEST(CrystalEnergyTests, RunAppWritesThePairTableWithInvertedCoefficients)

@@ -4048,8 +4048,8 @@ static void print_eli_contributions(const vec &pop, const svec &eli_labels, cons
 
 void ELI_analysis(const WFN &wavy, options &opt) {
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
-	std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
-	citations::cite(citations::Method::ELID, std::cout);
+	std::cout << (opt.qtaim_only ? "Analysing QTAIM basins" : "Analysing ELI basins") << " in the wavefunction..." << std::endl;
+	if (!opt.qtaim_only) citations::cite(citations::Method::ELID, std::cout);
 	density_field field;
 	const std::unique_ptr<Gaussian_Molecule> fit = fitted_source(wavy, opt, field, std::cout);
 	const density_field *fld = fit ? &field : nullptr;
@@ -4065,7 +4065,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	if (!opt.eli_mask_cube.empty()) { write_eli_mask_cube(l_w, opt.eli_mask_cube, std::cout); return; }
 	//g = rho tau - |grad rho|^2 / 4 vanishes identically when one orbital carries the density: ELI-D is 0/0 and
 	//its basins are round-off (DGrid shatters the same way). That is the definition, not the integrator, so warn.
-	if (l_w.get_nmo() < 2)
+	if (l_w.get_nmo() < 2 && !opt.qtaim_only)
 		std::cout << "WARNING: this wavefunction has a single occupied orbital, so ELI-D's pair"
 			" density g = rho*tau - |grad rho|^2/4 is identically zero and the field is undefined."
 			" The basins below are round-off structure, not chemistry - expect thousands of them and"
@@ -4076,7 +4076,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	const bool stream_qtaim = !opt.basin_cube && !fld && l_w.get_nmo() > 0;
 	const bool stream_eli = !opt.basin_cube;
 	if (!opt.eli_basin_atoms.empty() && !stream_eli) std::cout << "WARNING: -eli_basin_cube needs the analytic ELI-D basins and is ignored with -basin_cube." << std::endl;
-	const bool need_cube = (!stream_qtaim && !opt.eli_only) || !stream_eli;
+	const bool need_cube = (!stream_qtaim && !opt.eli_only) || (!stream_eli && !opt.qtaim_only);
 	const std::vector<atom> atoms = wavy.get_atoms();
 	cube rho, eli_cube;
 	basin_stage_timer T;
@@ -4452,9 +4452,9 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			}
 		}
 	};
-	if (l_w.get_nmo() == 0) {
+	if (l_w.get_nmo() == 0 || opt.qtaim_only) {
 		if (!opt.eli_only) report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
-		std::cout << "\nNo orbitals: the ELI-D basins are skipped." << std::endl;
+		if (!opt.qtaim_only) std::cout << "\nNo orbitals: the ELI-D basins are skipped." << std::endl;
 		return;
 	}
 

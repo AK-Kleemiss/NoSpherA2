@@ -297,6 +297,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-25 (libcint g-shell norm), `Int_Params` undoes ORCA's g-over-sqrt(3) convention for gbw, molden and fchk
+shells, so their libcint g, h and i functions have self-overlap 1 instead of 1/3, 1/945, 1/10395; `FittingIoCoverageIntegratorTests.GbwShellsUpToGAreNormalisedForLibcint`
+and `GbwShellsUpToIAreNormalisedForLibcint` (h and i, `tests/water_pv6z`) are new. `ctest` on a CUDA `release-windows-tests` build (GPU present)
+reports **1436 passed, 0 failed, 12 skipped** (2 disabled) of 1450. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-18 (`-SALTED_distance` excess ranking, `a3374da4`), the channel split ranks the channels an atom has by excess = fraction of nov0 - share of its descriptor (summing to 0) instead of by fraction, which the self channel mostly topped, lists channels with zero environment and a positive share as missing neighbours, and writes `excess`/`enrichment` per channel and element to the JSON; `SaltedDistanceRanksChannelsByTheirExcessShare` is new and the `SaltedDistance` golden takes the new lines. `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1449 passed, 0 failed, 12 skipped** (2 disabled) of 1463; on Linux (AKL016, Slurm job 1833379, GCC 11.5 `release-linux-tests`, CPU only, one process per test) **1434 passed, 0 failed, 23 skipped** (2 disabled) of 1459. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-18 (`-SALTED_distance` unrepresented channels, `61d634a7`), channels the model's FPS keeps no lambda = 0 feature of are reported from the geometry (log line `Channels the model keeps no features for:`, `unrepresented` per atom and per model in the JSON) instead of staying silent, and the absent line says it is about the kept features; three `KernelNovelty*` tests are new. `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1448 passed, 0 failed, 12 skipped** (2 disabled) of 1462; on Linux (AKL016, Slurm job 1833364, GCC 11.5 `release-linux-tests`, CPU only, one process per test) **1433 passed, 0 failed, 23 skipped** (2 disabled) of 1458. See `UNIT_TESTS_STATUS.md`.

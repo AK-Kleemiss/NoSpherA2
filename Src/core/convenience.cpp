@@ -474,7 +474,8 @@ std::string help_message =
  "                                    or, for an xyz, with -SALTED <model>.\n"
  "                                    Correlated (natural-orbital) input: see\n"
  "                                    -wfn and wiki Correlated-Wavefunctions.\n"
- "  -rgbi                              Roby-Gould bond-index analysis. With\n"
+ "  -rgbi <wfn>                        Roby-Gould bond-index analysis. Without\n"
+ "                                    <wfn> it reads -wfn. With\n"
  "                                    -do_XCW it runs on each refined\n"
  "                                    wavefunction and writes\n"
  "                                    NA2_<lambda>_RGBI.txt; the .wfn and\n"
@@ -578,6 +579,9 @@ std::string help_message =
  "                                    matrices would need over 512 MB.\n"
  "                                    Natural orbitals: Mueller DI, 1-RDM ELI-D;\n"
  "                                    wiki Correlated-Wavefunctions.\n"
+ "  -qtaim <wfn> [resolution radius]   -eli_analysis without the ELI-D basins:\n"
+ "                                    critical points, QTAIM basins and the\n"
+ "                                    delocalization indices; <stem>.qtaim_log.\n"
  "  -basin_grid <n>                    Pull the basin quadrature into the core:\n"
  "                                    tightest exponent sharpened n^2-fold, the\n"
  "                                    radial step divided by n, the angular\n"
@@ -3668,10 +3672,10 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		properties.eli_spin = true;
 	//The basins use the analytic field; resolution and radius only shape the cube built for -basin_cube
 	//and a fitted density
-	else if (temp == "-eli_analysis") {
-		err_checkf(argc >= i + 2, "Not enough arguments for -eli_analysis\nPlease provide a wfn!", std::cout);
+	else if (temp == "-eli_analysis" || temp == "-qtaim") {
+		err_checkf(argc >= i + 2, "Not enough arguments for " + temp + "\nPlease provide a wfn!", std::cout);
 		wfn = arguments[i + 1];
-		err_checkf(std::filesystem::exists(wfn), "-eli_analysis: wavefunction does not exist: " + wfn.string(), std::cout);
+		err_checkf(std::filesystem::exists(wfn), temp + ": wavefunction does not exist: " + wfn.string(), std::cout);
 		properties.resolution = 0.05;
 		properties.radius = 3.0;
 		i += 1;
@@ -3681,6 +3685,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 			i += 2;
 		}
 		eli_analysis_run = true;
+		qtaim_only = temp == "-qtaim";
 	}
 	else if (temp == "-fba") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -fba\nPlease provide a wfn!", std::cout);
@@ -4209,8 +4214,15 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		npa = true;
 		npa_orbitals = false;
 	}
-	else if (temp == "-rgbi")
+	//-rgbi <wfn>, like -nbo and -eli_analysis; the bare flag still reads -wfn
+	else if (temp == "-rgbi") {
 		rgbi = true;
+		if (i + 1 < argc && arguments[i + 1][0] != '-') {
+			wfn = arguments[i + 1];
+			err_checkf(std::filesystem::exists(wfn), "-rgbi: wavefunction does not exist: " + wfn.string(), std::cout);
+			i += 1;
+		}
+	}
 	else if (temp == "-rgbi_no_sym") {
 		rgbi = true;
 		rgbi_no_sym = true;
@@ -4565,7 +4577,7 @@ namespace {
 		if (o.fukui_analysis_run) return "-fukui_analysis";
 		if (o.eqc) return "-eqc";
 		if (o.fba) return "-fba";
-		if (o.eli_analysis_run) return "-eli_analysis";
+		if (o.eli_analysis_run) return o.qtaim_only ? "-qtaim" : "-eli_analysis";
 		if (o.fract) return "-fractal";
 		if (o.promol_nci) return "-promol_nci";
 		if (!o.interaction_energies_job.empty()) return "-interaction_energy";
@@ -4720,6 +4732,8 @@ void options::digest_options()
 	//-multipole_moments without -ri_fit: auto_aux, whichever order the two came in
 	if (multipole_lmax >= 0 && aux_basis.empty())
 		aux_basis.push_back(std::make_shared<BasisSet>());
+	err_checkf(!(qtaim_only && (eli_only || eli_contributions)),
+		"-qtaim computes no ELI-D basins: use -eli_analysis for -eli_only or -eli_contributions", log_file);
 	//last, so it sees every flag whichever order they were written in
 	refuse_unread_bonding_options();
 };

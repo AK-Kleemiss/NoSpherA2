@@ -35,7 +35,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: 6
     steps:
       # clean: false keeps build/ and .mambaenv/ between runs, so a run only rebuilds what changed
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           clean: false
           submodules: recursive
@@ -110,7 +110,7 @@ jobs:
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 4  # WSL gets 20 GB; nvcc on nine architectures is memory-hungry
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           clean: false
           submodules: recursive
