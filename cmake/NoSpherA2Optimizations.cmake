@@ -18,7 +18,9 @@ endif()
 #clang PGO: build with GENERATE, run NoSpherA2_Tests --gtest_filter=TomlIntegrationTests.*, llvm-profdata merge, rebuild with USE
 option(NOSPHERA2_PGO_GENERATE "Instrument for clang profile-guided optimisation" OFF)
 set(NOSPHERA2_PGO_USE "" CACHE FILEPATH "Merged .profdata for clang profile-guided optimisation")
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+#clang 19 calls libmvec's 4-wide _ZGVdN4v_* whatever the target; without AVX the vector goes in two xmm
+#registers where the callee reads one ymm (the fractal plot's log came out 0, -inf, NaN under NOS_AVX=OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64" AND NOS_USE_AVX)
     set(NOSPHERA2_LIBMVEC ON)
 endif()
 #lld-link is called directly; the objects name clang_rt.profile but not where it lives
