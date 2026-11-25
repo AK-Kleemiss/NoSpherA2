@@ -20,6 +20,10 @@ inline double fast_exp_neg(double x) {
 // FreeBSD k_sin/k_cos kernels: <= 2.2e-16 absolute error for |x| < 1e5; larger or non-finite x goes to the CRT (which
 // MSVC /fp:fast swaps for a scalar sin good to ~4e-8 at |x| ~ 1e8). calc_SF runs the same kernels on vector lanes.
 inline void sincos_shared(const double x, double* s, double* c) {
+#ifdef __clang__
+//-ffast-math would merge the three Cody-Waite steps and the 1.5*2^52 shift
+#pragma clang fp reassociate(off)
+#endif
 	if (!(std::abs(x) < 1e5)) { *s = std::sin(x); *c = std::cos(x); return; }
 #ifdef __ANDROID__
 	//armv7 has no inline nearbyint or double->int64: both are calls, 2.4x the kernel on the A53. The 1.5*2^52 shift rounds to nearest without -ffast-math
@@ -137,6 +141,10 @@ inline void sincos_shared_n(const int n, const double* x, double* s, double* c) 
 inline double exp_kernel(const double x) { return std::exp(x); }
 #else
 inline double exp_kernel(const double x) {
+#ifdef __clang__
+//same fold under clang -ffast-math: max rel error 0.39 without this, 2.2e-16 with
+#pragma clang fp reassociate(off)
+#endif
 	const uint64_t keep = x < -708.39 ? 0 : ~uint64_t(0);
 	const double xc = std::bit_cast<double>((std::bit_cast<uint64_t>(x) & keep) | (std::bit_cast<uint64_t>(-708.39) & ~keep));
 	const double kk = xc * 1.44269504088896338700e+00 + 6755399441055744.0;

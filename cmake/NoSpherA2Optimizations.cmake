@@ -15,6 +15,17 @@ if(NOT NOSPHERA2_IPO_SUPPORTED)
     )
 endif()
 
+#clang PGO: build with GENERATE, run NoSpherA2_Tests --gtest_filter=TomlIntegrationTests.*, llvm-profdata merge, rebuild with USE
+option(NOSPHERA2_PGO_GENERATE "Instrument for clang profile-guided optimisation" OFF)
+set(NOSPHERA2_PGO_USE "" CACHE FILEPATH "Merged .profdata for clang profile-guided optimisation")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    set(NOSPHERA2_LIBMVEC ON)
+endif()
+#lld-link is called directly; the objects name clang_rt.profile but not where it lives
+if(NOSPHERA2_PGO_GENERATE AND MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    execute_process(COMMAND "${CMAKE_CXX_COMPILER}" /clang:-print-runtime-dir OUTPUT_VARIABLE NOSPHERA2_CLANG_RT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
 function(nosphera2_enable_optimizations target_name)
     if(NOT TARGET "${target_name}")
         message(FATAL_ERROR
@@ -42,7 +53,9 @@ function(nosphera2_enable_optimizations target_name)
                 #clang-cl: /openmp:experimental emits __kmpc_* calls that MKL's libiomp5md serves, /Qpar it ignores.
                 #its /fp:fast is -ffast-math, whose finite-math-only folds every isnan/isfinite away; MSVC's keeps them
                 $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/Qpar>
-                $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,Clang>>:/clang:-fno-finite-math-only>
+                $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,Clang>>:/clang:-fno-finite-math-only /clang:-O3>
+                $<$<AND:$<BOOL:${NOSPHERA2_PGO_GENERATE}>,$<COMPILE_LANG_AND_ID:CXX,Clang>>:/clang:-fprofile-generate>
+                $<$<AND:$<BOOL:${NOSPHERA2_PGO_USE}>,$<COMPILE_LANG_AND_ID:CXX,Clang>>:/clang:-fprofile-use=${NOSPHERA2_PGO_USE} /clang:-Wno-profile-instr-unprofiled /clang:-Wno-profile-instr-out-of-date /clang:-Wno-backend-plugin>
                 $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
                 # unoptimised Debug objects outgrow the COFF section limit (C1128)
                 $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/bigobj>
@@ -50,6 +63,9 @@ function(nosphera2_enable_optimizations target_name)
         )
         if(NOSPHERA2_PROFILE_SYMBOLS)
             target_link_options("${target_name}" PRIVATE "$<HOST_LINK:/DEBUG>")
+        endif()
+        if(NOSPHERA2_CLANG_RT_DIR)
+            target_link_options("${target_name}" PRIVATE "$<HOST_LINK:/LIBPATH:${NOSPHERA2_CLANG_RT_DIR}>")
         endif()
 
         #HOST_LINK, because a CUDA target links twice. Link options otherwise reach the
@@ -93,8 +109,24 @@ function(nosphera2_enable_optimizations target_name)
                 $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:
                     -ffast-math
                     -fno-finite-math-only
+                    #clang 18 lets -ffast-math flush denormals to zero in the code itself (get_bessel_ratio's DBL_MIN rescale gave NaN)
+                    -fdenormal-fp-math=ieee
+                >
+                #vectorised exp/log/sin/pow: glibc's libmvec (inside libm), Apple's Accelerate (linked already)
+                $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,Clang>,$<BOOL:${NOSPHERA2_LIBMVEC}>>:-fveclib=libmvec>
+                $<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>,$<BOOL:${APPLE}>>:-fveclib=Accelerate>
+                $<$<AND:$<BOOL:${NOSPHERA2_PGO_GENERATE}>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-fprofile-generate>
+                $<$<AND:$<BOOL:${NOSPHERA2_PGO_USE}>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:
+                    -fprofile-use=${NOSPHERA2_PGO_USE}
+                    -Wno-profile-instr-unprofiled
+                    -Wno-profile-instr-out-of-date
                 >
         )
+        #only nosphera2_run/nosphera2_main (NOS_API) leave the shared library
+        set_target_properties("${target_name}" PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+        if(NOSPHERA2_PGO_GENERATE)
+            target_link_options("${target_name}" PRIVATE -fprofile-generate)
+        endif()
 
         # -fopenmp has to be a compile option on every target, static library included.
         # It used to sit inside the "not a static library" branch below, next to the link
@@ -157,6 +189,11 @@ function(nosphera2_enable_optimizations target_name)
                             LINKER:--gc-sections
                         >
                 )
+                #lld-link already folds with /OPT:ICF; safe = only functions whose address is never taken
+                #LINKER_ID, not CMAKE_LINKER_TYPE: CMake < 3.29 ignores the latter and links with ld.bfd
+                if(CMAKE_CXX_COMPILER_LINKER_ID STREQUAL "LLD")
+                    target_link_options("${target_name}" PRIVATE $<$<CONFIG:Release>:LINKER:--icf=safe>)
+                endif()
             endif()
             # Android has no MKL to bring libiomp5: the NDK's libomp, linked in statically
             if(ANDROID)

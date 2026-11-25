@@ -154,6 +154,8 @@
       ],
       "binaryDir": "${sourceDir}/build/release-windows",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
         "NOSPHERA2_BUILD_TESTS": "OFF"
       }
     },
@@ -166,6 +168,8 @@
       ],
       "binaryDir": "${sourceDir}/build/debug-windows",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
         "NOSPHERA2_BUILD_TESTS": "OFF"
       }
     },
@@ -267,6 +271,9 @@
       },
       "binaryDir": "${sourceDir}/build/release-linux",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_LINKER_TYPE": "LLD",
         "NOSPHERA2_BUILD_TESTS": "OFF"
       }
     },
@@ -284,6 +291,9 @@
       },
       "binaryDir": "${sourceDir}/build/debug-linux",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_LINKER_TYPE": "LLD",
         "NOSPHERA2_BUILD_TESTS": "OFF"
       }
     },

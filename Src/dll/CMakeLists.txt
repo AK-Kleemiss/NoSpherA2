@@ -75,8 +75,10 @@ set_target_properties(
 #Linux: export the entry points only. Everything else default-visible is interposable in a .so, so GCC's
 #LTO would not inline or internalise the core as it does in an executable; this also keeps the static
 #BLAS/TBB/OpenMP copies out of the dynamic symbol table, as Olex2 holds its own
+#static libstdc++ (hidden by the script): olex2c copy-relocates std::cout, so under FLINT's RTLD_DEEPBIND a shared
+#libstdc++ hands the library an unconstructed cout; also drops the GLIBCXX floor of the build machine
 if(LINUX)
-    target_link_options(NoSpherA2Dll PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+    target_link_options(NoSpherA2Dll PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map" -static-libstdc++)
     set_property(TARGET NoSpherA2Dll APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
 elseif(APPLE)
     #the same two names (Mach-O prefixes an underscore); without it the dylib exported ~8,800 symbols

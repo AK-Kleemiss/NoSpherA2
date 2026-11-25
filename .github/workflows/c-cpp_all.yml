@@ -74,6 +74,10 @@ jobs:
             architecture: x86_64
             shell: bash
             compiler: gcc
+            compiler-flags: >-
+              -DCMAKE_C_COMPILER=gcc
+              -DCMAKE_CXX_COMPILER=g++
+              -DCMAKE_LINKER_TYPE=BFD
 
           - name: Windows Release
             os: windows-2022
