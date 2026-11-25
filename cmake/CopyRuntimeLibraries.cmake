@@ -152,10 +152,13 @@ function(nosphera2_copy_runtime_libraries target)
     # clang's -fopenmp links LLVM's libomp where gcc's linked the system libgomp, and no distribution
     # installs libomp by default: it travels with the binary
     if(UNIX AND NOT APPLE AND NOSPHERA2_OPENBLAS AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libomp.so.5
-            OUTPUT_VARIABLE _libomp OUTPUT_STRIP_TRAILING_WHITESPACE)
+        set(_libomp "${MICROMAMBA_ENV_PREFIX}/lib/libomp.so")
+        if(NOT EXISTS "${_libomp}")
+            execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libomp.so.5
+                OUTPUT_VARIABLE _libomp OUTPUT_STRIP_TRAILING_WHITESPACE)
+        endif()
         if(NOT IS_ABSOLUTE "${_libomp}")
-            message(FATAL_ERROR "clang's libomp.so.5 not found (apt install libomp-dev)")
+            message(FATAL_ERROR "libomp not found in ${MICROMAMBA_ENV_PREFIX}/lib; rerun cmake -P scripts/BootstrapMicromamba.cmake")
         endif()
         list(APPEND _extra_runtime_source "${_libomp}")
     endif()

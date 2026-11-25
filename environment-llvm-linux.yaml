@@ -1,0 +1,16 @@
+name: llvm
+channels:
+   - conda-forge
+dependencies:
+   # clang, lld and compiler-rt for the Linux x86_64 presets. A prefix of its own because conda-forge
+   # clang pulls llvm-openmp, whose libiomp5.so would replace MKL's. nvcc 12.9 rejects host
+   # clang >= 20. sysroot and libstdc++ headers set the glibc (2.28) and libstdc++ (GCC 14) the
+   # binary needs at run time; libgcc-devel too, clang takes the newest GCC dir it finds.
+   - clang=19.1.7
+   - clangxx=19.1.7
+   - lld=19.1.7
+   - compiler-rt=19.1.7
+   - sysroot_linux-64=2.28
+   - libstdcxx-devel_linux-64=14.*
+   - libgcc-devel_linux-64=14.*
+   - llvm-openmp=19.1.7

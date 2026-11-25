@@ -301,8 +301,8 @@ alternative is one flag away in each case.
 ## Known Pitfalls
 
 - Use `cmake --list-presets=all` or inspect `CMakePresets.json` before assuming preset names. Host-conditional configure presets may hide non-host presets from a plain `cmake --list-presets`.
-- On Windows, use an x64 Visual Studio Developer environment before configuring CMake so Ninja can find `cl.exe` and the MSVC standard headers.
-- If MSVC builds fail on missing headers such as `stdlib.h`, `string.h`, or `stdio.h`, treat that as a toolchain-shell setup issue before suspecting CMake source rewriting.
+- On Windows, use an x64 Visual Studio Developer environment before configuring CMake so Ninja can find `clang-cl`, `lld-link` and the MSVC standard headers (`clang-cl`/`lld-link` come from `.mambaenv/llvm`, installed by `cmake -P scripts/BootstrapMicromamba.cmake`). A stale `CMakeCache.txt` from before the clang switch keeps `cl`; delete it rather than reconfiguring on top. On Linux the same bootstrap provides clang/lld; no apt clang is needed.
+- If Windows builds fail on missing headers such as `stdlib.h`, `string.h`, or `stdio.h`, treat that as a toolchain-shell setup issue before suspecting CMake source rewriting.
 - Golden-file float parsing must support scientific notation and multi-value lines without weakening existing thresholds.
 - Clone with `--recursive`; if submodules are missing, run `git submodule update --init --recursive`.
 - OCC source fixes must be committed inside the `occ` submodule first, then the parent repository must commit the updated submodule pointer.

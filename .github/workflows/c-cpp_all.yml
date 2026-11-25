@@ -321,25 +321,6 @@ jobs:
         # windows-11-arm may not ship ninja; the build takes it from the micromamba env
         continue-on-error: true
 
-      # clang, lld and libomp from the distribution; libomp ships beside the aarch64 binary
-      # (cmake/CopyRuntimeLibraries.cmake), x86_64 keeps MKL's libiomp5
-      - name: Install clang
-        if: runner.os == 'Linux' && matrix.compiler == 'clang'
-        shell: bash
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang lld llvm libomp-dev
-
-      # clang-cl comes from the VS installation msvc-dev-cmd put on PATH; lld-link has to be
-      # its own, or ThinLTO reads bitcode of a different LLVM version
-      - name: Show compiler
-        shell: bash
-        run: |
-          case "${{ matrix.compiler }}" in
-            clang-cl) where clang-cl lld-link; clang-cl --version ;;
-            clang) clang++ --version; ld.lld --version ;;
-            *) c++ --version ;;
-          esac
-        continue-on-error: true
-
       # Kept out of the micromamba environment: conda-forge has no ROCm for
       # Windows and no hipBLAS anywhere. The wheels unpack to a tree that
       # hip-config.cmake accepts as a prefix; the paths the compiler and the
@@ -384,6 +365,19 @@ jobs:
 
       - name: Bootstrap micromamba environments
         run: cmake ${{ matrix.bootstrap-flags }} -P scripts/BootstrapMicromamba.cmake
+
+      # clang, lld and the LLVM tools come from the bootstrap (.mambaenv/llvm, pinned in
+      # environment-llvm-*.yaml; aarch64: .mambaenv/env); the presets put them first on PATH
+      - name: Show compiler
+        shell: bash
+        run: |
+          export PATH="$PWD/.mambaenv/llvm/Library/bin:$PWD/.mambaenv/llvm/bin:$PWD/.mambaenv/env/bin:$PATH"
+          case "${{ matrix.compiler }}" in
+            clang-cl) which clang-cl lld-link llvm-lib; clang-cl --version ;;
+            clang) which clang++ ld.lld; clang++ --version; ld.lld --version ;;
+            *) c++ --version ;;
+          esac
+        continue-on-error: true
 
       # Cargo's registry and Git checkout caches contain downloaded sources,
       # not compiler outputs. Rust compiler outputs are handled by sccache.

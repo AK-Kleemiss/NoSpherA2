@@ -107,6 +107,23 @@ else()
             "${_mamba_bootstrap}"
     )
 
+    # the clang toolchain in a prefix of its own, away from MKL's intel-openmp (aarch64 has none and
+    # keeps clang in env)
+    if(WIN32 AND NOT "$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "ARM64")
+        set(_llvm_environment_file "${NOSPHERA2_SOURCE_DIR}/environment-llvm-win.yaml")
+    elseif(CMAKE_HOST_LINUX AND NOT _host_processor MATCHES "aarch64|arm64")
+        set(_llvm_environment_file "${NOSPHERA2_SOURCE_DIR}/environment-llvm-linux.yaml")
+    endif()
+    if(_llvm_environment_file)
+        setup_micromamba_environment(
+            ENVIRONMENT_FILE "${_llvm_environment_file}"
+            PREFIX "${NOSPHERA2_SOURCE_DIR}/.mambaenv/llvm"
+            ROOT_PREFIX "${_mamba_root}"
+            DOWNLOAD_DIRECTORY "${_mamba_bootstrap}"
+            EXPORT_PREFIX_VARIABLE MICROMAMBA_LLVM_PREFIX
+        )
+    endif()
+
     if(NOSPHERA2_BOOTSTRAP_WIN_ARM64 AND NOT "$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "ARM64")
         setup_micromamba_environment(
             ENVIRONMENT_FILE "${NOSPHERA2_SOURCE_DIR}/environment-win-arm64.yaml"
@@ -243,6 +260,15 @@ else()
 
     message(STATUS "Bootstrap complete")
     message(STATUS "Environment: ${MICROMAMBA_ENV_PREFIX}")
+    if(WIN32 AND MICROMAMBA_LLVM_PREFIX)
+        message(STATUS "Compiler: clang-cl from ${MICROMAMBA_LLVM_PREFIX}; the MSVC headers and the SDK still need Visual Studio or the Build Tools (Desktop development with C++) and an x64 Developer shell")
+    elseif(APPLE)
+        message(STATUS "Compiler: Apple clang (xcode-select --install)")
+    elseif(MICROMAMBA_LLVM_PREFIX)
+        message(STATUS "Compiler: clang + lld from ${MICROMAMBA_LLVM_PREFIX}")
+    elseif(NOT WIN32)
+        message(STATUS "Compiler: clang + lld from ${MICROMAMBA_ENV_PREFIX}")
+    endif()
     message(STATUS "Configure with: cmake --preset release-xxxx")
     message(STATUS "Build with: cmake --build --preset release-xxxx")
 endif()

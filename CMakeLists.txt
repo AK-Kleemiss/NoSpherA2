@@ -1,5 +1,27 @@
 cmake_minimum_required(VERSION 3.25)
 
+# the presets name clang-cl / clang++ / lld bare; say where to get them before project() fails on it
+set(_nos_tools "${CMAKE_CXX_COMPILER}")
+if(CMAKE_LINKER_TYPE STREQUAL "LLD" AND NOT CMAKE_HOST_WIN32)
+    list(APPEND _nos_tools ld.lld)
+endif()
+foreach(_t IN LISTS _nos_tools)
+    if(_t AND NOT IS_ABSOLUTE "${_t}")
+        unset(_nos_found)
+        find_program(_nos_found "${_t}" NO_CACHE)
+        if(NOT _nos_found)
+            if(CMAKE_HOST_WIN32)
+                set(_h "Run cmake -P scripts/BootstrapMicromamba.cmake (it installs clang-cl into .mambaenv/llvm) and configure with a preset from an x64 Developer shell.")
+            elseif(CMAKE_HOST_APPLE)
+                set(_h "Install the Xcode command-line tools: xcode-select --install")
+            else()
+                set(_h "Run cmake -P scripts/BootstrapMicromamba.cmake (it installs clang and lld into .mambaenv/llvm) and configure with a preset.")
+            endif()
+            message(FATAL_ERROR "${_t} not found on PATH. ${_h}\nGCC builds are for testing only: -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_LINKER_TYPE=BFD")
+        endif()
+    endif()
+endforeach()
+
 project(NoSpherA2 LANGUAGES C CXX)
 
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")

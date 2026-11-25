@@ -40,7 +40,7 @@
         "rhs": "Windows"
       },
       "environment": {
-        "PATH": "${sourceDir}/.mambaenv/env;${sourceDir}/.mambaenv/env/Library/bin;${sourceDir}/.mambaenv/env/Scripts;$penv{PATH}",
+        "PATH": "${sourceDir}/.mambaenv/llvm/Library/bin;${sourceDir}/.mambaenv/env;${sourceDir}/.mambaenv/env/Library/bin;${sourceDir}/.mambaenv/env/Scripts;$penv{PATH}",
         "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env",
         "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env/Library/lib/pkgconfig;${sourceDir}/.mambaenv/env/Library/share/pkgconfig",
         "RUSTC": "${sourceDir}/.mambaenv/env/Library/bin/rustc.exe",
@@ -130,7 +130,7 @@
         "rhs": "Windows"
       },
       "environment": {
-        "PATH": "${sourceDir}/.mambaenv/env/bin:$penv{PATH}",
+        "PATH": "${sourceDir}/.mambaenv/llvm/bin:${sourceDir}/.mambaenv/env/bin:$penv{PATH}",
         "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env",
         "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env/lib/pkgconfig:${sourceDir}/.mambaenv/env/share/pkgconfig",
         "RUSTC": "${sourceDir}/.mambaenv/env/bin/rustc"

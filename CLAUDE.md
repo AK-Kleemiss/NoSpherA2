@@ -89,11 +89,11 @@ path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()`
 
 ### Windows Agent/CLI Notes
 
-For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.
+For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the VS x64 environment before invoking CMake/Ninja. `release-windows`/`debug-windows` compile with `clang-cl` and link with `lld-link` from `.mambaenv/llvm` (pinned in `environment-llvm-win.yaml`, installed by `cmake -P scripts/BootstrapMicromamba.cmake`); the developer environment supplies the MSVC headers, libraries and SDK. The ARM64 presets still use `cl`. If Ninja finds the compiler but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete. On Linux x86_64 the bootstrap puts clang/lld in `.mambaenv/llvm` too (`environment-llvm-linux.yaml`, glibc 2.28 sysroot); no apt clang is needed.
 
 The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. For
 IDE work on any platform use the VS Code setup in `.vscode/` (CMake Tools with the presets; on
-Windows it sets up the MSVC environment itself via `cmake.useVsDeveloperEnvironment`).
+Windows it sets up the VS environment, `clang-cl` included, via `cmake.useVsDeveloperEnvironment`).
 
 ## Running Tests
 
@@ -244,7 +244,7 @@ code outside the target writes `core/<folder>/<file>`. The root keeps the CLI fr
 ## Known Pitfalls
 
 - Use `cmake --list-presets=all` or inspect `CMakePresets.json` before assuming preset names. Host-conditional configure presets may hide non-host presets from a plain `cmake --list-presets`.
-- On Windows, use an x64 Visual Studio Developer environment before configuring CMake so Ninja can find `cl.exe` and the MSVC standard headers.
+- On Windows, use an x64 Visual Studio Developer environment before configuring CMake so Ninja can find `clang-cl`, `lld-link` and the MSVC standard headers. A stale `CMakeCache.txt` from before the clang switch keeps `cl`; delete it rather than reconfiguring on top.
 - Golden-file float parsing must support scientific notation and multi-value lines without weakening existing thresholds.
 - Clone with `--recursive`; if submodules are missing, run `git submodule update --init --recursive`.
 - CI and local runs can differ because CI uses a dependency-only cache flow. Compare `.github/workflows/c-cpp_all.yml` step-by-step when a failure only appears in CI.
