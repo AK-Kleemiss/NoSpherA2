@@ -1236,9 +1236,9 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
 						ofstream cmo("cmo.debug", ofstream::out);
 						for (int p = 0; p < CMO.size(); p++)
 						{
-								for (int i = 0; i < 5; i++)
+								for (int i = 0; i < 5 && p + i < CMO.size(); i++)
 								{
-										cmo << scientific << setw(14) << setprecision(7) << CMO[p + i] << " ";
+										cmo <<scientific << setw(14) << setprecision(7) << CMO[p + i] << " ";
 								}
 								p += 4;
 								cmo << "\n";
@@ -1314,9 +1314,9 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
 								{
 										for (int i = 0; i < 5; i++)
 										{
-												if (i + p >= wave.get_DM_size())
+												if (i + p >= wave.get_SDM_size())
 														continue;
-												sdm << scientific << setw(14) << setprecision(7) << wave.get_SDM(i + p) << " ";
+												sdm <<scientific << setw(14) << setprecision(7) << wave.get_SDM(i + p) << " ";
 										}
 										p += 4;
 										sdm << "\n";
