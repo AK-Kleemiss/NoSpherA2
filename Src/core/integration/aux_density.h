@@ -225,6 +225,13 @@ namespace aux_density
 		return g / xa;
 	}
 	AUX_HD inline double lower_gamma_scaled(const int l, const double x) { return lower_gamma_scaled(l, x, exp(-x)); }
+	//Potential of one primitive n exp(-a r^2) r^l Y(u) without 4 pi n / (2l+1) Y(u), rl = r^l:
+	//r^(l+2) G(l+3/2, a r^2) / 2 + r^l exp(-a r^2) / (2a). One exp for both terms; beyond x = 746 it underflows to 0 in any libm
+	AUX_HD inline double primitive_potential(const int l, const double a, const double rl, const double r2)
+	{
+		const double xp = a * r2, ex = xp > 746.0 ? 0.0 : exp(-xp);
+		return 0.5 * rl * (r2 * lower_gamma_scaled(l, xp, ex) + ex / a);
+	}
 	//Electrostatic potential of the fitted density plus the nuclei at (x, y, z), in Hartree/e like
 	//WFN::computeESP. Each shell n exp(-a r^2) r^l Y(u) has the closed-form potential
 	//4 pi / (2l+1) Y(u) sum_p n_p [ r^(l+2) G(l+3/2, a_p r^2) / 2 + r^l exp(-a_p r^2) / (2 a_p) ]
@@ -244,11 +251,7 @@ namespace aux_density
 				double rl = 1.0;
 				for (int i = 0; i < l; i++) rl *= r;
 				double radial = 0.0;
-				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
-					//one exp for both terms; beyond x = 746 it underflows to 0 in any libm, so it is not called there
-					const double xp = pr_exp[p] * r2, ex = xp > 746.0 ? 0.0 : exp(-xp);
-					radial += pr_norm[p] * (0.5 * rl * r2 * lower_gamma_scaled(l, xp, ex) + 0.5 * rl * ex / pr_exp[p]);
-				}
+				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) radial += pr_norm[p] * primitive_potential(l, pr_exp[p], rl, r2);
 				esp -= 4.0 * constants::PI / (2 * l + 1) * radial * constants::spherical_harmonic(l, ux, uy, uz, coefs + coef_off[s]);
 			}
 		}

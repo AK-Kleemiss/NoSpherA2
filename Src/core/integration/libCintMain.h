@@ -22,7 +22,8 @@
  * @see Coulomb2C, Overlap2C for supported 2-center integral types
  */
 template <typename Kernel>
-void compute2C(Int_Params& params, vec& ret, int comp = 1); //comp > 1: comp blocks of nao x nao, one after the other
+void compute2C(Int_Params& params, vec& ret, int comp = 1, int split = 0); //comp > 1: comp blocks of nao x nao, one after the other
+//split > 0: only the block shells [0, split) x [split, nbas), element (i, j) at i + j * rows
 
 /*
 * Function to compute fitting coefficients for the density matrix using the desired metric indicated by the Kernel template parameter

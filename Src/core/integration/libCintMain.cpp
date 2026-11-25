@@ -87,7 +87,7 @@ template void computeEri3c<Coulomb3C_SPH>(Int_Params &param1,
 	vec &eri3c);
 
 template <typename Kernel>
-void compute2C(Int_Params &params, vec &ret, const int comp) {
+void compute2C(Int_Params &params, vec &ret, const int comp, const int split) {
 	ivec bas = params.get_bas();
 	ivec atm = params.get_atm();
 	vec env = params.get_env();
@@ -95,7 +95,7 @@ void compute2C(Int_Params &params, vec &ret, const int comp) {
 	int nbas = params.get_nbas();
 	int nat = params.get_natoms();
 
-	ivec shl_slice = { 0, nbas, 0, nbas };
+	ivec shl_slice = { 0, split > 0 ? split : nbas, split, nbas };
 	ivec aoloc = Kernel::gen_loc(bas, nbas);
 
 	int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
@@ -109,11 +109,11 @@ void compute2C(Int_Params &params, vec &ret, const int comp) {
 	ret.assign((size_t)comp * naoi * (size_t)naoj, 0.0);
 	Kernel::drv(ret.data(), comp, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 }
-template void compute2C<Coulomb2C_SPH>(Int_Params &params, vec &ret, int comp);
-template void compute2C<Coulomb2C_CRT>(Int_Params &params, vec &ret, int comp);
-template void compute2C<Overlap2C_SPH>(Int_Params &params, vec &ret, int comp);
-template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret, int comp);
-template void compute2C<Dipole2C_SPH>(Int_Params &params, vec &ret, int comp);
+template void compute2C<Coulomb2C_SPH>(Int_Params &params, vec &ret, int comp, int split);
+template void compute2C<Coulomb2C_CRT>(Int_Params &params, vec &ret, int comp, int split);
+template void compute2C<Overlap2C_SPH>(Int_Params &params, vec &ret, int comp, int split);
+template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret, int comp, int split);
+template void compute2C<Dipole2C_SPH>(Int_Params &params, vec &ret, int comp, int split);
 
 
 extern "C" libcint::CINTIntegralFunction int3c1e_sph;

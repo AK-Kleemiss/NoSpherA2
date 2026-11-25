@@ -91,8 +91,6 @@ namespace DensityFitting
 		double total() const { return electrostatic() + polarization() + disp + rep; };
 		vec2 pair, rank;
 	};
-	// Lower incomplete gamma function gamma(l+3/2, x)
-	double lower_gamma_half(const int l, const double x);
 	// Coulomb potential Int chi(r)/|r-R| of one aux primitive centred at the origin, Y_lm(R^) included
 	double aux_potential(const double exponent, const double coef, const int l, const int m, const double* R);
 	Interaction_Energy interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K = 0.0, const int x_fun = 0);

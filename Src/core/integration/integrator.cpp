@@ -1153,19 +1153,15 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
 	return config;
 }
 
-double DensityFitting::lower_gamma_half(const int l, const double x)
-{
-	return aux_density::lower_gamma_scaled(l, x) * std::pow(x, l + 1.5);
-}
-
 // V(R) = 4pi/(2l+1) N c [R^-l-1 gamma(l+3/2, aR^2)/(2a^(l+3/2)) + R^l exp(-aR^2)/(2a)] Y_lm(R^)
 double DensityFitting::aux_potential(const double exponent, const double normalized_coef, const int l, const int m, const double* R)
 {
 	const double r2 = R[0] * R[0] + R[1] * R[1] + R[2] * R[2], r = std::sqrt(r2);
 	if (r < 1e-10) return l == 0 ? constants::FOUR_PI * normalized_coef * constants::c_1_4p / (2.0 * exponent) : 0.0;
 	const double d[3] = { R[0] / r, R[1] / r, R[2] / r };
-	const double rad = std::pow(r, -l - 1) * DensityFitting::lower_gamma_half(l, exponent * r2) / (2.0 * std::pow(exponent, l + 1.5)) + std::pow(r, l) * std::exp(-exponent * r2) / (2.0 * exponent);
-	return constants::FOUR_PI / (2 * l + 1) * normalized_coef * rad * constants::spherical_harmonic(l, m, d);
+	double rl = 1.0;
+	for (int i = 0; i < l; i++) rl *= r;
+	return constants::FOUR_PI / (2 * l + 1) * normalized_coef * aux_density::primitive_potential(l, exponent, rl, r2) * constants::spherical_harmonic(l, m, d);
 }
 
 namespace {
@@ -1464,11 +1460,12 @@ DensityFitting::Interaction_Energy DensityFitting::interaction_energy(const vec&
 	Int_Params pAB(pA, pB);
 	const int na = pA.get_nao(), nao = pAB.get_nao();
 	err_checkf(na == (int)coef_A.size() && nao - na == (int)coef_B.size(), "Two-centre integral dimension does not match the coefficients", std::cout);
+	//only the A x B block of J and S
 	vec J;
-	compute2C<Coulomb2C_SPH>(pAB, J);
+	compute2C<Coulomb2C_SPH>(pAB, J, 1, pA.get_nbas());
 	for (int i = 0; i < na; i++)
 		for (int j = 0; j < nao - na; j++) {
-			const double e = coef_A[i] * J[i * nao + na + j] * coef_B[j];
+			const double e = coef_A[i] * J[i + j * na] * coef_B[j];
 			E.rho_rho += e;
 			const int shell_A = table_A.coef_shell[i], shell_B = table_B.coef_shell[j];
 
@@ -1476,9 +1473,9 @@ DensityFitting::Interaction_Energy DensityFitting::interaction_energy(const vec&
 			E.rank[table_A.sh_l[shell_A] + 1][table_B.sh_l[shell_B] + 1] += e;
 		}
 	vec S;
-	compute2C<Overlap2C_SPH>(pAB, S);
+	compute2C<Overlap2C_SPH>(pAB, S, 1, pA.get_nbas());
 	for (int i = 0; i < na; i++)
-		for (int j = 0; j < nao - na; j++) E.overlap += coef_A[i] * S[i * nao + na + j] * coef_B[j];
+		for (int j = 0; j < nao - na; j++) E.overlap += coef_A[i] * S[i + j * na] * coef_B[j];
 	if (repulsion_K > 0.0) E.rep = repulsion_K * E.overlap;
 	else {
 		double gk[5];

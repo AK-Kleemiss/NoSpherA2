@@ -650,7 +650,7 @@ namespace NoSpherA2UnitTests
 					sum += std::pow(u, 2 * l + 2) * std::exp(-u * u);
 				}
 				sum *= 2.0 * h;
-				EXPECT_NEAR(sum, DensityFitting::lower_gamma_half(l, x), 1e-9 * sum) << "l " << l << " x " << x;
+				EXPECT_NEAR(sum, aux_density::lower_gamma_scaled(l, x) * std::pow(x, l + 1.5), 1e-9 * sum) << "l " << l << " x " << x;
 			}
 	}
 
