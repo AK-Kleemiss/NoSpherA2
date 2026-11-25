@@ -805,6 +805,25 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		write_salted_ecp(arguments[i + 1], arguments[i + 2], stoi(arguments[i + 3]));
 		finished = true; return true;
 	}
+	else if (temp == "-SALTED_distance")
+	{
+		err_checkf(i + 2 < argc, "-SALTED_distance needs the model and the xyz", std::cout);
+#ifdef NOSPHERA2_USE_GPU
+		//The parser runs before run_app_impl sets the GPU globals, as for -SALTED_COEFS: needs -no_gpu_salted before it
+		equicomb_set_gpu(use_gpu && gpu_salted);
+		if (use_gpu && gpu_salted)
+			sf_gpu_warmup_start();
+#endif
+		double eigcut = 1e-10;
+		if (i + 3 < argc && arguments[i + 3].find("-") != 0)
+		{
+			char* end = nullptr;
+			eigcut = std::strtod(arguments[i + 3].c_str(), &end);
+			err_checkf(end != arguments[i + 3].c_str() && *end == '\0', "-SALTED_distance: the eigcut after the xyz must be a number, not " + arguments[i + 3], std::cout);
+		}
+		salted_distance(arguments[i + 1], arguments[i + 2], eigcut, *this);
+		finished = true; return true;
+	}
 	else if (temp == "-mtc")
 	{
 		combined_tsc_calc = true;

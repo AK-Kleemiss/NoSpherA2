@@ -141,7 +141,10 @@ void Int_Params::collect_basis_data()
 			for (int i = 0; i < coefficients.size(); i++)
 			{
 				int l = basis[i].get_type() - 1;
-				coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
+				// Conversion factor from GBW to libcint; sph2cart_norm2 undoes ORCA's g-over-sqrt(3) (and h+ over sqrt((2l-1)!!))
+				// convention that the sph2cart tables follow, else every libcint g function has norm^2 1/3 and the RI fit loses
+				// the g population (def2-QZVPP: 0.02-0.05 e; def2-TZVPP transition metals carry one g shell)
+				coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * l + 1] * constants::sph2cart_norm2[l]);
 			}
 		}
 		else if (wfn_origin == e_origin::tonto)

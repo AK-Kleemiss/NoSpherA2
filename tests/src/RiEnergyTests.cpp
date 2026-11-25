@@ -1584,6 +1584,19 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(identity, 3);
 		EXPECT_EQ(inversion, 5);
 		EXPECT_EQ(ns, std::set<std::string>({ "000", "001", "010", "011", "101" }));
+		for (const crystal_energies::pair& p : pairs) EXPECT_EQ(p.w, p.op == 0 ? 2 : 1);
+		//the lattice weights count every image within the radius once: translations come in +-n pairs, inversions alone
+		int w = 0, n = 0;
+		for (const crystal_energies::pair& p : crystal_energies::contacts(c, { mol }, 1.0, 25.0)) {
+			EXPECT_FALSE(p.contact);
+			EXPECT_LT(p.distance, 25.0);
+			w += p.w;
+		}
+		for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) for (int z = -3; z <= 3; z++) {
+			const double t = 10.0 * std::sqrt(x * x + y * y + z * z), i = std::sqrt(std::pow(10.0 * x - 2, 2) + std::pow(10.0 * y - 4, 2) + std::pow(10.0 * z - 6, 2));
+			n += (t > 0 && t < 25.0) + (i < 25.0);
+		}
+		EXPECT_EQ(w, n);
 		cell c3(cif3, std::cout, false, true);
 		const std::vector<crystal_energies::symop> ops = crystal_energies::symops(c3);
 		ASSERT_EQ(ops.size(), 2);

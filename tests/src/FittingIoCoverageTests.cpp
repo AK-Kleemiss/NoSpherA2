@@ -356,6 +356,65 @@ TEST(FittingIoCoverageIntegratorTests, CoulombFitOfOrcaFAndGShellsKeepsTheElectr
 	EXPECT_NEAR(fitted_electrons(population_rows(aux), c), 10.0, 1e-3);
 }
 
+//Every libcint AO of an ORCA wavefunction has self-overlap 1, and the reader's density in ao_overlap (the convention of the
+//RI fit, Mulliken and NPA, phases included) holds the electrons; the diagonal alone cannot see a wrong l-l' overlap or sign.
+static void expect_libcint_basis_matches_orca(const WFN& wave, const int lmax_expected, const double electrons)
+{
+	Int_Params np(wave);
+	const ivec bas = np.get_bas();
+	int lmax = 0;
+	std::vector<int> l_of_ao;
+	for (size_t s = 0; s < np.get_nbas(); s++) {
+		const int l = bas[s * 8 + 1]; // BAS_SLOTS 8, ANG_OF 1
+		lmax = std::max(lmax, l);
+		l_of_ao.insert(l_of_ao.end(), 2 * l + 1, l);
+	}
+	ASSERT_EQ(lmax, lmax_expected) << "the fixture must reach this angular momentum";
+	vec S;
+	compute2C<Overlap2C_SPH>(np, S);
+	const size_t n = (size_t)np.get_nao();
+	ASSERT_EQ(S.size(), n * n);
+	ASSERT_EQ(l_of_ao.size(), n);
+	for (size_t i = 0; i < n; i++)
+		EXPECT_NEAR(S[i * n + i], 1.0, 1e-8) << "AO " << i << " (l = " << l_of_ao[i] << ")";
+	const dMatrix2 D = wave.get_dm(), O = ao_overlap(wave);
+	ASSERT_EQ(D.extent(0), n);
+	double trace = 0.0;
+	for (size_t i = 0; i < n; i++)
+		for (size_t j = 0; j < n; j++)
+			trace += D(i, j) * O(j, i);
+	EXPECT_NEAR(trace, electrons, 1e-6) << "Tr(D S) of the reader's density in the libcint overlap";
+}
+
+//ORCA stores g primitives over sqrt(3) (constants::sph2cart_norm2); Int_Params must undo that, or every libcint g function
+//has self-overlap 1/3 and the RI fit of a def2-QZVPP molecule loses 0.02-0.05 e (TZVPP transition metals carry one g shell).
+TEST(FittingIoCoverageIntegratorTests, GbwShellsUpToGAreNormalisedForLibcint)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "eqc_water_fg" / "water.gbw";
+	if (!std::filesystem::exists(p)) GTEST_SKIP() << "tests/eqc_water_fg/water.gbw not found";
+	WFN wave(p);
+	expect_libcint_basis_matches_orca(wave, 4, 10.0);
+	//The same density through the FILE47 writer's own AO order and phases.
+	const std::filesystem::path out = std::filesystem::temp_directory_path() / "nos_gnorm_water.47";
+	std::ostringstream log;
+	ASSERT_TRUE(wave.write_nbo(out, false, &log));
+	std::filesystem::remove(out);
+	const std::string text = log.str();
+	const size_t at = text.find("Tr(P*S)=");
+	ASSERT_NE(at, std::string::npos) << text;
+	EXPECT_NEAR(std::stod(text.substr(at + 8)), 10.0, 2e-6);
+}
+
+//h and i: ORCA stores them over sqrt((2l-1)!!) (sph2cart_norm2 945, 10395) and with its own pure signs.
+//water_pv6z: HF/cc-pV6Z from ORCA 6.1.1, O up to i, H up to h (water.inp).
+TEST(FittingIoCoverageIntegratorTests, GbwShellsUpToIAreNormalisedForLibcint)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "water_pv6z" / "water.gbw";
+	if (!std::filesystem::exists(p)) GTEST_SKIP() << "tests/water_pv6z/water.gbw not found";
+	WFN wave(p);
+	expect_libcint_basis_matches_orca(wave, 6, 10.0);
+}
+
 //Tikhonov with lambda = 1 solves (H + I) c = g exactly.
 TEST(FittingIoCoverageIntegratorTests, TikhonovShiftsTheDiagonal)
 {

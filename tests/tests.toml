@@ -447,6 +447,14 @@ dmin = 0.73
 no_gpu_salted = ""
 ECP = 1
 
+# -SALTED_distance: the lambda = 0 kernel novelty of cysteine against the shipped model; -no_gpu_salted has to come first
+[SALTED_distance]
+directory = "SALTED"
+
+[SALTED_distance.args]
+no_gpu_salted = ""
+SALTED_distance = ["Model", "test_cysteine.xyz"]
+
 [sucrose_IAM]
 directory = "sucrose_IAM_SF"
 
