@@ -133,7 +133,7 @@ def thresholds():
 
 
 # The version stamp NoSpherA2's JSON writer puts in every file (NBO_JSON_PARSER_VERSION in
-# Src/core/nbo_run.h).  Version 1 files read gennbo's NRT "RS" column as a structure number,
+# Src/core/nbo/nbo_run.h).  Version 1 files read gennbo's NRT "RS" column as a structure number,
 # stored the composite alpha+beta valency table under "beta", and read the open-shell NAO table's
 # Spin column as Energy.  A measurement was already lost to a directory still holding them, so
 # they must not be silently readable: every reader of a stored reference goes through load_nbo.

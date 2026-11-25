@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "core/wfn_class.h"
-#include "core/constants.h"
-#include "core/nos_math.h"
+#include "core/wfn/wfn_class.h"
+#include "core/base/constants.h"
+#include "core/base/nos_math.h"
 
 #include <cmath>
 #include <filesystem>

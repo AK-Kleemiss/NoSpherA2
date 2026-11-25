@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "core/wfn_class.h"
+#include "core/wfn/wfn_class.h"
 
 #include <filesystem>
 

@@ -2,8 +2,8 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/tsc_block.h"
-#include "core/tsc_stream.h"
+#include "core/tsc/tsc_block.h"
+#include "core/tsc/tsc_stream.h"
 
 #include <filesystem>
 #include <fstream>

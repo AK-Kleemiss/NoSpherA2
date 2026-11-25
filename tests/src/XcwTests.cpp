@@ -1,13 +1,13 @@
-//The XCW lambda-scan halting statistics (Src/core/xcw_halting.cpp) against analytic
+//The XCW lambda-scan halting statistics (Src/core/xcw/xcw_halting.cpp) against analytic
 //values and goldens derived by hand, and the XCW settings-file parser, options::loadXCWsettings:
 //the parse errors it throws need no crystal, the successful parses build the structure_factors
 //and the XCW_wrapper of the P1 fixture and are checked through what those print.
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/convenience.h"
-#include "core/xcw_halting.h"
-#include "core/XCW_wrapper.h"
+#include "core/base/convenience.h"
+#include "core/xcw/xcw_halting.h"
+#include "core/xcw/XCW_wrapper.h"
 
 namespace
 {

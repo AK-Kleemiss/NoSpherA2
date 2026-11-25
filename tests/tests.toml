@@ -1212,8 +1212,6 @@ directory = "SALTED"
 no_gpu_salted = ""
 wfn = "test_cysteine.xyz"
 SALTED_COEFS = "Model"
-cif = "test_cysteine.cif"
-dmin = 0.73
 
 [SALTED_coef_file]
 directory = "SALTED"

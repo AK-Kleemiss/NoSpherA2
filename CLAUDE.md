@@ -63,12 +63,12 @@ the ROCm SDK wheels (`NOSPHERA2_BOOTSTRAP_ROCM_VERSION`, default the CI's 10.0.0
 from there. Skipped when a ROCm is already installed (`HIP_PATH`, `ROCM_PATH`, `/opt/rocm`).
 
 Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
-into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
-`Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
+into its own namespace (`Src/core/gpu/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
+`Src/core/gpu/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
 device (CUDA probed first; `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). A function
 added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
 fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
-name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
+name in `Src/core/gpu/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
 `dlopen`s / `LoadLibrary`s `libamdhip64.so.<major>` / `amdhip64_<major>.dll` on the first call
 (`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
 none - the shim rather than delay-loading because clang registers the kernels with the runtime from
@@ -89,11 +89,11 @@ path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()`
 
 ### Windows Agent/CLI Notes
 
-For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.
+For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the VS x64 environment before invoking CMake/Ninja. `release-windows`/`debug-windows` compile with `clang-cl` and link with `lld-link` from `.mambaenv/llvm` (pinned in `environment-llvm-win.yaml`, installed by `cmake -P scripts/BootstrapMicromamba.cmake`); the developer environment supplies the MSVC headers, libraries and SDK. The ARM64 presets still use `cl`. If Ninja finds the compiler but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete. On Linux x86_64 the bootstrap puts clang/lld in `.mambaenv/llvm` too (`environment-llvm-linux.yaml`, glibc 2.28 sysroot); no apt clang is needed.
 
 The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. For
 IDE work on any platform use the VS Code setup in `.vscode/` (CMake Tools with the presets; on
-Windows it sets up the MSVC environment itself via `cmake.useVsDeveloperEnvironment`).
+Windows it sets up the VS environment, `clang-cl` included, via `cmake.useVsDeveloperEnvironment`).
 
 ## Running Tests
 
@@ -182,7 +182,7 @@ Whenever an agent adds, removes, modifies, or investigates a test in `tests/test
 
 `docs/wiki/` holds the pages of the GitHub wiki — `Home.md`, `Command-Reference.md`, `Tuning-Knobs.md`, `Use-Cases.md`, `Troubleshooting.md`, `EQC-Energy-Decomposition.md` — and is the source; the published copy is its own repository, `https://github.com/AK-Kleemiss/NoSpherA2.wiki.git`, cloned and pushed by hand. A flag that is added, renamed or given a new default must be updated in `docs/wiki/Command-Reference.md` in the same commit, or the wiki is wrong the moment the change lands.
 
-- Document what the parser accepts, not what `-h` claims. The pages were written from the seven `digest_*` functions in `Src/core/convenience.cpp` and the defaults in `struct options` and `struct properties_options`; reading them that way is what found `-hdef`, the cuBLAS default and the `acc = 0` examples.
+- Document what the parser accepts, not what `-h` claims. The pages were written from the seven `digest_*` functions in `Src/core/options_parse.cpp` and the defaults in `struct options` and `struct properties_options`; reading them that way is what found `-hdef`, the cuBLAS default and the `acc = 0` examples.
 - A `-tune` knob — any literal name read through `tuning()` or its wrappers `tuning_double`, `read_threshold`, `nao_knob` — that is added, renamed, removed or given a new default must be updated in `docs/wiki/Tuning-Knobs.md` in the same commit. `python scripts/check_tuning_knobs.py` must then report that page and sources agree; a new wrapper goes into the script's `CALL` pattern, or its knobs stay invisible.
 - Every command shown on a page must be one that runs. Take it from `tests/tests.toml` rather than composing it.
 - The published copy links pages without the extension (`](Troubleshooting#flag-order-matters)`), the in-repo copy with it. That is the only permitted difference between the two.
@@ -209,14 +209,28 @@ scripts/             Micromamba/bootstrap/GPU-toolkit helper scripts
 Linux/               Linux packaging/build helper scripts
 ```
 
-Key core modules live in `Src/core`:
+`Src/core` is split into subsystem folders. Every folder is on the include path, so sources include a
+core header by its name alone (`#include "wfn_class.h"`) and file names must stay unique across the folders;
+code outside the target writes `core/<folder>/<file>`. The root keeps the CLI front end (`NoSpherA2.cpp/h`,
+`options.h`, `options_parse.cpp`, `help_text.cpp`, `banner.cpp`, `dev_diagnostics.cpp/h`), `pch.h` and the
+`CMakeLists.txt`.
 
-- I/O: `fchk.cpp/h`, `cif.cpp/h`, `wfn_class.cpp/h`
-- Molecular representation: `atoms.cpp/h`, `molecule.cpp/h`, `basis_set.cpp/h`
-- Integration engine: `AtomGrid.cpp/h`, `GridManager.cpp/h`, `integrator.cpp/h`, `integration_params.cpp/h`
-- Math/integrals: `nos_math.cpp/h`, `libCintMain.cpp/h`, `libCintKernels.cpp/h`
-- Analysis/output: `scattering_factors.cpp/h`, `bondwise_analysis.cpp/h`, `isosurface.cpp/h`, `properties.cpp/h`, `cube.cpp/h`, `tsc_block.h`
-- ML density: `SALTED_*.cpp/h`
+- `base/`: typedefs and helpers (`convenience.cpp/h`, `nos_types.h`, `constants.cpp/h`, `nos_math.cpp/h`, `tuning.cpp/h`,
+  `citations.cpp/h`, `sphere_lebedev_rule.cpp/h`, `hkl.h`, ...)
+- `wfn/`: wavefunction and its readers/writers (`wfn_*.cpp`, `wfn_class.h`, `atoms.cpp/h`, `fchk.cpp/h`, `basis_set.cpp/h`,
+  `ccsd_density.cpp/h`, `density_source.h`)
+- `integration/`: grids and integrals (`AtomGrid.cpp/h`, `GridManager.cpp/h`, `integrator.cpp/h`, `integration_params.cpp/h`,
+  `libCintMain.cpp/h`, `libCintKernels.cpp/h`, `aux_density*`)
+- `tsc/`: scattering factors and tables (`scattering_factors.cpp/h`, `sf_*.cpp`, `tsc_block.h`, `tshb_block.h`, `cif.cpp/h`,
+  `spherical_density.cpp/h`, `gaussian_atom.cpp/h`, `ECPs_corrections.cpp/h`, the Thakkar/Slater/GTO tables)
+- `xcw/`: X-ray constrained wavefunctions (`XCW_*`, `SCF_*`, `structure_factors.cpp/h`, `xcw_*`, `cell.cpp/h`, `stored_eri.cpp/h`)
+- `salted/`: ML density (`SALTED_*.cpp/h`)
+- `nbo/`: `nao`, `nbo`, `nrt`, `ibo`
+- `analysis/`: ELI/QTAIM basins and bonding (`eli_*`, `topology`, `b2c`, `basin_*`, `bondwise_analysis`, `rgbi`, `qct`, `eqc`,
+  `crystal_energies`, `geometry_aid`, `ci_rdm2`)
+- `properties/`: grids and cubes (`properties*`, `cube.cpp/h`, `isosurface.cpp/h`, `dipoles.cpp`, `polarizabilities.cpp`)
+- `gpu/`: CUDA/HIP kernels (`*.cu`, `*.cuh`, `*_gpu.h`), `gpu_api.h`, `gpu_backend.h`, `gpu_dispatch.cpp`,
+  `hip_runtime_shim.cpp`, `cublas_dynamic.cpp/h`, `itensor_metal.mm`
 
 ## Dependency and Linking Notes
 
@@ -230,7 +244,7 @@ Key core modules live in `Src/core`:
 ## Known Pitfalls
 
 - Use `cmake --list-presets=all` or inspect `CMakePresets.json` before assuming preset names. Host-conditional configure presets may hide non-host presets from a plain `cmake --list-presets`.
-- On Windows, use an x64 Visual Studio Developer environment before configuring CMake so Ninja can find `cl.exe` and the MSVC standard headers.
+- On Windows, use an x64 Visual Studio Developer environment before configuring CMake so Ninja can find `clang-cl`, `lld-link` and the MSVC standard headers. A stale `CMakeCache.txt` from before the clang switch keeps `cl`; delete it rather than reconfiguring on top.
 - Golden-file float parsing must support scientific notation and multi-value lines without weakening existing thresholds.
 - Clone with `--recursive`; if submodules are missing, run `git submodule update --init --recursive`.
 - CI and local runs can differ because CI uses a dependency-only cache flow. Compare `.github/workflows/c-cpp_all.yml` step-by-step when a failure only appears in CI.
@@ -243,6 +257,14 @@ As of 2026-11-25 (libcint g-shell norm), `Int_Params` undoes ORCA's g-over-sqrt(
 shells, so their libcint g, h and i functions have self-overlap 1 instead of 1/3, 1/945, 1/10395; `FittingIoCoverageIntegratorTests.GbwShellsUpToGAreNormalisedForLibcint`
 and `GbwShellsUpToIAreNormalisedForLibcint` (h and i, `tests/water_pv6z`) are new. `ctest` on a CUDA `release-windows-tests` build (GPU present)
 reports **1436 passed, 0 failed, 12 skipped** (2 disabled) of 1450. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-21 (branch `usability/input-forms` on `cleanup/final`), every analysis that reads one wavefunction takes it as `<flag> <wfn>` or `-wfn <wfn> <flag>`; `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1472 passed, 0 failed, 12 skipped** (2 disabled) of 1486; the result-equivalence gate (150 cases at `-cpus` 8 and 1 against master) finds no difference beyond master's own run-to-run noise (`eqc_ch3f_pbe0` at `-cpus` 8 exits 0xC0000409 or 0 with either exe). See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-21 (branch `cleanup/final`: `cleanup/integration` + `restructure/layout` (Src/core in subsystem folders) + `usability/cli` (console warnings, did-you-mean, `-h <section>`, `-tune list`, named paths in refusals)), `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1466 passed, 0 failed, 12 skipped** (2 disabled) of 1480, and `scripts/result_equivalence.py` finds every output, log and console line of the 150 cases byte-identical to master `d624d8c4` (files master does not reproduce itself were rerun and matched one of master's values). See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-21 (cleanup, branch `cleanup/integration`: nine file-disjoint cleanup branches merged on master `d624d8c4`), dead code is removed (the Rys/Jacobi tables of `constants.h`, `CUDA_utilities.h`, `molecule.*`, the file dialogs, unused diagnostics) and the god files are split by topic (`convenience.*` into `options_parse.cpp`, `help_text.cpp`, `platform.cpp` and topic headers; `bondwise_analysis.cpp`, `b2c.cpp`, `properties.cpp`, `scattering_factors.cpp`, `wfn_*`); every function whose body changed is pinned bit for bit against a frozen copy of master's code (`*CleanupTests`). `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1453 passed, 0 failed, 12 skipped** (2 disabled) of 1467, against 1434 of 1448 for master on the same machine on 2026-11-20. Every output file, log and console line of the 90 `tests.toml` cases and 60 extra cases is byte-identical to master's at `-cpus 8` and `-cpus 1` (files master does not reproduce itself were rerun and matched one of master's values). See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-21 (command-line usability, branch `usability/cli`), the console (stderr) names unknown options with the nearest spelling, NBO options nothing reads, flags after a one-shot option and undocumented `-tune` names; `-h <word>` and `-tune list` are new, and logs and outputs of valid command lines are unchanged. `ctest` on a CUDA `release-windows-tests` build (GPU present): **1466 passed, 0 failed, 12 skipped** (2 disabled) of 1480; the result-equivalence gate (150 cases at `-cpus` 8 and 1 against master) finds no difference beyond master's own run-to-run noise. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-18 (`-SALTED_distance` excess ranking, `a3374da4`), the channel split ranks the channels an atom has by excess = fraction of nov0 - share of its descriptor (summing to 0) instead of by fraction, which the self channel mostly topped, lists channels with zero environment and a positive share as missing neighbours, and writes `excess`/`enrichment` per channel and element to the JSON; `SaltedDistanceRanksChannelsByTheirExcessShare` is new and the `SaltedDistance` golden takes the new lines. `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1449 passed, 0 failed, 12 skipped** (2 disabled) of 1463; on Linux (AKL016, Slurm job 1833379, GCC 11.5 `release-linux-tests`, CPU only, one process per test) **1434 passed, 0 failed, 23 skipped** (2 disabled) of 1459. See `UNIT_TESTS_STATUS.md`.
 
@@ -539,8 +561,8 @@ gtests are ported and the eleven CPU P1 XCW goldens regenerated; `P1_test_XCW_gp
 still needs a device. Visual Studio `Tests`, every test in its own process from `tests/src`:
 1102 passed, 0 failed, 15 skipped and 16 crashed out of 1133 (the 16 all build and run OCC objects in the test itself - StoredEriTests, OccSecondOrderScf, OccHighAngularTests, BondwiseRobyTests, FormatConsistencyTests.OccFchkMatchesBridge, TomlIntegrationTests.AlanineIntegratedOcc - and exit with code 127 before printing anything, with or without OCC_DATA_PATH; the same OCC SCF passes inside the XCW tests of the same binary and the executable runs alanine_integrated_occ to the end, so the locally built Visual Studio test binary is the suspect, root cause not established; a ctest run of the CMake target is still owed). See `UNIT_TESTS_STATUS.md`.
 
-As of 2026-09-24, the in-house NBO analysis (`-nbo`, `Src/core/nbo.cpp` and
-`Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
+As of 2026-09-24, the in-house NBO analysis (`-nbo`, `Src/core/nbo/nbo.cpp` and
+`Src/core/nbo/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
 `NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
 `py -3.12 tests/nbo_reference/compare_nbo.py --all .` against the 22 stored NBO 7.0.9 references,
 which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by label - gennbo
@@ -571,7 +593,7 @@ box - the set cctbx's tsc reader resolves for a measured list, verified with tha
 on seven cases with 0 unresolved indices - and `-ED` ignores the box
 (`HklGenerationTests`). Olex2's `utilities.py` sends both the file box and the file's
 d_min. Earlier that day: 307/307 with the stored
-two-electron integrals over the Schwarz-screened pairs (`Src/core/stored_eri.cpp`,
+two-electron integrals over the Schwarz-screened pairs (`Src/core/xcw/stored_eri.cpp`,
 `StoredEriTests`, three `-xcw_incremental` golden cases), 302/302 (107 s) before that. Earlier baseline, 2026-09-02: 275/275 passing (253 s).
 This baseline covers the pTB cartesian-f fix in `WFN::read_ptb` and the new
 `-no_date_but_gpu` flag. On a machine with a CUDA device, 16 golden-file cases had been
@@ -602,7 +624,7 @@ unrelated access violation in OCC's SOAD initial guess. This was not re-run agai
 
 As of 2026-07-03, `ctest --preset release-windows` reports **201/201 passing** after a full
 rebuild (following the Thakkar cubic-spline interpolation change in
-`Src/core/spherical_density.h` / `Src/core/GridManager.cpp`, Hirshfeld-weight density
+`Src/core/tsc/spherical_density.h` / `Src/core/integration/GridManager.cpp`, Hirshfeld-weight density
 partitioning). A same-day run against a not-fully-rebuilt binary showed 13 `TomlIntegrationTests`
 cases failing with small numeric drift; after rebuilding, all 13 pass against their existing
 `.good` files unchanged — see `UNIT_TESTS_STATUS.md` Known Issues. Only
@@ -611,7 +633,7 @@ you have rerun the current CMake presets in this checkout.
 
 As of 2026-07-03, `ctest --preset release-macos-arm64` reports **202/202 passing**, including
 `TomlIntegrationTests.IntermolecularNCI`, after fixing an off-by-one atomic-number indexing bug
-in `make_thakkar_interpolators()` (`Src/core/properties.cpp`, commit `88f0a9a`) that had been
+in `make_thakkar_interpolators()` (`Src/core/properties/properties.cpp`, commit `88f0a9a`) that had been
 causing undefined-behavior-driven divergence between macOS arm64 and other platforms. Verified
 identical (byte-for-byte) `unit_surrounding_values.dat` output between a from-scratch local
 `release-macos-x86_64` build and the arm64 build. Separately, the 5 `-rgbi_no_sym` RGBI tests

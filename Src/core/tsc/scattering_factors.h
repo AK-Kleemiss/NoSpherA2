@@ -1,0 +1,340 @@
+/**
+ * @file scattering_factors.h
+ * @brief This file contains the declarations of functions and classes related to scattering factors calculations.
+ */
+
+#pragma once
+
+#include <string>
+#include <vector>
+#include <fstream>
+#include "convenience.h"
+#include "SALTED_predictor.h"
+#include "wfn_class.h"
+#include "tsc_block.h"
+
+ /**
+  * @class WFN
+  * @brief Class representing the wavefunction.
+  */
+class WFN;
+class cube;
+template class tsc_block<int, cdouble>;
+typedef tsc_block<int, cdouble> itsc_block;
+
+/**
+ * @class cell
+ * @brief Class representing the unit cell.
+ */
+class cell;
+
+/**
+ * @struct options
+ * @brief Struct representing the options for calculations.
+ */
+struct options;
+struct scattering_data {
+	double F_obs;
+	double abs_F_obs;
+	double F_obs2;
+	double sigma_obs;
+	double sigma_obs2;
+};
+
+// Store scattering data for each reflection
+struct scatter_data {
+	vec F_obs;
+	vec F_obs2;
+	vec sigma_obs;
+	vec sigma_obs2;
+	vec abs_F_obs;
+	cvec F_calc;
+	vec F_calc2;
+	double scale;
+	ivec hkl_mask;
+	hkl_list hkl;
+	// hkl plus the twin images R h (-twin): the reflections the written table covers; the fit stays on hkl
+	hkl_list hkl_table;
+	// The images of hkl_table under the operations F_calc sums over, the entries the grid integrates
+	hkl_list hkl_enlarged;
+	// The images of hkl_table under every CIF operation, the rows of the written tsc table; hkl_enlarged unless a grown model
+	// deleted operations
+	hkl_list hkl_tsc;
+	// hkl_enlarged with one entry of every inversion related pair, see cell::remove_inv_vectors
+	hkl_list inversion_cleaned_hkl;
+	cvec anom_correction;
+};
+
+enum GridIndex
+{
+	x_coord = 0,
+	y_coord = 1,
+	z_coord = 2,
+	atomic_weight = 3,
+	electron_density = 4,
+	molecular_becke_weight = 5,
+	molecular_TFVC_weight = 6
+};
+
+enum TotalGridIndex
+{
+	X = 0,
+	Y = 1,
+	Z = 2,
+	quadrature_weight = 3,
+	spherical_electron_density = 4,
+	wavefunction_electron_density = 5,
+	becke_weight = 6,
+	TFVC_weight = 7,
+	MBIS_weight = 8
+};
+
+void make_k_pts(const bool& read_k_pts,
+	const bool& save_k_pts,
+	const cell& unit_cell,
+	hkl_list& hkl,
+	vec2& k_pt,
+	std::ostream& file,
+	bool debug = false);
+
+//streams a combined (-mtc) SALTED table in reflection blocks; false means nothing was written, take the ordinary path
+bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts);
+
+//label and atomID of every _atom_site row of the CIFs, each atomID once, as the table keys them: what -merge holds a merged
+//.tshb against before it calls it complete
+std::vector<std::pair<std::string, atomID>> cif_scatterer_keys(const pathvec& cifs);
+
+//per disorder part, gathered once; reflection-independent, so the -mtc reflection loop runs outside the parts
+class Gaussian_Molecule;
+
+struct salted_part_prep
+{
+	std::shared_ptr<Gaussian_Molecule> mol;
+	ivec asym_atom_list;
+	svec labels;
+	vec2 k_pt;
+	std::vector<i3> hkl_v;
+	//spherical remainder only
+	ivec atom_type_list;
+	ivec asym_atom_to_type_list;
+	vec k_of_reflection;
+	//stl of the same reflections, carried rather than inverted out of k (which would undo a 4*pi and a unit conversion)
+	vec stl_of_reflection;
+};
+
+/**
+ * @brief Calculates the scattering factors based on calculator_type and opt.partitioning_type.
+ * @param opt The options for scattering factors calculations.
+ * @param calculator The calculator to use for the calculations.
+ * @param file The output stream to write the results to.
+ * @param known_atoms The list of known atoms.
+ * @param nr The number of wavefunctions.
+ * @param kpts The list of k-points.
+ * @return The calculated scattering factors block.
+ */
+template<typename tsc_block_type, typename calculator_type>
+tsc_block_type calculate_scattering_factors(
+	options& opt,
+	calculator_type calculator,
+	std::ostream& file,
+	svec& known_atoms,
+	const int& nr,
+	vec2* kpts = NULL,
+	salted_part_prep* prep_out = NULL  // set: stop after the prediction and hand it back
+);
+
+/**
+ * @brief Generates the hkl (Miller indices) list.
+ * @param dmin The minimum d-spacing.
+ * @param hkl The generated hkl list.
+ * @param twin_law The list of twin laws.
+ * @param unit_cell The unit cell.
+ * @param file The output stream to write the results to.
+ * @param debug Flag indicating whether to enable debug mode.
+ * @param hkl_min_max Optional index box {{hmin,hmax},{kmin,kmax},{lmin,lmax}}; when given,
+ *        only the point-group orbit (with Friedel mates) of the box is kept from the sphere.
+ */
+void generate_hkl(
+	const double& dmin,
+	hkl_list& hkl,
+	const vec2& twin_law,
+	cell& unit_cell,
+	std::ostream& file,
+	bool debug = false,
+	const ivec2& hkl_min_max = ivec2());
+
+/**
+ * @brief hkl from -dmin, -hkl_min_max (both: the box orbit inside the sphere), else the -hkl file.
+ * ED gets the whole sphere at dmin/2 - 0.001, box ignored: the dynamical calculation needs every beam.
+ */
+void generate_hkl_from_options(
+	const options& opt,
+	hkl_list& hkl,
+	cell& unit_cell,
+	std::ostream& file);
+
+void generate_hkl(
+	const ivec2& hkl_min_max,
+	hkl_list& hkl,
+	const vec2& twin_law,
+	cell& unit_cell,
+	std::ostream& file,
+	bool debug = false,
+	bool ED = false);
+
+/**
+ * @brief Generates the fractional hkl (Miller indices) list.
+ * @param dmin The minimum d-spacing.
+ * @param hkl The generated fractional hkl list.
+ * @param twin_law The list of twin laws.
+ * @param unit_cell The unit cell.
+ * @param file The output stream to write the results to.
+ * @param stepsize The step size for generating fractional hkl.
+ * @param debug Flag indicating whether to enable debug mode.
+ */
+
+void generate_fractional_hkl(
+	const double& dmin,
+	hkl_list_d& hkl,
+	const vec2& twin_law,
+	cell& unit_cell,
+	std::ostream& file,
+	const d3& stepsize,
+	bool debug);
+
+/**
+ * @brief Reads atoms from CIF (Crystallographic Information File).
+ * @param cif_input The input stream for the CIF file.
+ * @param input_groups The list of input groups.
+ * @param unit_cell The unit cell.
+ * @param wave The wavefunction.
+ * @param known_atoms The list of known atoms.
+ * @param atom_type_list The list of atom types.
+ * @param asym_atom_to_type_list The list of asymmetric atoms to atom types.
+ * @param asym_atom_list The list of asymmetric atoms.
+ * @param needs_grid The list indicating whether an atom needs a grid.
+ * @param file The output stream to write the results to.
+ * @param debug Flag indicating whether to enable debug mode.
+ */
+/**
+ * @brief Negligible magnitude at a -acc level, shared so the XCW grid screens AO
+ * contributions on the same terms as the scattering factors.
+ */
+double cutoff(const int& accuracy);
+
+svec read_atoms_from_CIF(
+	std::ifstream& cif_input,
+	const ivec& input_groups,
+	const cell& unit_cell,
+	WFN& wave,
+	const svec& known_atoms,
+	ivec& atom_type_list,
+	ivec& asym_atom_to_type_list,
+	ivec& asym_atom_list,
+	bvec& needs_grid,
+	std::ostream& file,
+	const bool debug = false,
+	//a spherical fill of an already covered part finds no atoms; everywhere else zero means a broken CIF
+	const bool allow_empty = false);
+
+
+/**
+ * Reads atoms from a CIF file and performs necessary operations. Works without wavefunction for XCW routine.
+ */
+void read_atoms_from_CIF(std::ifstream& cif_input,
+	const cell& unit_cell,
+	int& ncen,
+	bvec& needs_grid,
+	std::vector<asym_atom>& asym_atoms,
+	const bool debug);
+
+//svec read_anom_disp_from_CIF(std::ifstream& cif_input,
+//    const ivec& input_groups,
+//    const cell& unit_cell,
+//    const WFN& wave,
+//    const svec& known_atoms,
+//    ivec& atom_type_list,
+//    ivec& asym_atom_to_type_list,
+//    ivec& asym_atom_list,
+//    bvec& needs_grid,
+//    std::ostream& file,
+//    bvec& constant_atoms,
+//    const bool SALTED,
+//    const bool debug);
+
+/**
+ * @brief Calculates the scattering factors.
+ * @param points The number of points.
+ * @param k_pt The list of k-points.
+ * @param d1 The list of d1 vectors.
+ * @param d2 The list of d2 vectors.
+ * @param d3 The list of d3 vectors.
+ * @param dens The list of density vectors.
+ * @param sf The scattering factors.
+ * @param file The output stream to write the results to.
+ * @param start The start time point.
+ * @param end1 The end time point.
+ * @param debug Flag indicating whether to enable debug mode.
+ * @param layout The prototype points of the density points (GridManager::getDensityVectors); enables Fourier-Bessel.
+ */
+void calc_SF(const int& points,
+	const vec2& k_pt,
+	const vec2& d1,
+	const vec2& d2,
+	const vec2& d3,
+	const vec2& dens,
+	cvec2& sf,
+	std::ostream& file,
+	_time_point& start,
+	_time_point& end1,
+	bool debug,
+	bool no_date = false,
+	bool do_XCW = false,
+	bool use_gpu = true,
+	bool gpu_fp64 = false,
+	bool gpu_fp32 = false,
+	const struct sf_shell_layout* layout = nullptr);
+
+//Fourier-Bessel transform of atom-centred Lebedev shell grids (see sf_kernels.cpp): fills sf[i] (sized to the
+//k list) for every atom layout places on a prototype grid and that it does faster than the direct sum, and returns
+//which ones; the rest (no layout: cube grids, hand-made points) need the direct sum. L_override < 0 takes L = D/2 of
+//the prototype's largest Lebedev degree; exact skips the |k| table; L_override >= 0, exact or force take every atom.
+std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, const struct sf_shell_layout* layout,
+	cvec2& sf, int L_override = -1, bool exact = false, bool force = false);
+
+double fourier_bessel_integral(
+	const primitive& p,
+	const double& H,
+	const int& l);
+
+cdouble sfac_bessel(
+	const primitive& p,
+	const double* k_point,
+	const double* coefs);
+
+//Form factors of the listed atoms of a fitted density at every k-point, sf[atom][k]: the Fourier-Bessel transform
+//of aux_density_table::fourier_atom with the radial factors tabulated once per k over the distinct (exponent, l)
+void calc_SF_SALTED(
+	const vec2& k_pt,
+	const vec& coefs,
+	const aux_density_table& table,
+	const ivec& asym_atom_list,
+	cvec2& sf,
+	ProgressBar* progress = nullptr);
+
+/**
+ * @brief Calculates the diffuse scattering factors.
+ * @param opt The options for scattering factors calculations.
+ * @param log_file The output stream to write the log to.
+ */
+void calc_sfac_diffuse(const options& opt, std::ostream& log_file);
+
+itsc_block calculate_scattering_factors_from_cube(
+	options& opt,
+	WFN& wave,
+	const cube& density_cube,
+	std::ostream& file);
+
+void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);
+hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, scatter_data& obs, bool debug = false);
+void read_mask(const std::filesystem::path& mask_filename, const hkl_list& hkl, const hkl_list& hkl_enlarged, const cell& unit_cell, std::ostream& file, vec2& mask_info, const int& n_r, bool debug = false);

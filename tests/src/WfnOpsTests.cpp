@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/atoms.h"
-#include "core/wfn_class.h"
-#include "core/cube.h"
-#include "core/mo_class.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/atoms.h"
+#include "core/wfn/wfn_class.h"
+#include "core/properties/cube.h"
+#include "core/wfn/mo_class.h"
 
 #include <cmath>
 #include <fstream>

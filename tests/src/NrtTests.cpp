@@ -1,7 +1,7 @@
 #include "pch.h"
 
-#include "core/constants.h"
-#include "core/nbo.h"
+#include "core/base/constants.h"
+#include "core/nbo/nbo.h"
 
 //Natural resonance theory on inputs small enough that the answer is known by hand. nrt.cpp's internals sit
 //in an anonymous namespace, so the checks drive the public entry point with a synthetic NAO basis, density

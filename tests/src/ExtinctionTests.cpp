@@ -1,12 +1,12 @@
-//The extinction models of Src/core/extinction.h against their published forms and against
+//The extinction models of Src/core/xcw/extinction.h against their published forms and against
 //finite differences, and the settings keyword that switches them on: parsed by
 //options::loadXCWsettings, set up by the structure_factors constructor on the P1 fixture.
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/cell.h"
-#include "core/extinction.h"
-#include "core/structure_factors.h"
+#include "core/xcw/cell.h"
+#include "core/xcw/extinction.h"
+#include "core/xcw/structure_factors.h"
 
 namespace NoSpherA2UnitTests
 {

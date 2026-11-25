@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "core/eli_family.h"
-#include "core/b2c.h"
-#include "core/properties.h"
-#include "core/cube.h"
+#include "core/analysis/eli_family.h"
+#include "core/analysis/b2c.h"
+#include "core/properties/properties.h"
+#include "core/properties/cube.h"
 
 //Kohout's ELI family: the UEG limit fixes the normalisation constants analytically, regression rows
 //come from DGrid 5.2 grids (the conventions they encode are in eli_family.h).

@@ -22,6 +22,7 @@
 #include "eli_family.h"
 #include "section_log.h"
 #include "eqc.h"
+#include "analyses.h"
 #include "ccsd_density.h"
 #include "tshb_block.h"
 #include <future>
@@ -78,6 +79,29 @@ static void set_occ_df_budget(occ::io::OccInput &config, const options &opt)
 	if (config.method.df_store_memory_mb > 0.0) return;
 	const double avail = opt.mem_given ? opt.mem : available_memory_bytes() / 1048576.0;
 	if (avail > 0.0) config.method.df_store_memory_mb = avail / 2;
+}
+
+//false, after saying so on both streams, when occ's basis data cannot be found
+static bool occ_data_path_found(int argc, char **argv, std::ostream &log_file)
+{
+	if (ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
+		return true;
+	std::cerr << "ERROR: OCC basis set data directory not found.\n"
+			  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
+			  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
+	log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+	return false;
+}
+
+//The table the run asked for: .tscb and/or the text .tsc
+static void write_tables(const itsc_block &res, const options &opt, std::ostream &log_file)
+{
+	log_file << "Writing tsc file... " << std::flush;
+	if (opt.binary_tsc)
+		res.write_tscb_file();
+	if (opt.old_tsc)
+		res.write_tsc_file(opt.cif);
+	log_file << " ... done!" << std::endl;
 }
 
 //Field 22 of a /proc/<pid>/stat line, the start time in clock ticks after boot; -1 for a line that is not one
@@ -267,6 +291,8 @@ static int run_app_impl(int argc, char **argv)
 	} join_warmup;
 #endif
 	vector<WFN> wavy;
+	//Hands cout back to the console and says the job is done
+	const auto finished = [&]() { log_file.flush(); std::cout.rdbuf(_coutbuf); std::cout << "Finished!" << endl; return 0; };
 
 	if (opt.promol_nci)
 	{
@@ -291,130 +317,18 @@ static int run_app_impl(int argc, char **argv)
 		if (!opt.wfn.empty()) wavy.emplace_back(opt.wfn, opt.debug);  // -wfn preloads the menu
 		return QCT(opt, wavy);
 	}
-	//Conceptual-DFT reactivity analysis and quit; its table goes to stdout, not the log
-	if (opt.fukui_analysis_run)
+	//the analyses that read the wavefunction, print their tables and quit (analyses.cpp)
+	for (int i = 0; i < analyses().size(); i++)
 	{
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		fukui_analysis(opt, std::cout);
-		return 0;
-	}
-	//EQC energy decomposition and quit; its tables go to stdout and <stem>.eqc_log
-	if (opt.eqc)
-	{
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf);
-		//Only a basis loaded by name needs occ's data directory; the gbw carries its own
-		const bool have_data = ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
-		err_checkf(have_data || opt.eqc_basis.empty(), "-eqc_basis needs occ's data directory (set OCC_DATA_PATH)", std::cout);
-		return eqc::run(opt);
-	}
-	//Full bonding analysis and quit. Each stage rereads the wavefunction: RGBI and the NBO search modify it,
-	//and the basins must not see that
-	if (opt.fba)
-	{
-		const auto read_wfn = [&opt]() {
-			WFN w(opt.wfn);
-			if (opt.ECP) w.set_has_ECPs(true, true, opt.ECP_mode);
-			return w;
-		};
-		log_file << "\nFull bonding analysis of " << opt.wfn.string() << ": RGBI, bondwise Laplacian, QTAIM and ELI-D, then NBO/NPA with NRT\n" << endl;
-		//NBO/NRT on its own thread with its own stream: RGBI and the basins print to std::cout, whose format flags
-		//all threads share. RGBI is serial and the NBO search stops scaling past a few threads, so it takes the
-		//cores the basins leave.
-		std::ostringstream nbo_log;
-		citations::cite(citations::Method::NAONPA, nbo_log);
-		citations::cite(citations::Method::NBO, nbo_log);
-		citations::cite(citations::Method::E2, nbo_log);
-		citations::cite(citations::Method::NRT, nbo_log);
-		const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
-		//Refused here, not by write_nbo on the NBO thread, whose exit would tear down RGBI mid-run
-		WFN nbo_wfn = read_wfn();
-		refuse_unsupported_nbo_source(nbo_wfn, std::cout);
-		eli_family::print_noon_header(eli_family::noon_summary(nbo_wfn), log_file);
-		log_file << endl;
-		auto nbo_done = std::async(std::launch::async, [&nbo_log, &opt, &json](WFN w) {
-			const auto t0 = std::chrono::steady_clock::now();
-			NboOptions nbo;
-			nbo.debug = opt.debug;
-			nbo.nrt = true;
-			if (opt.threads > 0) nbo.threads = opt.threads;
-			//The search's many small OpenMP regions would wait at barriers for threads the basin loops hold;
-			//NRT's per-candidate loop is coarse and keeps the full count.
-			nbo.search_threads = 1;
-			NboResults r = native_nbo(w, nbo, nbo_log);
-			r.name = opt.wfn.stem().string();
-			//Not registered: cout belongs to RGBI and the basins on the main thread
-			section_log::section nbo_file(opt.wfn, "nbo", "Natural bond orbitals: NPA, NBO, second-order E(2) and NRT",
-				{ citations::Method::NAONPA, citations::Method::NBO, citations::Method::E2, citations::Method::NRT }, opt.no_date, false);
-			std::ostringstream tables;
-			print_nbo(r, tables);
-			nbo_log << tables.str();
-			nbo_file.stream() << tables.str() << "\n  Machine-readable copy: " << json.filename().string() << "\n";
-			write_nbo_json(r, json);
-			nbo_log << "wrote " << json.string() << std::endl;
-			//NAO, search and E2 are in the json's timings; NRT is what this leaves over
-			if (basin_timing_enabled())
-				nbo_log << "  [timing] fba NBO/NPA/NRT thread: " << std::fixed << std::setprecision(2)
-				        << std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s" << std::endl;
-		}, std::move(nbo_wfn));
-		//-basin_timing: laps of the main thread, which runs alongside NBO/NRT
-		basin_stage_timer fba_timer;
-		const section_log::section rgbi_file(opt.wfn, "rgbi", "Roby-Gould Bond Indices (RGBI)", { citations::Method::RGBI }, opt.no_date),
-			qtaim_file(opt.wfn, "qtaim", "QTAIM: critical points, atomic basins and delocalization indices",
-				{ citations::Method::QTAIM, citations::Method::LIDI }, opt.no_date),
-			eli_file(opt.wfn, "eli", "ELI-D: electron localizability basins", { citations::Method::ELID }, opt.no_date);
+		const analysis& a = analyses()[i];
+		if (!a.asked(opt))
+			continue;
+		if (a.console)
 		{
-			WFN w = read_wfn();
-			Roby_information Roby(w, opt.rgbi_group_sets, !opt.rgbi_no_sym,
-				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
-				opt.rgbi_legacy_cutoff);
+			log_file.flush();
+			std::cout.rdbuf(_coutbuf);
 		}
-		fba_timer.lap("fba RGBI");
-		bondwise_laplacian_plots(opt.wfn);
-		fba_timer.lap("fba bondwise Laplacian");
-		ELI_analysis(read_wfn(), opt);
-		fba_timer.lap("fba QTAIM and ELI-D");
-		{
-			//Charges of the grid partitions, on a standard molecular grid: the basin grids carry no density.
-			//Labels as in the QTAIM/ELI-D tables, element plus 0-based wfn index.
-			WFN w = read_wfn();
-			w.delete_unoccupied_MOs();
-			GridConfiguration config;
-			config.accuracy = opt.accuracy;
-			config.all_charges = true;
-			GridManager grids(config);
-			ivec atoms(w.get_ncen());
-			std::iota(atoms.begin(), atoms.end(), 0);
-			grids.setup3DGridsForMolecule(w, atoms);
-			const PartitionResults charges = grids.calculatePartitionedCharges(w);
-			svec labels;
-			for (int a : atoms) labels.push_back(w.get_atom_label(a) + std::to_string(a));
-			const section_log::section part_file(opt.wfn, "partition", "Atomic charges: Becke, Hirshfeld, TFVC, MBIS and EMBIS partitions",
-				{ citations::Method::BeckeGrid, citations::Method::Hirshfeld, citations::Method::TFVC, citations::Method::MBIS, citations::Method::EMBIS }, opt.no_date);
-			const section_log::tee part_tee("partition", "Charges by partitioning scheme");
-			grids.printChargeTable(labels, w, atoms, std::cout, charges);
-		}
-		fba_timer.lap("fba partition charges");
-		//Rethrows whatever stopped the NBO side
-		nbo_done.get();
-		fba_timer.lap("fba waiting for NBO/NRT");
-		std::cout << "\n" << nbo_log.str() << "\nFull bonding analysis finished." << std::endl;
-		return 0;
-	}
-	//Basin analysis and quit; the tables stay in the log, which is what the golden test reads
-	if (opt.eli_analysis_run)
-	{
-		WFN basins(opt.wfn);
-		if (opt.ECP) basins.set_has_ECPs(true, true, opt.ECP_mode);
-		const section_log::section qtaim_file(opt.wfn, "qtaim", "QTAIM: critical points, atomic basins and delocalization indices",
-			{ citations::Method::QTAIM, citations::Method::LIDI }, opt.no_date);
-		//-qtaim writes no .eli_log
-		std::optional<section_log::section> eli_file;
-		if (!opt.qtaim_only)
-			eli_file.emplace(opt.wfn, "eli", "ELI-D: electron localizability basins", std::vector<citations::Method>{ citations::Method::ELID }, opt.no_date);
-		ELI_analysis(basins, opt);
-		return 0;
+		return a.run(opt, argc > 0 ? argv[0] : nullptr, log_file);
 	}
 	// Perform fractal dimensional analysis and quit
 	if (opt.fract)
@@ -619,14 +533,8 @@ static int run_app_impl(int argc, char **argv)
 			//If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
 			if (opt.combined_tsc_calc_files[i].extension() == ".toml")
 			{
-				if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
-				{
-					std::cerr << "ERROR: OCC basis set data directory not found.\n"
-							  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
-							  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
-					log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+				if (!occ_data_path_found(argc, argv, log_file))
 					return 1;
-				}
 				log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
 				occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
 				set_occ_df_budget(config, opt);
@@ -735,23 +643,13 @@ static int run_app_impl(int argc, char **argv)
 			log_file << "Writing tsc file...  ... done!" << endl;
 			log_file << (opt.tsc_replaced_by_tshb ? "  (no table: experimental.tshb holds the fitted densities)"
 				: "  (written block by block while the factors were computed)") << endl;
-			log_file.flush();
-			std::cout.rdbuf(_coutbuf);
-			std::cout << "Finished!" << endl;
-			return 0;
+			return finished();
 		}
 		known_scatterer = result.get_scatterers_string();
 		log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
 		_time_point start = get_time();
 		const auto t_write = std::chrono::steady_clock::now();
-		log_file << "Writing tsc file... " << flush;
-		if (opt.binary_tsc)
-			result.write_tscb_file();
-		if (opt.old_tsc)
-		{
-			result.write_tsc_file(opt.cif);
-		}
-		log_file << " ... done!" << endl;
+		write_tables(result, opt, log_file);
 		if (ProgressBar::report_counts)
 			std::cout << "[stages] write table " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_write).count() << " s" << endl;
 		if (!opt.no_date)
@@ -767,10 +665,7 @@ static int run_app_impl(int argc, char **argv)
 			if (opt.write_CIF)
 				write_wfn_CIF(wavy, "test.wfn_cif", result, opt);
 		}
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Performs the Thakkar IAM
 	if (opt.iam_switch)
@@ -799,21 +694,11 @@ static int run_app_impl(int argc, char **argv)
 		}
 		else
 		{
-			log_file << "Writing tsc file... " << flush;
-			if (opt.binary_tsc)
-				res.write_tscb_file();
-			if (opt.old_tsc)
-			{
-				res.write_tsc_file(opt.cif);
-			}
-			log_file << " ... done!" << endl;
+			write_tables(res, opt, log_file);
 			if (opt.write_CIF)
 				write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
 		}
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Partition electron density read from a cube file and perform Fourier transform to TSC.
 	if (opt.cube_density != "")
@@ -845,17 +730,9 @@ static int run_app_impl(int argc, char **argv)
 			opt.groups[0].push_back(0);
 
 		itsc_block res = calculate_scattering_factors_from_cube(opt, cube_wave, density_cube, log_file);
-		log_file << "Writing tsc file... " << flush;
-		if (opt.binary_tsc)
-			res.write_tscb_file();
-		if (opt.old_tsc)
-			res.write_tsc_file(opt.cif);
-		log_file << " ... done!" << endl;
+		write_tables(res, opt, log_file);
 
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf);
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// This one has conversion to fchk and calculation of one single tsc file
 	if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0 && !opt.do_XCW)
@@ -863,14 +740,8 @@ static int run_app_impl(int argc, char **argv)
 		if (opt.occ != "") {
 			log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
 			if (opt.occ.ends_with(".toml")) {
-				if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
-				{
-					std::cerr << "ERROR: OCC basis set data directory not found.\n"
-							  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
-							  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
-					log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+				if (!occ_data_path_found(argc, argv, log_file))
 					return 1;
-				}
 				occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
 				set_occ_df_budget(config, opt);
 				occ::log::set_log_file("NoSpherA2_OCC.log");
@@ -1020,24 +891,14 @@ static int run_app_impl(int argc, char **argv)
 			else
 			{
 				const auto t_write = std::chrono::steady_clock::now();
-				log_file << "Writing tsc file... " << flush;
-				if (opt.binary_tsc)
-					res.write_tscb_file();
-				if (opt.old_tsc)
-				{
-					res.write_tsc_file(opt.cif);
-				}
-				log_file << " ... done!" << endl;
+				write_tables(res, opt, log_file);
 				if (ProgressBar::report_counts)
 					std::cout << "[stages] write table " << std::chrono::duration<double>(std::chrono::steady_clock::now() - t_write).count() << " s" << endl;
 				if (opt.write_CIF)
 					write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
 			}
 		}
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Performs XCW
 	if (!opt.properties.calc() && opt.do_XCW)
@@ -1062,10 +923,7 @@ static int run_app_impl(int argc, char **argv)
 	if (opt.properties.calc())
 	{
 		properties_calculation(opt);
-		log_file.flush();
-		std::cout.rdbuf(_coutbuf); // reset to standard output again
-		std::cout << "Finished!" << endl;
-		return 0;
+		return finished();
 	}
 	// Converts gbw file to wfn file and leaves
 	if (opt.gbw2wfn)
@@ -1100,7 +958,8 @@ static int run_app_impl(int argc, char **argv)
 	if (!opt.no_date)
 		std::cout << build_date;
 	std::cout << "Did not understand the task to perform!\n"
-		<< help_message << endl;
+		<< help_text() << endl;
 	log_file.flush();
+	std::cerr << "Did not understand the task to perform: no option on the command line selects a job. The help is in " << output_file << ", or run NoSpherA2 -h" << endl;
 	return 0;
 }

@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "core/tuning.h"
+#include "core/base/tuning.h"
 
 //Say where the executable should run before any test fails on a relative path
 static void warn_about_working_directory()

@@ -615,7 +615,7 @@ TEST(TomlIntegrationTests, P1_test_XCW_full)
 
 // `weighted` variant of P1_test_XCW (2 lambda steps): fits against
 // the 1/|H|^2-weighted residual self-energy criterion instead of the
-// classical GoF^2 (see Src/core/xcw_halting.h and structure_factors::ensure_inv_H2_weights).
+// classical GoF^2 (see Src/core/xcw/xcw_halting.h and structure_factors::ensure_inv_H2_weights).
 TEST(TomlIntegrationTests, P1_test_XCW_h2)
 {
 	ensure_p1_eri();

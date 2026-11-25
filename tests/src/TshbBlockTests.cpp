@@ -1,21 +1,21 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/convenience.h"
+#include "core/base/convenience.h"
 #include "core/NoSpherA2.h"
-#include "core/cell.h"
-#include "core/constants.h"
-#include "core/gaussian_atom.h"
-#include "core/scattering_factors.h"
-#include "core/spherical_density.h"
-#include "core/spherical_harmonic.h"
-#include "core/tshb_block.h"
-#include "core/GridManager.h"
-#include "core/AtomGrid.h"
-#include "core/wfn_class.h"
-#include "core/basis_set.h"
-#include "core/SALTED_utilities.h"
-#include "core/npy.h"
+#include "core/xcw/cell.h"
+#include "core/base/constants.h"
+#include "core/tsc/gaussian_atom.h"
+#include "core/tsc/scattering_factors.h"
+#include "core/tsc/spherical_density.h"
+#include "core/base/spherical_harmonic.h"
+#include "core/tsc/tshb_block.h"
+#include "core/integration/GridManager.h"
+#include "core/integration/AtomGrid.h"
+#include "core/wfn/wfn_class.h"
+#include "core/wfn/basis_set.h"
+#include "core/salted/SALTED_utilities.h"
+#include "core/base/npy.h"
 
 #include <complex>
 #include <fstream>
@@ -24,7 +24,7 @@
 #include <random>
 #include <set>
 
-//tshb_block (Src/core/tshb_block.h): the per-scatterer densities a .tshb carries, keyed and merged as tsc_block keys and
+//tshb_block (Src/core/tsc/tshb_block.h): the per-scatterer densities a .tshb carries, keyed and merged as tsc_block keys and
 //merges rows, and the joint file of a -mtc run against the table the same run makes without -tshb
 namespace
 {

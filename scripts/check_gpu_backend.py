@@ -10,9 +10,9 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRCS = [os.path.join(ROOT, "Src", "core", n)
+SRCS = [os.path.join(ROOT, "Src", "core", "gpu", n)
         for n in ("sf_gpu.cu", "itensor_gpu.cu", "salted_gpu.cu", "grid_gpu.cu")]
-HDR = os.path.join(ROOT, "Src", "core", "gpu_backend.h")
+HDR = os.path.join(ROOT, "Src", "core", "gpu", "gpu_backend.h")
 
 
 def main():
@@ -127,7 +127,9 @@ def compile_hip_branch():
         continue
       with tempfile.TemporaryDirectory() as tmp:
         cmd = [nvcc, "-c", "-O3", "-DNOSPHERA2_USE_HIP",
-               "-I", shim, "-I", os.path.join(ROOT, "Src", "core"),
+               "-I", shim] + [a for d in ("", "base", "wfn", "integration", "tsc", "xcw", "salted", "nbo",
+                                         "analysis", "properties", "gpu")
+                              for a in ("-I", os.path.join(ROOT, "Src", "core", d))] + [
                "-o", os.path.join(tmp, "hip_probe.obj"), src_path]
         p = subprocess.run(cmd, capture_output=True, text=True)
         if p.returncode != 0:

@@ -49,8 +49,12 @@ git submodule update --init --recursive
 
 #### Prerequisites
 
-- **CMake** (min 3.25)
-- **C++20 compiler** (MSVC 19.35, GCC 12.2, Clang 15.0)
+- **CMake** (min 3.25; 3.29 or newer so `CMAKE_LINKER_TYPE` selects lld on Linux)
+- **C++20 compiler from the clang family.** The presets and every CI artifact use it:
+  - Windows x64 and Linux: nothing to install. The bootstrap (Step 1) downloads a pinned clang, lld and the LLVM tools into `.mambaenv/llvm` (clang-cl 22.1.8 on Windows, clang 19.1.7 on Linux, with a glibc 2.28 sysroot and GCC 14 libstdc++ headers so the binaries run on older distributions; on Linux aarch64 they sit in `.mambaenv/env`), and the presets put it first on `PATH`.
+  - Windows additionally needs Visual Studio 2022/2026 or the Build Tools with "Desktop development with C++" for the MSVC headers, libraries and the Windows SDK; configure from an x64 Developer shell. The Windows ARM64 presets still use MSVC `cl`.
+  - macOS: Apple clang from the Xcode command-line tools (`xcode-select --install`).
+  - GCC 12.2+ and MSVC 19.35+ still compile the code and CI tests GCC, but no artifact is built with them; select one with `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_LINKER_TYPE=BFD` (or `cl`) when configuring.
 
 #### Step 1: Bootstrap the micromamba environment
 
@@ -94,7 +98,7 @@ The CUDA runtime is linked statically and cuBLAS is opened by name on its first 
 
 At runtime, supported GPU paths are enabled by default: Fourier transforms, XCW I-tensor contractions, SALTED descriptor combinations, and Becke/TFVC atomic-grid weights. Each automatically falls back to the CPU if the device, memory budget, or input layout is unsuitable. Use `-no_gpu` to disable every GPU path, or `-no_gpu_grid`, `-no_gpu_itensor`, and `-no_gpu_salted` to pin an individual calculation to the CPU. `-gpu_blas` remains opt-in because its transfers only pay off for sufficiently large dense matrix products.
 
-On Windows, configure from the x64 Visual Studio developer environment and use a CUDA/toolset combination supported by NVIDIA. If CMake cannot validate the selected CUDA compiler, configuration continues as a CPU-only build and reports the fallback; choose a compatible MSVC toolset or CUDA release before relying on GPU support.
+On Windows, configure from the x64 Visual Studio developer environment and use a CUDA/toolset combination supported by NVIDIA; `nvcc` uses the MSVC toolset of that environment as its host compiler, while the C++ code is compiled by `clang-cl`. If CMake cannot validate the selected CUDA compiler, configuration continues as a CPU-only build and reports the fallback; choose a compatible MSVC toolset or CUDA release before relying on GPU support.
 
 On Linux aarch64 and Windows ARM64 the [Arm Performance Libraries](https://learn.arm.com/install-guides/armpl/) replace OpenBLAS whenever one is installed (`-DNOSPHERA2_USE_ARMPL=OFF` keeps OpenBLAS). CMake looks in `NOSPHERA2_ARMPL_DIR`, `.mambaenv/armpl`, `ARMPL_DIR`, `~/armpl`, `/opt/arm` and `Program Files\Arm Performance Libraries`, and links ArmPL statically, so nothing extra ships. Arm's site refuses scripted downloads: fetch the package by hand (on Windows the `_Windows.msi`, not the `_Windows_Arm64EC.msi`) and either name it in `NOSPHERA2_ARMPL_PACKAGE` or drop it into `.mambaenv/bootstrap`, and the bootstrap installs it into `.mambaenv/armpl`, which accepts Arm's licence.
 
@@ -113,7 +117,7 @@ The final executable will be located in the preset build directory, e.g. `build/
 The repository ships a VS Code setup (`.vscode/`) that works the same on Windows, Linux and macOS. Install the recommended extensions (C/C++ and CMake Tools; VS Code offers them on first open), then:
 
 1. Pick a configure preset in the CMake Tools status bar (e.g. `debug-windows`, `debug-linux`, `debug-macos-arm64`) — run the micromamba bootstrap first, as described above.
-2. Build with F7. On Windows, CMake Tools sets up the MSVC environment itself (`cmake.useVsDeveloperEnvironment`), so VS Code does not have to be started from a developer prompt; the integrated terminal profile "VS x64 Developer PowerShell" gives the same environment for running `cmake`/`ctest` by hand.
+2. Build with F7. On Windows, CMake Tools sets up the Visual Studio environment itself (`cmake.useVsDeveloperEnvironment`, for the MSVC headers and the SDK; `clang-cl` comes from `.mambaenv/llvm`), so VS Code does not have to be started from a developer prompt; the integrated terminal profile "VS x64 Developer PowerShell" gives the same environment for running `cmake`/`ctest` by hand.
 3. Pick a launch target (`NoSpherA2` or `NoSpherA2_Tests`) and debug with the "CMake target" launch configuration — `cppvsdbg` on Windows, gdb/lldb on Linux/macOS. Set the run's arguments and working directory in `.vscode/launch.json`; the "native NBO on epoxide" entry shows the pattern.
 4. Tests appear in the Testing panel once configured with `-DNOSPHERA2_BUILD_TESTS=ON`.
 

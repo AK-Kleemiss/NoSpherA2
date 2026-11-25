@@ -1,4 +1,4 @@
-//Coverage for the uncovered branches of Src/core/bondwise_analysis.cpp: the do_bonds box
+//Coverage for the uncovered branches of Src/core/analysis/bondwise_analysis.cpp: the do_bonds box
 //geometry in every size mode, the property cubes of a debug run, the Roby table row of a
 //homonuclear bond, the wavefunction mode of run_QTAIM_ELI_mask and the debug listing of
 //ELI_analysis. Every expectation is derived by hand from the input.example spec and from the
@@ -17,12 +17,12 @@
 #include <utility>
 #include <vector>
 
-#include "core/convenience.h"
-#include "core/wfn_class.h"
-#include "core/cube.h"
-#include "core/atoms.h"
-#include "core/constants.h"
-#include "core/bondwise_analysis.h"
+#include "core/base/convenience.h"
+#include "core/wfn/wfn_class.h"
+#include "core/properties/cube.h"
+#include "core/wfn/atoms.h"
+#include "core/base/constants.h"
+#include "core/analysis/bondwise_analysis.h"
 
 namespace
 {

@@ -1,16 +1,16 @@
-//Coverage tests for the parts of Src/core/convenience.cpp that ConvenienceTests.cpp leaves untouched:
+//Coverage tests for the parts of Src/core/base/convenience.cpp that ConvenienceTests.cpp leaves untouched:
 //the CIF ADP / U_iso readers, the interactive cube selection, the int Fortran record, the option
 //branches that die or finish, the small helpers with uncovered branches and the process helpers.
 //Every expectation is derived by hand from the input, never from what the code prints.
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/basis_set.h"
-#include "core/wfn_class.h"
-#include "core/cube.h"
-#include "core/cell.h"
-#include "core/throughput.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/basis_set.h"
+#include "core/wfn/wfn_class.h"
+#include "core/properties/cube.h"
+#include "core/xcw/cell.h"
+#include "core/base/throughput.h"
 
 #include <array>
 #include <cfloat>
@@ -709,6 +709,51 @@ TEST(ConvenienceCoverageOptionTests, MtcWithDebugCollectsFilesAndGroups)
 	EXPECT_EQ(opt.groups[0], (ivec{ 1, 2 }));
 	EXPECT_EQ(opt.groups[1], (ivec{ 3 }));
 	EXPECT_NE(out.find("--Group: 3"), std::string::npos);
+}
+
+TEST(ConvenienceCoverageOptionTests, RefineWithoutAValueTakesTheDefault)
+{
+	const options opt = parse({ "-refine", "-charge", "3" });
+	EXPECT_DOUBLE_EQ(opt.properties.integral_accuracy, 0.1);
+	EXPECT_EQ(opt.charge, 3);
+	EXPECT_DOUBLE_EQ(parse({ "-refine", "0.05" }).properties.integral_accuracy, 0.05);
+}
+
+//a group without a comma is split at '.', and that choice must not carry over to the next group
+TEST(ConvenienceCoverageOptionTests, MtcChoosesTheDelimiterPerGroup)
+{
+	const options opt = parse({ "-mtc", "a.wfn", "0.1", "b.wfn", "0,2" });
+	ASSERT_EQ(opt.groups.size(), 2u);
+	EXPECT_EQ(opt.groups[0], (ivec{ 0, 1 }));
+	EXPECT_EQ(opt.groups[1], (ivec{ 0, 2 }));
+	const options c = parse({ "-cmtc", "a.wfn", "a.cif", "0.1", "b.wfn", "b.cif", "0,2" });
+	ASSERT_EQ(c.groups.size(), 2u);
+	EXPECT_EQ(c.groups[1], (ivec{ 0, 2 }));
+}
+
+TEST(ConvenienceCoverageOptionTests, PartitioningTestFinishes)
+{
+	ScratchDir scratch("partitioning_test");
+	for (const char* f : { "HF.gbw", "DFT.gbw" })
+		std::filesystem::copy_file(nos_test_repo_root() / "tests" / "partition" / f, scratch.file(f));
+	scratch.enter();
+	std::string out;
+	const options opt = parse_quiet({ "-partitioning_test", "-charge", "5" }, false, out);
+	EXPECT_TRUE(opt.finished);
+	EXPECT_EQ(opt.charge, 0);
+}
+
+TEST(ConvenienceCoverageOptionTests, SaltedCoefsFinishes)
+{
+	const auto dir = nos_test_repo_root() / "tests" / "SALTED";
+	ScratchDir scratch("salted_coefs");
+	scratch.enter();
+	std::string out;
+	const options opt = parse_quiet({ "-no_gpu_salted", "-wfn", (dir / "test_cysteine.xyz").string(),
+		"-SALTED_COEFS", (dir / "Model").string(), "-charge", "5" }, false, out);
+	EXPECT_TRUE(opt.finished);
+	EXPECT_EQ(opt.charge, 0);
+	EXPECT_TRUE(std::filesystem::exists("SALTED_COEFS.npy"));
 }
 
 TEST(ConvenienceCoverageOptionTests, NnlsTestFinishes)

@@ -1,13 +1,13 @@
 #include "pch.h"
 
-#include "core/constants.h"
-#include "core/convenience.h"
-#include "core/nos_math.h"
-#include "core/atoms.h"
-#include "core/tsc_block.h"
-#include "core/cell.h"
-#include "core/wfn_class.h"
-#include "core/cif.h"
+#include "core/base/constants.h"
+#include "core/base/convenience.h"
+#include "core/base/nos_math.h"
+#include "core/wfn/atoms.h"
+#include "core/tsc/tsc_block.h"
+#include "core/xcw/cell.h"
+#include "core/wfn/wfn_class.h"
+#include "core/tsc/cif.h"
 
 namespace NoSpherA2UnitTests
 {

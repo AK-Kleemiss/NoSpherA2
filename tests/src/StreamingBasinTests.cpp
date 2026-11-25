@@ -1,11 +1,11 @@
 #include "pch.h"
-#include "core/b2c.h"
-#include "core/wfn_class.h"
-#include "core/atoms.h"
-#include "core/constants.h"
-#include "core/cube.h"
-#include "core/nos_math.h"
-#include "core/properties.h"
+#include "core/analysis/b2c.h"
+#include "core/wfn/wfn_class.h"
+#include "core/wfn/atoms.h"
+#include "core/base/constants.h"
+#include "core/properties/cube.h"
+#include "core/base/nos_math.h"
+#include "core/properties/properties.h"
 
 #include <cmath>
 #include <filesystem>

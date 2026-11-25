@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "core/nbo.h"
-#include "core/wfn_class.h"
+#include "core/nbo/nbo.h"
+#include "core/wfn/wfn_class.h"
 
 #include <algorithm>
 #include <cmath>
