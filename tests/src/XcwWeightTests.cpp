@@ -4,7 +4,7 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/structure_factors.h"
+#include "core/xcw/structure_factors.h"
 
 namespace NoSpherA2UnitTests
 {

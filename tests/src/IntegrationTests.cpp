@@ -615,7 +615,7 @@ TEST(TomlIntegrationTests, P1_test_XCW_full)
 
 // `weighted` variant of P1_test_XCW (2 lambda steps): fits against
 // the 1/|H|^2-weighted residual self-energy criterion instead of the
-// classical GoF^2 (see Src/core/xcw_halting.h and structure_factors::ensure_inv_H2_weights).
+// classical GoF^2 (see Src/core/xcw/xcw_halting.h and structure_factors::ensure_inv_H2_weights).
 TEST(TomlIntegrationTests, P1_test_XCW_h2)
 {
 	ensure_p1_eri();
@@ -810,6 +810,12 @@ TEST(TomlIntegrationTests, SALTED)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, SaltedDistance)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_distance");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, SucroseIAM)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_IAM");
@@ -945,6 +951,18 @@ TEST(TomlIntegrationTests, ELI_contributions_epoxide)
 TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, RGBI_NH3Li_direct)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_direct");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, QTAIM_NH3Li)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "QTAIM_NH3Li");
 	EXPECT_TRUE(result.success) << result.message;
 }
 TEST(TomlIntegrationTests, cube_rho)

@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "core/convenience.h"
+#include "core/base/convenience.h"
 #include "core/NoSpherA2.h"
 
 //An analysis that cannot run, or an option nothing reads, must exit non-zero: exit 0 looks like success
@@ -69,22 +69,22 @@ std::filesystem::path fixture(const std::string& rel)
 
 } // namespace
 
-//RGBI has no positional form: `-rgbi water.gbw` sets the flag and leaves opt.wfn empty
+//bare -rgbi reads -wfn, so with neither there is nothing to analyse
 TEST(CliRefusal, RgbiWithoutWavefunctionExitsNonZeroAndNamesTheInput)
 {
 	Cli cli("rgbi");
-	const int rc = cli.run({"-rgbi", fixture("RGBI_groups/nh3li.gbw").string()});
+	const int rc = cli.run({"-rgbi"});
 	EXPECT_NE(rc, 0);
 	const std::string out = cli.output();
 	EXPECT_NE(out.find("-rgbi"), std::string::npos) << out;
 	EXPECT_NE(out.find("-wfn"), std::string::npos) << out;
 }
 
-//NPA shares the RGBI branch
+//NPA shares the RGBI branch; -npa <file> names one (CliUsability.AnalysisFlagsTakeTheirWavefunctionEitherWay)
 TEST(CliRefusal, NpaWithoutWavefunctionExitsNonZero)
 {
 	Cli cli("npa");
-	EXPECT_NE(cli.run({"-npa", fixture("RGBI_groups/nh3li.gbw").string()}), 0);
+	EXPECT_NE(cli.run({"-npa"}), 0);
 	EXPECT_NE(cli.output().find("-npa"), std::string::npos) << cli.output();
 }
 
@@ -190,7 +190,7 @@ TEST(CliRefusal, PositionalWavefunctionThatDoesNotExistIsFatal)
 //source catches a new flag that is neither digested nor listed before it aborts real runs
 TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
 {
-	const auto src = nos_test_repo_root() / "Src" / "core" / "convenience.cpp";
+	const auto src = nos_test_repo_root() / "Src" / "core" / "options_parse.cpp";
 	std::ifstream in(src);
 	ASSERT_TRUE(in.good()) << src;
 	const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());

@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "core/b2c.h"
-#include "core/ci_rdm2.h"
-#include "core/wfn_class.h"
+#include "core/analysis/b2c.h"
+#include "core/analysis/ci_rdm2.h"
+#include "core/wfn/wfn_class.h"
 
 #include <cmath>
 #include <numeric>

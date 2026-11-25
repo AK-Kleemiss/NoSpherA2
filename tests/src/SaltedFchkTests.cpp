@@ -1,20 +1,21 @@
 #include "pch.h"
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/fchk.h"
-#include "core/SALTED_io.h"
-#include "core/SALTED_utilities.h"
-#include "core/SALTED_equicomb.h"
-#include "core/SALTED_predictor.h"
-#include "core/wfn_class.h"
-#include "core/basis_set.h"
-#include "core/cube.h"
-#include "core/npy.h"
-#include "core/nos_math.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/fchk.h"
+#include "core/salted/SALTED_io.h"
+#include "core/salted/SALTED_utilities.h"
+#include "core/salted/SALTED_equicomb.h"
+#include "core/salted/SALTED_predictor.h"
+#include "core/wfn/wfn_class.h"
+#include "core/wfn/basis_set.h"
+#include "core/properties/cube.h"
+#include "core/base/npy.h"
+#include "core/base/nos_math.h"
 #include "core/NoSpherA2.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
 #include <random>
 #include <regex>
 #undef I
@@ -1965,6 +1966,884 @@ TEST(SaltedFchkPredictorTests, BasisNotFittingWeightsExits)
 	}
 	EXPECT_EXIT(fold_salted_file(extra, tmp_path("extra_weight_folded.salted")), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	std::filesystem::remove(extra);
+}
+
+namespace
+{
+	// CONFG: the value follows its 5-byte tag and a 4-byte type word
+	void set_salted_zeta(const std::filesystem::path& file, const double zeta)
+	{
+		std::fstream f(file, std::ios::in | std::ios::out | std::ios::binary);
+		std::string head(4096, '\0');
+		f.read(head.data(), head.size());
+		const size_t at = head.find("zeta");
+		ASSERT_NE(at, std::string::npos);
+		f.clear();
+		f.seekp(at + 9);
+		f.write(reinterpret_cast<const char*>(&zeta), sizeof(zeta));
+	}
+	std::vector<salted_novelty> novelty_of(const std::filesystem::path& xyz, const std::filesystem::path& model, const double eigcut = 1e-10, const bool eig = false)
+	{
+		WFN w(xyz, false);
+		options opt;
+		opt.salted_model_dir = model;
+		SALTEDPredictor SP(w, opt);
+		return SP.kernel_novelty(w, eigcut, eig);
+	}
+	// kernel_novelty_salted.py (SALTED fork-minimise-speed in salted_new.sif, Slurm job 1827715) on the shipped model and on
+	// its copy with zeta = 2, lambda 0 read from FEATS where the script reads FEATL, in input order: kmax0, row of kmax0, nov0;
+	// nov0 at eigcut 1e-2 from job 1828598, where K_MM keeps 39 of 98 H eigenvalues at zeta 1 and 55 at zeta 2
+	struct novelty_ref
+	{
+		std::string xyz;
+		vec kmax0;
+		ivec nearest;
+		vec nov_z1, nov_z2, cut_z1, cut_z2;
+	};
+	const std::vector<novelty_ref> novelty_refs{
+		{ "SALTED/test_cysteine.xyz",
+			{ 0.754045478178509, 0.774495929367651, 0.739953488699972, 0.645008575763813, 0.642696179320275, 0.655477621548586, 0.659872654593108,
+			  0.677864282273147, 0.726285576508273, 0.734167059646307, 0.777846061933896, 0.732884044430286, 0.706836571086824, 0.717942810068487 },
+			{ 3, 3, 3, 0, 0, 3, 4, 45, 30, 8, 20, 21, 52, 21 },
+			{ 0.0117797375535706, 0.00453695737563131, 0.00870231169675484, 0.0140974756828659, 0.0136450478036562, 0.0112595798480108, 0.00898310975134875,
+			  0.00227153525551615, 0.00177424163193673, 0.00192304699029833, 0.00187489131554963, 0.00136885396671171, 0.00195198563145882, 0.00100435685484646 },
+			{ 0.0246668153831703, 0.0107230858551686, 0.0204508598398003, 0.0290194162101628, 0.0284509692653839, 0.0256681637554955, 0.0190661102894034,
+			  0.00883340846900049, 0.00604142975824773, 0.00730866100164373, 0.0069412133254575, 0.00457980990759987, 0.00617739440626297, 0.00407103576622481 },
+			{ 0.011940626883210181, 0.006138993432647011, 0.01058855057455077, 0.01425811370291219, 0.015607642989628356, 0.011403145399314973, 0.009412558448220865,
+			  0.00449702981002964, 0.004750807783221789, 0.005324366268608993, 0.003394392392558787, 0.0034507106346224337, 0.0037741959876437248, 0.002621675021036163 },
+			{ 0.024977741801844977, 0.012888844661895216, 0.022581311214535438, 0.029019416210162796, 0.028523416539094182, 0.025928586711795876, 0.019067724367184735,
+			  0.011997258072159789, 0.009472759536513609, 0.01150040212299408, 0.009575878553352069, 0.007763792639124967, 0.009372900525734917, 0.006304757733920807 } },
+		{ "reading_SALTED/water_monomer.xyz",
+			{ 0.646376601897029, 0.792180180330442, 0.792180180330442 },
+			{ 14, 65, 65 },
+			{ 0.136930450574212, 0.016164218956451, 0.016164218956451 },
+			{ 0.299485602667512, 0.0615321490271709, 0.0615321490271709 },
+			{ 0.14806827511795106, 0.026896128672088127, 0.026896128672088127 },
+			{ 0.30654672016102014, 0.0683310039578382, 0.0683310039578382 } } };
+}
+
+// -SALTED_distance: kmax0, its reference row and nov0 of every atom as SALTED's own descriptors give them, for zeta 1 and 2;
+// the zeta = 2 copy folded (FEATL) gives the same numbers as unfolded (FEATS)
+TEST(SaltedFchkPredictorTests, KernelNoveltyMatchesSaltedScript)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "z2.salted");
+	set_salted_zeta(dir / "z2.salted", 2.0);
+	const int threads = omp_get_max_threads();
+	fold_salted_file(dir / "z2.salted", dir / "z2_folded.salted");
+	MKL_Set_Num_Threads(threads);
+	{
+		SALTED_BINARY_FILE f(dir / "z2_folded.salted");
+		ASSERT_TRUE(f.has_block("FEATL") && !f.has_block("FEATS"));
+	}
+	for (const auto& ref : novelty_refs)
+	{
+		const auto z1 = novelty_of(root / ref.xyz, root / "SALTED" / "Model" / "model.salted");
+		const auto z2 = novelty_of(root / ref.xyz, dir / "z2.salted"), z2f = novelty_of(root / ref.xyz, dir / "z2_folded.salted");
+		ASSERT_EQ(z1.size(), ref.kmax0.size());
+		ASSERT_EQ(z2.size(), ref.kmax0.size());
+		ASSERT_EQ(z2f.size(), ref.kmax0.size());
+		for (int a = 0; a < (int)z1.size(); a++)
+		{
+			for (const auto* r : { &z1[a], &z2[a], &z2f[a] })
+			{
+				EXPECT_EQ(r->atom, a);
+				EXPECT_EQ(r->status, "ok");
+				EXPECT_EQ(r->role, "assigned");
+				EXPECT_NEAR(r->kmax0, ref.kmax0[a], 1e-8) << ref.xyz << " atom " << a;
+				EXPECT_EQ(r->nearest, ref.nearest[a]) << ref.xyz << " atom " << a;
+				EXPECT_GT(r->nov0, -1e-12);
+				EXPECT_LT(r->nov0, 1.0 + 1e-12);
+			}
+			EXPECT_NEAR(z1[a].nov0, ref.nov_z1[a], 1e-8) << ref.xyz << " atom " << a;
+			EXPECT_NEAR(z2[a].nov0, ref.nov_z2[a], 1e-8) << ref.xyz << " atom " << a;
+			EXPECT_NEAR(z2f[a].nov0, z2[a].nov0, 1e-12) << ref.xyz << " atom " << a;
+		}
+	}
+	std::filesystem::remove_all(dir);
+}
+
+// eigcut 1e-2 drops eigenvalues of K_MM for every species but N at zeta 2 (1e-4 drops none), nov0 grows by up to 1.1e-2
+TEST(SaltedFchkPredictorTests, KernelNoveltyDropsEigenvaluesBelowEigcut)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_cut");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "z2.salted");
+	set_salted_zeta(dir / "z2.salted", 2.0);
+	const int threads = omp_get_max_threads();
+	fold_salted_file(dir / "z2.salted", dir / "z2_folded.salted");
+	MKL_Set_Num_Threads(threads);
+	for (const auto& ref : novelty_refs)
+	{
+		const auto z1 = novelty_of(root / ref.xyz, root / "SALTED" / "Model" / "model.salted", 1e-2);
+		const auto z2 = novelty_of(root / ref.xyz, dir / "z2.salted", 1e-2), z2f = novelty_of(root / ref.xyz, dir / "z2_folded.salted", 1e-2);
+		ASSERT_EQ(z1.size(), ref.cut_z1.size());
+		ASSERT_EQ(z2.size(), ref.cut_z2.size());
+		ASSERT_EQ(z2f.size(), ref.cut_z2.size());
+		for (int a = 0; a < (int)z1.size(); a++)
+		{
+			EXPECT_NEAR(z1[a].nov0, ref.cut_z1[a], 1e-8) << ref.xyz << " atom " << a;
+			EXPECT_NEAR(z2[a].nov0, ref.cut_z2[a], 1e-8) << ref.xyz << " atom " << a;
+			EXPECT_NEAR(z2f[a].nov0, ref.cut_z2[a], 1e-8) << ref.xyz << " atom " << a;
+		}
+	}
+	std::filesystem::remove_all(dir);
+}
+
+// at the default eigcut K_MM - eigcut I is positive definite for every species of cysteine and water, so K_MM's Cholesky
+// factor gives nov0, within 1e-10 of the eigendecomposition's; at eigcut 1e-2 K_MM drops eigenvalues and the eigendecomposition runs
+TEST(SaltedFchkPredictorTests, KernelNoveltyCholeskyMatchesTheEigendecomposition)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto run = [&root](const std::filesystem::path& xyz, const double eigcut, const bool eig, std::string& out) {
+		const bool before = ProgressBar::report_counts;
+		ProgressBar::report_counts = true;
+		testing::internal::CaptureStdout();
+		const auto r = novelty_of(xyz, root / "SALTED" / "Model" / "model.salted", eigcut, eig);
+		out = testing::internal::GetCapturedStdout();
+		ProgressBar::report_counts = before;
+		return r;
+	};
+	for (const auto& ref : novelty_refs)
+	{
+		std::string chol, eig, cut;
+		const auto c = run(root / ref.xyz, 1e-10, false, chol), e = run(root / ref.xyz, 1e-10, true, eig);
+		EXPECT_NE(chol.find("K_MM Cholesky"), std::string::npos) << chol;
+		EXPECT_EQ(chol.find("eigendecomposition"), std::string::npos) << chol;
+		EXPECT_EQ(eig.find("Cholesky"), std::string::npos) << eig;
+		ASSERT_EQ(c.size(), ref.kmax0.size());
+		ASSERT_EQ(e.size(), ref.kmax0.size());
+		for (int a = 0; a < (int)c.size(); a++)
+		{
+			EXPECT_NEAR(c[a].nov0, e[a].nov0, 1e-10) << ref.xyz << " atom " << a;
+			EXPECT_EQ(c[a].kmax0, e[a].kmax0) << ref.xyz << " atom " << a;
+			EXPECT_EQ(c[a].nearest, e[a].nearest) << ref.xyz << " atom " << a;
+		}
+		run(root / ref.xyz, 1e-2, false, cut);
+		EXPECT_NE(cut.find("K_MM eigendecomposition"), std::string::npos) << cut;
+		EXPECT_EQ(cut.find("Cholesky"), std::string::npos) << cut;
+	}
+}
+
+// a pass with the eigendecomposition forced leaves the predictor as it was: the next pass of the same one takes the Cholesky path
+TEST(SaltedFchkPredictorTests, KernelNoveltyForcedEigendecompositionIsReset)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	WFN w(root / "SALTED" / "test_cysteine.xyz", false);
+	options opt;
+	opt.salted_model_dir = root / "SALTED" / "Model" / "model.salted";
+	SALTEDPredictor SP(w, opt);
+	const auto e = SP.kernel_novelty(w, 1e-10, true), c = SP.kernel_novelty(w, 1e-10);
+	ASSERT_EQ(e.size(), 14u);
+	ASSERT_EQ(c.size(), 14u);
+	for (int a = 0; a < 14; a++)
+	{
+		EXPECT_EQ(e[a].path, "eigendecomposition") << a;
+		EXPECT_EQ(c[a].path, "Cholesky") << a;
+		EXPECT_NEAR(c[a].nov0, e[a].nov0, 1e-10) << a;
+	}
+}
+
+// the eigcut after the xyz reaches the novelty, and one that is no number stops
+TEST(SaltedFchkPredictorTests, KernelNoveltyTakesTheEigcutFromTheFlag)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto args = [&root](const std::string& cut) {
+		return svec{ "NoSpherA2", "-no_gpu_salted", "-SALTED_distance", (root / "SALTED" / "Model" / "model.salted").string(),
+			(root / "reading_SALTED" / "water_monomer.xyz").string(), cut };
+	};
+	//the parser stops before anything is read or written, so no working directory of its own
+	auto parse = [&args](const std::string& cut) {
+		svec a = args(cut);
+		std::vector<char*> argv;
+		for (std::string& s : a) argv.push_back(s.data());
+		int argc = static_cast<int>(argv.size());
+		std::ostringstream log;
+		options opt(argc, argv.data(), log);
+		opt.digest_options();
+	};
+	EXPECT_EXIT(parse("1e-2x"), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	const auto dir = tmp_path("novelty_flag"), old = std::filesystem::current_path();
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::filesystem::current_path(dir);
+	svec a = args("1e-2");
+	std::vector<char*> argv;
+	for (std::string& s : a) argv.push_back(s.data());
+	EXPECT_EQ(run_app(static_cast<int>(argv.size()), argv.data()), 0);
+	std::filesystem::current_path(old);
+	svec lines;
+	{
+		std::ifstream in(dir / "water_monomer_salted_distance.csv");
+		for (std::string line; std::getline(in, line);) lines.push_back(line);
+	}
+	ASSERT_EQ(lines.size(), 4u);
+	for (int a = 0; a < 3; a++)
+	{
+		svec f;
+		std::stringstream s(lines[a + 1]);
+		for (std::string x; std::getline(s, x, ',');) f.push_back(x);
+		ASSERT_GE(f.size(), 8u) << lines[a + 1];
+		EXPECT_NEAR(std::stod(f[7]), novelty_refs[1].cut_z1[a], 1e-8) << lines[a + 1];
+	}
+	std::filesystem::remove_all(dir);
+}
+
+// ENVW (folded at zeta = 1) keeps only V W^T F, no reference features: the novelty stops and says so
+TEST(SaltedFchkPredictorTests, KernelNoveltyNeedsTheFeatures)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto folded = tmp_path("novelty_envw.salted");
+	const int threads = omp_get_max_threads();
+	fold_salted_file(root / "SALTED" / "Model" / "model.salted", folded);
+	MKL_Set_Num_Threads(threads);
+	EXPECT_EXIT(novelty_of(root / "reading_SALTED" / "water_monomer.xyz", folded), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	std::filesystem::remove(folded);
+}
+
+// an element the model lacks goes to the spherical fill, and so does an atom of a model element with nothing within rcut:
+// their rows say filled and empty environment at their place in the input, the others keep their numbers; salted_distance
+// writes the same rows to <xyz stem>_salted_distance.csv, the model quoted with forward slashes
+TEST(SaltedFchkPredictorTests, KernelNoveltyListsFilledAndEmptyAtomsInPlace)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_filled");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	{
+		std::ofstream o(dir / "water_cl.xyz");
+		o << "5\nwater, a far Cl and a far O\nO 0.066334 0.0 0.003701\nCl 20.0 0.0 0.0\nH -0.526383 -0.769327 -0.029366\nH -0.526383 0.769327 -0.029366\n"
+		  << "O 0.0 20.0 0.0\n";
+	}
+	const auto old = std::filesystem::current_path();
+	std::filesystem::current_path(dir);
+	options opt;
+	const auto rows = salted_distance(root / "SALTED" / "Model" / "model.salted", dir / "water_cl.xyz", 1e-10, opt);
+	std::filesystem::current_path(old);
+	ASSERT_EQ(rows.size(), 5u);
+	const novelty_ref& w = novelty_refs[1];
+	for (const auto& [a, el, status] : { std::make_tuple(1, "Cl", "filled"), std::make_tuple(4, "O", "empty environment") })
+	{
+		EXPECT_EQ(rows[a].atom, a);
+		EXPECT_EQ(rows[a].element, el);
+		EXPECT_EQ(rows[a].status, status);
+		EXPECT_TRUE(rows[a].model.empty());
+		EXPECT_TRUE(std::isnan(rows[a].nov0));
+	}
+	for (const int a : { 0, 2, 3 })
+	{
+		const int r = a == 0 ? 0 : a - 1;
+		EXPECT_EQ(rows[a].atom, a);
+		EXPECT_EQ(rows[a].status, "ok");
+		EXPECT_NEAR(rows[a].kmax0, w.kmax0[r], 1e-8) << a;
+		EXPECT_NEAR(rows[a].nov0, w.nov_z1[r], 1e-8) << a;
+	}
+	svec lines;
+	{
+		std::ifstream in(dir / "water_cl_salted_distance.csv");
+		std::string line;
+		while (std::getline(in, line)) lines.push_back(line);
+	}
+	ASSERT_EQ(lines.size(), 6u);
+	EXPECT_EQ(lines[0], "atom,label,element,model,role,kmax0,cosine,nov0,status,nearest,p0p0");
+	EXPECT_EQ(lines[2], "2,Cl,Cl,\"\",,,,,filled,,");
+	EXPECT_EQ(lines[5], "5,O,O,\"\",,,,,empty environment,,");
+	EXPECT_EQ(lines[1].rfind("1,O,O,\"", 0), 0u) << lines[1];
+	EXPECT_NE(lines[1].find("/model.salted\",assigned,"), std::string::npos) << lines[1];
+	EXPECT_EQ(lines[1].find('\\'), std::string::npos) << lines[1];
+	EXPECT_NE(lines[1].find(",ok,14,"), std::string::npos) << lines[1];
+	std::filesystem::remove_all(dir);
+}
+
+// a folder with a lead and an O.salted, and an O.salted in the subgroup alt: H belongs to the lead and O to O.salted, and
+// by the first shell each atom goes to the model of its bonded partner's element, so O to the lead and H to O.salted, with
+// alt/O.salted the alternative listed after it; all the same file, so all with the numbers of the model itself
+TEST(SaltedFchkPredictorTests, KernelNoveltyReportsTheAlternatives)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_folder");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "alt");
+	for (const auto& f : { dir / "model.salted", dir / "O.salted", dir / "alt" / "O.salted" })
+		std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", f);
+	const auto rows = novelty_of(root / "reading_SALTED" / "water_monomer.xyz", dir);
+	const novelty_ref& w = novelty_refs[1];
+	//pins build_merged as it is: O going to the lead because H is the lead's element is a known bug, a fixed rule changes this row
+	const std::vector<std::tuple<int, std::string, std::string, std::string>> want{
+		{ 0, dir.filename().string(), "model.salted", "assigned" },
+		{ 1, dir.filename().string(), "O.salted", "assigned" }, { 1, "alt", "O.salted", "alternative" },
+		{ 2, dir.filename().string(), "O.salted", "assigned" }, { 2, "alt", "O.salted", "alternative" } };
+	ASSERT_EQ(rows.size(), want.size());
+	for (int i = 0; i < (int)rows.size(); i++)
+	{
+		const auto& [a, folder, file, role] = want[i];
+		const std::filesystem::path m(rows[i].model);
+		EXPECT_EQ(rows[i].atom, a);
+		EXPECT_EQ(rows[i].role, role) << i;
+		EXPECT_EQ(m.filename().string(), file) << i;
+		EXPECT_EQ(m.parent_path().filename().string(), folder) << i;
+		EXPECT_NEAR(rows[i].nov0, w.nov_z1[a], 1e-8) << i;
+		EXPECT_NEAR(rows[i].kmax0, w.kmax0[a], 1e-8) << i;
+	}
+	std::filesystem::remove_all(dir);
+}
+
+// a lead, S.salted and H.salted on cysteine: S is bonded to C (lead) and H, Cb to S and H, so both are first-shell means of
+// two models, the first bonded partner's model assigned and the other shared; every row has the numbers of the model itself
+TEST(SaltedFchkPredictorTests, KernelNoveltyReportsSharedModels)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_shared");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	for (const auto& f : { dir / "model.salted", dir / "S.salted", dir / "H.salted" })
+		std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", f);
+	const auto rows = novelty_of(root / "SALTED" / "test_cysteine.xyz", dir);
+	const novelty_ref& c = novelty_refs[0];
+	std::map<int, svec> roles;
+	for (const auto& r : rows)
+	{
+		roles[r.atom].push_back(std::filesystem::path(r.model).filename().string() + " " + r.role);
+		EXPECT_EQ(r.status, "ok") << r.atom;
+		EXPECT_NEAR(r.nov0, c.nov_z1[r.atom], 1e-8) << r.atom;
+		EXPECT_NEAR(r.kmax0, c.kmax0[r.atom], 1e-8) << r.atom;
+	}
+	ASSERT_EQ(roles.size(), c.kmax0.size());
+	EXPECT_EQ(roles[0], svec({ "model.salted assigned", "H.salted shared" }));
+	EXPECT_EQ(roles[6], svec({ "S.salted assigned", "H.salted shared" }));
+	for (const auto& [a, v] : roles)
+		if (a != 0 && a != 6) EXPECT_EQ(v.size(), 1u) << a;
+	std::filesystem::remove_all(dir);
+}
+
+namespace
+{
+	// the predictor's l = 0 features of every atom (featomic, equicomb on the model's FPS selection), the neighbour pair channel
+	// of each kept feature by the layout of SALTED_utilities (featomic's neighbour types in neighspe order with nrad radial
+	// functions each, feature (n1 nspe2 nrad2 + n2) llmax + l) and the model's l = 0 reference block per species
+	struct lambda0_data
+	{
+		dMatrix2 p;
+		svec channel;
+		std::map<std::string, dMatrix2> F;
+	};
+	lambda0_data lambda0_of(const std::filesystem::path& xyz, const std::filesystem::path& model)
+	{
+		SALTED_BINARY_FILE file(model);
+		SALTEDConfig c;
+		file.populate_config(c);
+		const auto fps = file.read_fps();
+		const auto w3j = file.read_wigners();
+		const auto index = file.index_lambda_based_data("FEATS");
+		WFN w(xyz, false);
+		SALTED_Utils::FeatomicHyperParameters hp;
+		hp.cutoff_radius = c.rcut1;
+		hp.max_radial = c.nrad1;
+		hp.max_angular = c.nang1;
+		hp.atomic_gaussian_width = c.sig1;
+		hp.species = c.species;
+		hp.neighspe = c.neighspe1;
+		const SALTEDDescriptors v = SALTED_Utils::calculate_SALTED_descriptors(SALTED_Utils::gen_featomic_system(w), hp);
+		ivec2 ll;
+		for (int l = 0; l <= c.nang1; l++) ll.push_back({ l, l });
+		const ivec2 llvec = transpose<int>(ll);
+		const int n = w.get_ncen(), llmax = c.nang1 + 1, nr1 = c.nspe1 * c.nrad1, nr2 = c.nspe2 * c.nrad2, nf = (int)fps.at(0).size();
+		vec p((size_t)n * nf);
+		equicomb(n, nr1, nr2, v, v, w3j.at(0), llvec, 0, SALTED_Utils::complex_to_real_transformation({ 1 })[0], nr1 * nr2 * llmax, nf, fps.at(0), p, true);
+		lambda0_data d;
+		d.p = dMatrix2(n, nf);
+		std::copy(p.begin(), p.end(), d.p.data());
+		auto pos = [&c](const std::string& e) { return std::find(c.neighspe1.begin(), c.neighspe1.end(), e) - c.neighspe1.begin(); };
+		for (int f = 0; f < nf; f++)
+		{
+			const int64_t g = fps.at(0)[f];
+			std::string a = c.neighspe1[g / (llmax * nr2) / c.nrad1], b = c.neighspe2[(g / llmax) % nr2 / c.nrad2];
+			if (pos(b) < pos(a)) std::swap(a, b);
+			d.channel.push_back(a + "-" + b);
+		}
+		for (const auto& s : c.species) d.F[s] = file.load_block(index.at(s + "0"));
+		return d;
+	}
+	void write_water_with_s(const std::filesystem::path& file, const double x)
+	{
+		std::ofstream o(file);
+		o << "4\nwater and an S\nO 0.066334 0.0 0.003701\nH -0.526383 -0.769327 -0.029366\nH -0.526383 0.769327 -0.029366\nS " << x << " 0.0 0.0\n";
+	}
+	// the features of channel c in the l = 0 reference block of element e set to zero in place
+	void zero_lambda0_channel(const std::filesystem::path& model, const std::string& e, const svec& channel, const std::string& c)
+	{
+		SALTED_BINARY_FILE::block_ref b;
+		{
+			SALTED_BINARY_FILE f(model);
+			b = f.index_lambda_based_data("FEATS").at(e + "0");
+		}
+		std::fstream io(model, std::ios::in | std::ios::out | std::ios::binary);
+		const double zero = 0.0;
+		for (size_t m = 0; m < b.rows; m++)
+			for (size_t f = 0; f < b.cols; f++)
+				if (channel[f] == c)
+				{
+					io.seekp(b.offset + (std::streamoff)((m * b.cols + f) * sizeof(double)));
+					io.write(reinterpret_cast<const char*>(&zero), sizeof(zero));
+				}
+	}
+	// a copy of model whose l = 0 FPS selection and reference blocks keep no feature of channel c
+	void drop_lambda0_channel(const std::filesystem::path& model, const std::filesystem::path& out, const svec& channel, const std::string& c)
+	{
+		SALTED_BINARY_FILE f(model);
+		SALTEDConfig cfg;
+		f.populate_config(cfg);
+		const auto fps = f.read_fps();
+		const auto feats = f.read_features();
+		salted_writer p, w;
+		p.block_head((int)fps.size());
+		for (int l = 0; l < (int)fps.size(); l++)
+		{
+			std::vector<int64_t> v;
+			for (int i = 0; i < (int)fps.at(l).size(); i++)
+				if (l > 0 || channel[i] != c) v.push_back(fps.at(l)[i]);
+			p.dataset(v, { (uint32_t)v.size() });
+		}
+		w.block_head((int)cfg.species.size());
+		for (const auto& s : cfg.species)
+		{
+			int nl = 0;
+			while (feats.count(s + std::to_string(nl))) nl++;
+			w.tag(s);
+			w.raw(static_cast<int32_t>(nl));
+			for (int l = 0; l < nl; l++)
+			{
+				const dMatrix2& B = feats.at(s + std::to_string(l));
+				vec v;
+				for (int m = 0; m < (int)B.extent(0); m++)
+					for (int i = 0; i < (int)B.extent(1); i++)
+						if (l > 0 || channel[i] != c) v.push_back(B(m, i));
+				w.dataset(v, { (uint32_t)B.extent(0), (uint32_t)(v.size() / B.extent(0)) });
+			}
+		}
+		f.write_with_blocks(out, 2, { "FPS", "FEATS" }, { { "FPS", p.buf }, { "FEATS", w.buf } });
+	}
+}
+
+// a l = 0 feature multiplies two neighbour densities, the centre's own among them (featomic's centre weight 1): water's atoms
+// weigh on H-H, H-O and O-O only, as the features give it by the layout; moving an added S changes the O atom's channels
+// with S and leaves the ratios of the others
+TEST(SaltedFchkPredictorTests, KernelNoveltySplitFollowsTheNeighbourPairs)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests", model = root / "SALTED" / "Model" / "model.salted", water = root / "reading_SALTED" / "water_monomer.xyz";
+	const auto rows = novelty_of(water, model);
+	const lambda0_data d = lambda0_of(water, model);
+	ASSERT_EQ(rows.size(), 3u);
+	for (int a = 0; a < 3; a++)
+	{
+		double pp = 0.0;
+		std::map<std::string, double> env;
+		for (int f = 0; f < (int)d.channel.size(); f++)
+		{
+			env[d.channel[f]] += d.p(a, f) * d.p(a, f);
+			pp += d.p(a, f) * d.p(a, f);
+		}
+		EXPECT_NEAR(pp, rows[a].self, 1e-12 * pp);
+		EXPECT_EQ(rows[a].split.size(), env.size());
+		for (const auto& [c, v] : rows[a].split)
+		{
+			EXPECT_EQ(v.first > 0.0, c == "H-H" || c == "H-O" || c == "O-O") << a << " " << c;
+			EXPECT_NEAR(v.first, env[c] / pp, 1e-12) << a << " " << c;
+		}
+	}
+	const auto dir = tmp_path("novelty_pairs");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	write_water_with_s(dir / "s30.xyz", 3.0);
+	write_water_with_s(dir / "s34.xyz", 3.4);
+	const auto s30 = novelty_of(dir / "s30.xyz", model)[0].split, s34 = novelty_of(dir / "s34.xyz", model)[0].split;
+	EXPECT_GT(s30.at("O-S").first, 1e-4);
+	EXPECT_GT(s30.at("H-S").first, 1e-4);
+	for (const auto& [c, v] : s30)
+	{
+		const double r1 = v.first / s30.at("O-O").first, r2 = s34.at(c).first / s34.at("O-O").first;
+		if (c.find('S') == std::string::npos) EXPECT_NEAR(r2, r1, 1e-10 * r1) << c;
+		else if (v.first > 1e-8) EXPECT_GT(std::abs(r2 / r1 - 1.0), 1e-2) << c;
+	}
+	std::filesystem::remove_all(dir);
+}
+
+// the channels' shares sum to nov0 on the Cholesky and on the eigendecomposition path, at zeta 1 and 2, and none is negative;
+// at zeta 1.5 they are no sums of squares and there is no split
+TEST(SaltedFchkPredictorTests, KernelNoveltySharesSumToNov0)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_split");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "z2.salted");
+	set_salted_zeta(dir / "z2.salted", 2.0);
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", dir / "z15.salted");
+	set_salted_zeta(dir / "z15.salted", 1.5);
+	for (const auto& ref : novelty_refs)
+	{
+		for (const auto& model : { root / "SALTED" / "Model" / "model.salted", dir / "z2.salted" })
+			for (const bool eig : { false, true })
+				for (const auto& r : novelty_of(root / ref.xyz, model, 1e-10, eig))
+				{
+					EXPECT_EQ(r.path, eig ? "eigendecomposition" : "Cholesky");
+					ASSERT_FALSE(r.split.empty()) << ref.xyz << " atom " << r.atom;
+					double s = 0.0;
+					for (const auto& [c, v] : r.split)
+					{
+						s += v.second;
+						EXPECT_GT(v.second, -1e-12) << ref.xyz << " atom " << r.atom << " " << c;
+					}
+					EXPECT_GT(r.nov0, 1e-6);
+					EXPECT_NEAR(s, r.nov0, 1e-10 * r.nov0) << ref.xyz << " " << model.filename() << " eig " << eig << " atom " << r.atom;
+				}
+		for (const auto& r : novelty_of(root / ref.xyz, dir / "z15.salted"))
+		{
+			EXPECT_EQ(r.status, "ok");
+			EXPECT_TRUE(r.split.empty()) << ref.xyz << " atom " << r.atom;
+		}
+	}
+	std::filesystem::remove_all(dir);
+}
+
+// at zeta 1 the share of channel c is |r_c|^2 / p.p for the linear residual r = p - F^T (F F^T)^+ F p, with the pseudo-inverse
+// over eigenvalues above 1e-10, computed here from the features and the reference block directly
+TEST(SaltedFchkPredictorTests, KernelNoveltySplitIsTheLinearResidualAtZeta1)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests", model = root / "SALTED" / "Model" / "model.salted";
+	using rmat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+	for (const auto& ref : novelty_refs)
+	{
+		const auto rows = novelty_of(root / ref.xyz, model);
+		const lambda0_data d = lambda0_of(root / ref.xyz, model);
+		const int nf = (int)d.channel.size();
+		ASSERT_EQ(rows.size(), d.p.extent(0));
+		for (int a = 0; a < (int)rows.size(); a++)
+		{
+			const dMatrix2& F = d.F.at(rows[a].element);
+			const Eigen::Map<const rmat> Fm(F.data(), F.extent(0), F.extent(1));
+			const Eigen::VectorXd p = Eigen::Map<const rmat>(d.p.data(), d.p.extent(0), nf).row(a).transpose();
+			const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(Fm * Fm.transpose());
+			Eigen::VectorXd y = es.eigenvectors().transpose() * (Fm * p);
+			for (int j = 0; j < (int)y.size(); j++) y[j] = es.eigenvalues()[j] > 1e-10 ? y[j] / es.eigenvalues()[j] : 0.0;
+			const Eigen::VectorXd r = p - Fm.transpose() * (es.eigenvectors() * y);
+			std::map<std::string, double> rc;
+			for (int f = 0; f < nf; f++) rc[d.channel[f]] += r[f] * r[f] / p.squaredNorm();
+			EXPECT_EQ(rows[a].split.size(), rc.size());
+			for (const auto& [c, v] : rows[a].split) EXPECT_NEAR(v.second, rc[c], 1e-10) << ref.xyz << " atom " << a << " " << c;
+		}
+	}
+}
+
+// salted_distance writes <xyz stem>_salted_distance.json with every row and its channel and element shares, excesses (summing to 0)
+// and enrichments, and prints a line of the ranked ones per atom
+TEST(SaltedFchkPredictorTests, SaltedDistanceWritesTheChannelSplitAsJson)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests", model = root / "SALTED" / "Model" / "model.salted";
+	const auto dir = tmp_path("novelty_json"), old = std::filesystem::current_path();
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::filesystem::current_path(dir);
+	options opt;
+	testing::internal::CaptureStdout();
+	const auto rows = salted_distance(model, root / "reading_SALTED" / "water_monomer.xyz", 1e-10, opt);
+	const std::string log = testing::internal::GetCapturedStdout();
+	std::filesystem::current_path(old);
+	nlohmann::json j;
+	{
+		std::ifstream in(dir / "water_monomer_salted_distance.json");
+		ASSERT_TRUE(in.good());
+		j = nlohmann::json::parse(in);
+	}
+	EXPECT_EQ(j["eigcut"].get<double>(), 1e-10);
+	const auto& m = j["models"][rows[0].model];
+	EXPECT_EQ(m["zeta"].get<double>(), 1.0);
+	EXPECT_TRUE(m["split"].get<bool>());
+	EXPECT_EQ(m["path"]["O"].get<std::string>(), "Cholesky");
+	EXPECT_EQ(m["path"]["H"].get<std::string>(), "Cholesky");
+	ASSERT_EQ(j["atoms"].size(), rows.size());
+	for (int a = 0; a < (int)rows.size(); a++)
+	{
+		const auto& x = j["atoms"][a];
+		const salted_novelty& r = rows[a];
+		EXPECT_EQ(x["atom"].get<int>(), a + 1);
+		EXPECT_EQ(x["element"].get<std::string>(), r.element);
+		EXPECT_EQ(x["status"].get<std::string>(), "ok");
+		EXPECT_EQ(x["nov0"].get<double>(), r.nov0);
+		EXPECT_EQ(x["kmax0"].get<double>(), r.kmax0);
+		EXPECT_EQ(x["p0p0"].get<double>(), r.self);
+		EXPECT_EQ(x["nearest"].get<int>(), r.nearest);
+		EXPECT_TRUE(x["absent"].empty());
+		ASSERT_EQ(x["channels"].size(), r.split.size());
+		std::map<std::string, std::pair<double, double>> el;
+		double fs = 0.0, es = 0.0, xs = 0.0, ys = 0.0;
+		for (const auto& [c, v] : r.split)
+		{
+			const auto& y = x["channels"][c];
+			EXPECT_EQ(y["share"].get<double>(), v.second) << c;
+			EXPECT_EQ(y["environment"].get<double>(), v.first) << c;
+			EXPECT_NEAR(y["fraction"].get<double>(), v.second / r.nov0, 1e-15) << c;
+			EXPECT_DOUBLE_EQ(y["excess"].get<double>(), v.second / r.nov0 - v.first) << c;
+			if (v.first > 0.0) EXPECT_DOUBLE_EQ(y["enrichment"].get<double>(), v.second / r.nov0 / v.first) << c;
+			else EXPECT_TRUE(y["enrichment"].is_null()) << c;
+			EXPECT_FALSE(y["absent"].get<bool>()) << c;
+			fs += y["fraction"].get<double>();
+			es += y["environment"].get<double>();
+			xs += y["excess"].get<double>();
+			for (const std::string& e : { c.substr(0, c.find('-')), c.substr(c.find('-') + 1) })
+			{
+				el[e].first += 0.5 * v.first;
+				el[e].second += 0.5 * v.second;
+			}
+		}
+		EXPECT_NEAR(fs, 1.0, 1e-10) << a;
+		EXPECT_NEAR(es, 1.0, 1e-10) << a;
+		EXPECT_NEAR(xs, 0.0, 1e-10) << a;
+		ASSERT_EQ(x["elements"].size(), el.size());
+		for (const auto& [e, v] : el)
+		{
+			const auto& y = x["elements"][e];
+			EXPECT_NEAR(y["share"].get<double>(), v.second, 1e-15) << e;
+			EXPECT_NEAR(y["environment"].get<double>(), v.first, 1e-15) << e;
+			EXPECT_NEAR(y["excess"].get<double>(), v.second / r.nov0 - v.first, 1e-12) << e;
+			if (v.first > 0.0) EXPECT_NEAR(y["enrichment"].get<double>(), v.second / r.nov0 / v.first, 1e-12 * v.second / r.nov0 / v.first) << e;
+			else EXPECT_TRUE(y["enrichment"].is_null()) << e;
+			ys += y["excess"].get<double>();
+		}
+		EXPECT_NEAR(ys, 0.0, 1e-10) << a;
+	}
+	size_t from = 0;
+	for (size_t at = log.find("\n      from: "); at != std::string::npos; at = log.find("\n      from: ", at + 1)) from++;
+	EXPECT_EQ(from, 3u) << log;
+	EXPECT_NE(log.find("Channels absent from the kept features of the model's references: none"), std::string::npos) << log;
+	std::filesystem::remove_all(dir);
+}
+
+// the from and elements lines of cysteine name, in order, the (at most two) channels and elements the atom has whose fraction of nov0
+// exceeds their share of its descriptor most, and as missing the two largest by fraction of those it has nothing of; in H 9, 13 and
+// 14 the self channel H-H has the largest fraction but less than its weight in the descriptor, and H-C is named first
+TEST(SaltedFchkPredictorTests, SaltedDistanceRanksChannelsByTheirExcessShare)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests", model = root / "SALTED" / "Model" / "model.salted";
+	const auto dir = tmp_path("novelty_excess"), old = std::filesystem::current_path();
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::filesystem::current_path(dir);
+	options opt;
+	testing::internal::CaptureStdout();
+	const auto rows = salted_distance(model, root / "SALTED" / "test_cysteine.xyz", 1e-10, opt);
+	const std::string log = testing::internal::GetCapturedStdout();
+	std::filesystem::current_path(old);
+	svec from, els;
+	{
+		std::istringstream in(log);
+		for (std::string l; std::getline(in, l);)
+			if (l.rfind("      from: ", 0) == 0) from.push_back(l.substr(12));
+			else if (l.rfind("      elements: ", 0) == 0) els.push_back(l.substr(16));
+	}
+	ASSERT_EQ(rows.size(), 14u);
+	ASSERT_EQ(from.size(), 14u) << log;
+	ASSERT_EQ(els.size(), 14u) << log;
+	auto names = [](const std::string& s, const std::string& re) {
+		svec v;
+		const std::regex r(re);
+		for (std::sregex_iterator m(s.begin(), s.end(), r), e; m != e; ++m) v.push_back((*m)[1]);
+		return v;
+	};
+	//expected: the two the atom has with the largest positive excess, then the two largest by fraction it has nothing of
+	auto expect = [](const std::map<std::string, std::pair<double, double>>& v, const double nov) {
+		std::vector<std::pair<double, std::string>> h, m;
+		for (const auto& [c, x] : v)
+			if (x.first > 0.0) h.push_back({ x.second / nov - x.first, c });
+			else if (x.second > 0.0) m.push_back({ x.second / nov, c });
+		std::sort(h.rbegin(), h.rend());
+		std::sort(m.rbegin(), m.rend());
+		svec a, b;
+		for (int i = 0; i < 2 && i < (int)h.size() && h[i].first > 0.0; i++) a.push_back(h[i].second);
+		for (int i = 0; i < 2 && i < (int)m.size(); i++) b.push_back(m[i].second);
+		return std::make_pair(a, b);
+	};
+	int missing = 0;
+	for (int a = 0; a < 14; a++)
+	{
+		const salted_novelty& r = rows[a];
+		std::map<std::string, std::pair<double, double>> el;
+		for (const auto& [c, v] : r.split)
+		{
+			el[c.substr(0, c.find('-'))].first += 0.5 * v.first;
+			el[c.substr(0, c.find('-'))].second += 0.5 * v.second;
+			el[c.substr(c.find('-') + 1)].first += 0.5 * v.first;
+			el[c.substr(c.find('-') + 1)].second += 0.5 * v.second;
+		}
+		const size_t cm = from[a].find("; missing neighbours: "), em = els[a].find("; missing: ");
+		const svec fh = names(from[a].substr(0, cm), "([A-Z][a-z]?-[A-Z][a-z]?) [0-9<]"),
+			fm = cm == std::string::npos ? svec{} : names(from[a].substr(cm), "([A-Z][a-z]?-[A-Z][a-z]?) [0-9<]"),
+			eh = names(els[a].substr(0, em), "\\b([A-Z][a-z]?) [0-9<]"), emi = em == std::string::npos ? svec{} : names(els[a].substr(em), "\\b([A-Z][a-z]?) [0-9<]");
+		const auto ce = expect(r.split, r.nov0), ee = expect(el, r.nov0);
+		EXPECT_EQ(fh, ce.first) << a << ": " << from[a];
+		EXPECT_EQ(fm, ce.second) << a << ": " << from[a];
+		EXPECT_EQ(eh, ee.first) << a << ": " << els[a];
+		EXPECT_EQ(emi, ee.second) << a << ": " << els[a];
+		for (const auto& c : fm)
+		{
+			EXPECT_EQ(r.split.at(c).first, 0.0) << a << " " << c;
+			EXPECT_GT(r.split.at(c).second, 0.0) << a << " " << c;
+		}
+		for (const auto& c : fh) EXPECT_GT(r.split.at(c).first, 0.0) << a << " " << c;
+		missing += (int)fm.size();
+		std::string top;
+		for (const auto& [c, v] : r.split)
+			if (top.empty() || v.second > r.split.at(top).second) top = c;
+		if (a == 8 || a == 12 || a == 13)
+		{
+			EXPECT_EQ(top, "H-H") << a;
+			EXPECT_LT(r.split.at(top).second / r.nov0 - r.split.at(top).first, 0.0) << a;
+			ASSERT_FALSE(fh.empty()) << a;
+			EXPECT_EQ(fh[0], "H-C") << a << ": " << from[a];
+		}
+	}
+	EXPECT_GE(missing, 2) << log;
+	std::filesystem::remove_all(dir);
+}
+
+// a model whose O references carry nothing on O-S (those features of its l = 0 block set to zero): water's O next to an S has
+// O-S in its environment, is told so in the log (its from line marks O-S absent) and the JSON, and that channel's share is all
+// its own weight there
+TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheReferencesLack)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_absent"), old = std::filesystem::current_path();
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	const auto model = dir / "no_os.salted";
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", model);
+	zero_lambda0_channel(model, "O", lambda0_of(root / "reading_SALTED" / "water_monomer.xyz", model).channel, "O-S");
+	write_water_with_s(dir / "water_s.xyz", 3.0);
+	std::filesystem::current_path(dir);
+	options opt;
+	testing::internal::CaptureStdout();
+	const auto rows = salted_distance(model, dir / "water_s.xyz", 1e-10, opt);
+	const std::string log = testing::internal::GetCapturedStdout();
+	std::filesystem::current_path(old);
+	ASSERT_EQ(rows.size(), 4u);
+	EXPECT_EQ(rows[0].absent, svec{ "O-S" });
+	for (int a = 1; a < 4; a++) EXPECT_TRUE(rows[a].absent.empty()) << a;
+	const auto& os = rows[0].split.at("O-S");
+	EXPECT_GT(os.first, 1e-4);
+	EXPECT_NEAR(os.second, os.first, 1e-12);
+	EXPECT_NE(log.find("Channels absent from the kept features of the model's references: O: O-S (atom 1)\n"), std::string::npos) << log;
+	const size_t f = log.find("\n      from: ");
+	ASSERT_NE(f, std::string::npos) << log;
+	const std::string o = log.substr(f, log.find('\n', f + 1) - f);
+	EXPECT_NE(o.find("O-S "), std::string::npos) << o;
+	EXPECT_NE(o.find("x, absent)"), std::string::npos) << o;
+	nlohmann::json j;
+	{
+		std::ifstream in(dir / "water_s_salted_distance.json");
+		j = nlohmann::json::parse(in);
+	}
+	EXPECT_EQ(j["atoms"][0]["absent"], nlohmann::json::array({ "O-S" }));
+	EXPECT_TRUE(j["atoms"][0]["channels"]["O-S"]["absent"].get<bool>());
+	EXPECT_FALSE(j["atoms"][0]["channels"]["H-S"]["absent"].get<bool>());
+	std::filesystem::remove_all(dir);
+}
+
+// the same model and an O of a second water far from the S: its features on O-S are zero, so it is not told the channel is absent,
+// though its references lack it and the first O makes O-S a channel of the species
+TEST(SaltedFchkPredictorTests, KernelNoveltyNamesNoChannelAnAtomDoesNotWeighOn)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	const auto dir = tmp_path("novelty_zero_weight");
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	const auto model = dir / "no_os.salted";
+	std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", model);
+	zero_lambda0_channel(model, "O", lambda0_of(root / "reading_SALTED" / "water_monomer.xyz", model).channel, "O-S");
+	{
+		std::ofstream o(dir / "two.xyz");
+		o << "7\nwater and an S, a far water\nO 0.066334 0.0 0.003701\nH -0.526383 -0.769327 -0.029366\nH -0.526383 0.769327 -0.029366\nS 3.0 0.0 0.0\n"
+		  << "O 20.066334 0.0 0.003701\nH 19.473617 -0.769327 -0.029366\nH 19.473617 0.769327 -0.029366\n";
+	}
+	const auto rows = novelty_of(dir / "two.xyz", model);
+	ASSERT_EQ(rows.size(), 7u);
+	EXPECT_EQ(rows[0].absent, svec{ "O-S" });
+	EXPECT_EQ(rows[4].split.at("O-S").first, 0.0);
+	EXPECT_TRUE(rows[4].absent.empty());
+	std::filesystem::remove_all(dir);
+}
+
+// a copy whose l = 0 FPS selection keeps no O-S feature: water's O and the S next to it have O-S by their neighbours (the O's
+// own element counts), an H as far as the S is within rcut; the channel is reported apart from the absent ones, in the log and
+// the JSON, and is no share: the others still sum to nov0. The model as shipped keeps every channel
+TEST(SaltedFchkPredictorTests, KernelNoveltyNamesChannelsTheModelKeepsNoFeaturesFor)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests", shipped = root / "SALTED" / "Model" / "model.salted";
+	const auto dir = tmp_path("novelty_unrepresented"), old = std::filesystem::current_path();
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	const auto model = dir / "no_os.salted";
+	const svec channel = lambda0_of(root / "reading_SALTED" / "water_monomer.xyz", shipped).channel;
+	drop_lambda0_channel(shipped, model, channel, "O-S");
+	SALTEDConfig c;
+	{
+		SALTED_BINARY_FILE f(model);
+		f.populate_config(c);
+		ASSERT_EQ(f.read_fps().at(0).size(), channel.size() - std::count(channel.begin(), channel.end(), "O-S"));
+		ASSERT_LT(f.read_fps().at(0).size(), channel.size());
+	}
+	write_water_with_s(dir / "water_s.xyz", 3.0);
+	std::filesystem::current_path(dir);
+	options opt;
+	testing::internal::CaptureStdout();
+	const auto rows = salted_distance(model, dir / "water_s.xyz", 1e-10, opt);
+	const std::string log = testing::internal::GetCapturedStdout();
+	std::filesystem::current_path(old);
+	ASSERT_EQ(rows.size(), 4u);
+	const bool h = std::hypot(3.0 + 0.526383, 0.769327, 0.029366) < c.rcut1;
+	for (int a = 0; a < 4; a++)
+	{
+		EXPECT_EQ(rows[a].unrepresented, a == 0 || a == 3 || h ? svec{ "O-S" } : svec{}) << a;
+		EXPECT_EQ(rows[a].split.count("O-S"), 0u) << a;
+		EXPECT_TRUE(rows[a].absent.empty()) << a;
+		double sum = 0.0;
+		for (const auto& [k, v] : rows[a].split) sum += v.second;
+		EXPECT_NEAR(sum, rows[a].nov0, 1e-10 * rows[a].nov0) << a;
+	}
+	EXPECT_EQ(rows[0].model_unrepresented, svec{ "O-S" });
+	EXPECT_NE(log.find(std::string("Channels the model keeps no features for: ") + (h ? "H: O-S (atoms 2, 3); " : "") + "O: O-S (atom 1); S: O-S (atom 4)\n"),
+		std::string::npos) << log;
+	nlohmann::json j;
+	{
+		std::ifstream in(dir / "water_s_salted_distance.json");
+		j = nlohmann::json::parse(in);
+	}
+	EXPECT_EQ(j["atoms"][0]["unrepresented"], nlohmann::json::array({ "O-S" }));
+	EXPECT_EQ(j["models"][rows[0].model]["unrepresented"], nlohmann::json::array({ "O-S" }));
+	const auto full = novelty_of(dir / "water_s.xyz", shipped);
+	for (const auto& r : full) EXPECT_TRUE(r.unrepresented.empty() && r.model_unrepresented.empty()) << r.atom;
+	std::filesystem::remove_all(dir);
 }
 
 // the input's cores (-ECP, -mtc_ECP, an ECP gbw) belong to its basis: an all-electron model declares none, a model

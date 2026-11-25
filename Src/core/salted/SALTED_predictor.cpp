@@ -1,0 +1,1873 @@
+#include "pch.h"
+#include "SALTED_predictor.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "salted_gpu.h"
+#include "sf_gpu.h"
+#include "SALTED_equicomb.h"
+#endif
+#include "SALTED_utilities.h"
+#include <occ/core/eeq.h>
+#include "spherical_density.h"
+#include "SALTED_equicomb.h"
+#include "nos_math.h"
+#include "constants.h"
+#include "wfn_class.h"
+#include "basis_set.h"
+#include "citations.h"
+#include <nlohmann/json.hpp>
+#include <cstring>
+#include <filesystem>
+
+
+// inorganic: no carbon bonded to H, C or a metal (carbonate, cyanide and carbide stay inorganic); organometallic: such
+// a carbon and a metal anywhere (carbonyls, metal salts of organic acids); organic: such a carbon and no metal.
+// Bonded as in build_merged's first shell, 0.5 <= d / (r_a + r_b) <= 1.3.
+std::string salted_structure_class(const WFN& wavy)
+{
+	auto metal = [](const int Z) { return !std::set<int>{1, 2, 5, 6, 7, 8, 9, 10, 14, 15, 16, 17, 18, 33, 34, 35, 36, 52, 53, 54, 85, 86}.count(Z); };
+	auto radius = [](const int Z) { return Z < 114 ? constants::covalent_radii[Z] : 1.5; };
+	bool has_metal = false, organic_C = false;
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		const int Za = wavy.get_atom_charge(a);
+		has_metal = has_metal || metal(Za);
+		if (Za != 6 || organic_C) continue;
+		for (int b = 0; b < wavy.get_ncen() && !organic_C; b++)
+		{
+			const int Zb = wavy.get_atom_charge(b);
+			if (b == a || (Zb != 1 && Zb != 6 && !metal(Zb))) continue;
+			const double x = array_length(wavy.get_atom_pos(a), wavy.get_atom_pos(b)) / constants::ang2bohr(radius(Za) + radius(Zb));
+			organic_C = x >= 0.5 && x <= 1.3;
+		}
+	}
+	return !organic_C ? "inorganic" : has_metal ? "organometallic" : "organic";
+}
+
+SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
+{
+	std::filesystem::path _path = opt_in.salted_model_dir;
+	SALTED_DIR = opt_in.salted_model_dir;
+	debug = opt_in.debug;
+
+	if (opt_in.salted_model_dir.empty() && opt_in.coef_file != "") {
+		std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
+		wavy = generate_aux_wfn(wavy_in, opt_in.aux_basis);
+		// the coefficients fit the input's valence density: its cores (counts on the atoms) go back on in its mode
+		wavy.set_has_ECPs(wavy_in.get_has_ECPs(), false, wavy_in.get_ECP_mode());
+		bbasis_set_loaded = true;
+		config.dfbasis = opt_in.aux_basis[0]->get_name();
+		config.salted_filename = "coefficient file";
+		coef_file = opt_in.coef_file;
+		return;
+	}
+
+	// A folder brings its lead plus the element models of the elements in this structure (salted_folder_models).
+	// Every subfolder (at any depth) is a subgroup and brings its own: the one of the structure's class
+	// (salted_structure_class) first, then the folder itself, the others sorted last. The first is each element's default,
+	// the others its alternatives, chosen per atom by SOAP similarity (build_merged, merge_predictions).
+	pathvec models = opt_in.salted_model_dirs;
+	if (models.size() <= 1 && std::filesystem::is_directory(_path)) {
+		std::set<int> present;
+		for (int a = 0; a < wavy_in.get_ncen(); a++) present.insert(wavy_in.get_atom_charge(a));
+		const std::filesystem::path sub = _path / salted_structure_class(wavy_in);
+		pathvec dirs;
+		for (const auto& e : std::filesystem::recursive_directory_iterator(_path))
+			if (e.is_directory() && e.path() != sub) dirs.push_back(e.path());
+		std::sort(dirs.begin(), dirs.end());
+		dirs.insert(dirs.begin(), _path);
+		if (std::filesystem::is_directory(sub)) {
+			std::cout << "Structure class " << sub.filename().string() << ": models from " << sub.string() << " first" << std::endl;
+			dirs.insert(dirs.begin(), sub);
+		}
+		models.clear();
+		for (const auto& d : dirs)
+			for (const auto& m : salted_folder_models(d, present)) models.push_back(m);
+	}
+	if (models.size() > 1) {
+		build_merged(wavy_in, opt_in, models);
+		return;
+	}
+	if (models.size() == 1) _path = models[0];
+
+	// A model may be named by its own file: two models in one folder are otherwise indistinguishable.
+	if (std::filesystem::is_regular_file(_path)) {
+		SALTED_DIR = _path.parent_path();
+		config.salted_filename = _path.filename();
+		_path = SALTED_DIR;
+	}
+	else {
+		config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
+		if (config.salted_filename.empty()) {
+			std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
+			exit(1);
+		}
+	}
+
+	wavy = wavy_in;
+	// the input's cores belong to its own basis: only the model's ECP block declares one
+	wavy.set_has_ECPs(false, false, 0);
+	for (int a = 0; a < wavy.get_ncen(); a++) wavy.set_atom_ECP_electrons(a, 0);
+	if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
+	_path = _path / config.salted_filename;
+	const auto _t_config = std::chrono::steady_clock::now();
+	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
+	file.populate_config(config);
+	eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_config).count();
+
+	const auto _t_filter = std::chrono::steady_clock::now();
+	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
+	if (ProgressBar::report_counts)
+		std::cout << "[stages] filter input "
+				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_filter).count()
+				  << " s" << std::endl;
+	// A model trained on ECP densities predicts the valence only. wavy holds just this model's atoms now (the filter
+	// erased the spherical fill, which stays all-electron), so its cores are the ones that go back on
+	if (config.ecp_mode > 0)
+	{
+		wavy.set_has_ECPs(true, true, config.ecp_mode);
+		int n_core = 0;
+		for (int a = 0; a < wavy.get_ncen(); a++) n_core += wavy.get_atom_ECP_electrons(a) != 0;
+		std::cout << "Model " << config.salted_filename.string() << " predicts valence densities (ECP mode "
+				  << config.ecp_mode << "): the core goes back on for " << n_core << " atom(s)." << std::endl;
+	}
+	// The descriptors see the unfiltered input, so unknown species stay neighbours. The isolated atoms of model
+	// species go, though: the filter dropped them from the basis, and left in they would be descriptor centres
+	// with no coefficients (Tsize != n_coef, "model and basis do not belong together"). Isolated means nobody's
+	// neighbour within rcut either, so no other environment changes.
+	std::vector<char> isolated = use_thakkar;
+	for (size_t a = 0; a < isolated.size(); a++)
+		if (std::find(config.species.begin(), config.species.end(), constants::atnr2letter(wavy_in.get_atom_charge(a))) == config.species.end())
+			isolated[a] = 0;
+	// A model with the pseudo neighbours Md and No sees every element it neither predicts nor lists as a neighbour
+	// in one of two channels, nonmetal (No) or metal (Md), as its training saw the counter-ions around an anion
+	ivec z;
+	auto has = [](const std::vector<std::string>& v, const std::string& s) { return std::find(v.begin(), v.end(), s) != v.end(); };
+	if (has(config.neighspe1, "Md") && has(config.neighspe1, "No")) {
+		const ivec nonmetal = { 1, 2, 5, 6, 7, 8, 9, 10, 14, 15, 16, 17, 18, 32, 33, 34, 35, 36, 51, 52, 53, 54, 85, 86 };
+		z.resize(wavy_in.get_ncen());
+		for (int a = 0; a < wavy_in.get_ncen(); a++) {
+			z[a] = wavy_in.get_atom_charge(a);
+			const std::string l = constants::atnr2letter(z[a]);
+			if (z[a] > 0 && !has(config.species, l) && !has(config.neighspe1, l) && !has(config.neighspe2, l))
+				z[a] = std::find(nonmetal.begin(), nonmetal.end(), z[a]) != nonmetal.end() ? 102 : 101;
+		}
+	}
+	featomic_system = SALTED_Utils::gen_featomic_system(wavy_in, isolated, z);
+	if (!use_thakkar.empty()) {
+		spherical_fill_used = true;
+		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
+	}
+
+	//wavy.write_xyz("temp_rascaline.xyz"); //Also this
+	//config.predict_filename = "temp_rascaline.xyz";
+
+
+	if (wavy.get_nmo() != 0)
+		wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
+
+	wavy.delete_basis_set();
+	if (file.basis_set_defined()) {
+		const auto _t_basis = std::chrono::steady_clock::now();
+		model_basis = file.read_basis_set();
+		eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_basis).count();
+		load_basis_into_WFN(wavy, model_basis);
+		bbasis_set_loaded = true;
+	}
+	eager_bytes += file.dataset_bytes;
+}
+
+void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vector<char>& use_thakkar, options& opt_in)
+{
+	{
+		// The filled atoms get a NEUTRAL Thakkar density, which fixes how many
+		// electrons they carry. Estimate what they should really carry, so the
+		// size of that assumption can be reported rather than hidden. EEQ gives
+		// smooth non-integer charges from geometry and honours the net charge,
+		// which suits coordination chemistry far better than assigning a formal
+		// oxidation state.
+		const int ncen_in = wavy_in.get_ncen();
+		n_filled = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
+		try
+		{
+			occ::IVec nums(ncen_in);
+			occ::Mat3N pos(3, ncen_in);
+			const bool bohr = wavy_in.get_isBohr();
+			for (int a = 0; a < ncen_in; a++)
+			{
+				// occ's EEQ tables stop at Rn and read past their end above it (U came out +9.2 in COD
+				// 1548085). ponytail: the lanthanide homologue stands in for Fr-Lr, until EEQ has them.
+				nums(a) = wavy_in.get_atom_charge(a);
+				if (nums(a) > 86) nums(a) -= 32;
+				for (int ax = 0; ax < 3; ax++)
+				{
+					const double c = wavy_in.get_atom_coordinate(a, ax);
+					pos(ax, a) = bohr ? constants::bohr2ang(c) : c;   // EEQ wants Angstrom
+				}
+			}
+			const occ::Vec q = occ::core::charges::eeq_partial_charges(
+				nums, pos, static_cast<double>(wavy_in.get_charge()));
+			filled_eeq_charge = 0.0;
+			applied_fill_charge = 0.0;
+			opt_in.spherical_fill_charges.clear();
+			for (int a = 0; a < ncen_in; a++)
+			{
+				if (!use_thakkar[a]) continue;
+				filled_eeq_charge += q(a);
+				// Only charge the fill can actually carry may be moved out of
+				// the predicted region. If no ion is tabulated for this element
+				// the fill stays neutral, so the target must stay neutral too -
+				// otherwise the two disagree and the system total is wrong.
+				const int Zf = wavy_in.get_atom_charge(a);
+				const double qf = HE_Spherical_Atom::carried_charge(Zf, q(a));
+				applied_fill_charge += qf;
+				// Position-keyed, in the wavefunction's own units: the fill
+				// rebuilds its wavefunction from the original file, so indices
+				// there are not ours to assume.
+				opt_in.spherical_fill_charges.push_back({
+					wavy_in.get_atom_coordinate(a, 0),
+					wavy_in.get_atom_coordinate(a, 1),
+					wavy_in.get_atom_coordinate(a, 2),
+					qf});
+			}
+		}
+		catch (const std::exception &e)
+		{
+			std::cout << "Could not estimate the filled-region charge (" << e.what()
+					  << "); reporting it as unknown." << std::endl;
+			filled_eeq_charge = std::numeric_limits<double>::quiet_NaN();
+		}
+	}
+}
+
+const std::string SALTEDPredictor::get_dfbasis_name() const
+{
+	return config.dfbasis;
+}
+
+std::shared_ptr<BasisSet> SALTEDPredictor::get_model_basis() const
+{
+	return model_basis ? model_basis : BasisSetLibrary::get_basis_set(config.dfbasis);
+}
+
+// The predictor's filter only erases atoms and keeps the rest in order and untouched, so one forward
+// walk with an exact comparison maps its structure back onto the full one.
+static ivec map_atoms(const WFN& full, const WFN& part)
+{
+	ivec idx(full.get_ncen(), -1);
+	int p = 0;
+	for (int a = 0; a < full.get_ncen() && p < part.get_ncen(); a++)
+	{
+		if (full.get_atom_charge(a) != part.get_atom_charge(p)) continue;
+		bool same = true;
+		for (int ax = 0; ax < 3 && same; ax++)
+			same = (full.get_atom_coordinate(a, ax) == part.get_atom_coordinate(p, ax));
+		if (same) idx[a] = p++;
+	}
+	return idx;
+}
+
+// Each atom's first coefficient in the auxiliary basis, as the density evaluation indexes it; one entry past the end.
+static ivec coef_offsets(const WFN& w)
+{
+	const aux_density_table t(*w.get_atoms_ptr());
+	ivec off(w.get_ncen() + 1, t.n_coef);
+	for (int a = 0; a < w.get_ncen(); a++) off[a] = t.coef_off[t.sh_start[a]];
+	return off;
+}
+
+void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models)
+{
+	// Each model predicts the atoms it keeps (merge_predictions) on the whole structure: an atom another model owns is still a neighbour.
+	// Each per-atom block carries its own model's auxiliary basis, so stitching them is a concatenation.
+	std::cout << "Combining " << models.size()
+			  << " SALTED models. Each of them first reports what IT alone cannot predict;"
+			  << " the assignment that counts is printed below." << std::endl;
+	for (const auto& model : models)
+	{
+		options sub_opt = opt_in;               // its own spherical-fill bookkeeping
+		sub_opt.salted_model_dirs.clear();
+		sub_opt.salted_model_dir = model;
+		sub_opt.needs_Thakkar_fill = false;
+		sub_opt.spherical_fill_charges.clear();
+		auto sub = std::make_unique<SALTEDPredictor>(wavy_in, sub_opt);
+		if (!sub->basis_set_loaded())
+			load_basis_into_WFN(sub->wavy, sub->get_model_basis());
+		sub_models.push_back(std::move(sub));
+	}
+
+	// An element goes to the first model that predicts it, and all its atoms with
+	// it: the auxiliary basis lives per element, so two models cannot share one.
+	// Its own <El>.salted first, then a lead, then any other: an element model also predicts its first shell's species.
+	std::vector<ivec> sub_index;
+	for (const auto& sub : sub_models) sub_index.push_back(map_atoms(wavy_in, sub->wavy));
+	auto model_name = [&](const int m) { return (sub_models[m]->SALTED_DIR.filename() / sub_models[m]->get_salted_filename()).string(); };
+	ivec element_model(118, -1);
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int Z = wavy_in.get_atom_charge(a) - 1;
+		if (element_model[Z] >= 0) continue;
+		auto rank = [&](const int m) { const int Zf = salted_element_file_Z(sub_models[m]->get_salted_filename()); return Zf == Z + 1 ? 0 : Zf == 0 ? 1 : 2; };
+		for (int m = 0; m < (int)sub_models.size(); m++)
+			if (sub_index[m][a] >= 0 && (element_model[Z] < 0 || rank(m) < rank(element_model[Z]))) element_model[Z] = m;
+	}
+
+	wavy = wavy_in;
+	wavy.set_has_ECPs(false, false, 0);
+	for (int a = 0; a < wavy.get_ncen(); a++) wavy.set_atom_ECP_electrons(a, 0);
+	atom_model.assign(wavy_in.get_ncen(), -1);
+	atom_in_model.assign(wavy_in.get_ncen(), -1);
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int m = element_model[wavy_in.get_atom_charge(a) - 1];
+		// A model that dropped this atom for having no environment cannot predict it.
+		if (m < 0 || sub_index[m][a] < 0) continue;
+		atom_model[a] = m;
+		atom_in_model[a] = sub_index[m][a];
+	}
+
+	// First shell: an element model trained on X and the lead species of its molecules has seen those atoms next
+	// to X, which the lead model never did. An atom bonded to an atom of such a model's element (d < 1.3 (r_a + r_b),
+	// the CSD covalent radii b2c bonds with) comes from that model, and bonded to the elements of two models it is
+	// their mean weighted by 1/x^2, x = d / (r_a + r_b) to that model's nearest atom: the shorter bond, relative to the
+	// radii, counts more. Only where the model predicts the atom at all (one trained on X alone does not) and in the
+	// basis its element already has here: the merged basis is one per element.
+	// ponytail: exponent 2 is a guess, fit it on mixed-metal holdouts once there are enough of them
+	auto same_basis = [&](const int m1, const int m2, const int Z) {
+		const auto p1 = (*sub_models[m1]->get_model_basis())[Z], p2 = (*sub_models[m2]->get_model_basis())[Z];
+		return std::equal(p1.begin(), p1.end(), p2.begin(), p2.end(), [](const SimplePrimitive& x, const SimplePrimitive& y) {
+			return x.type == y.type && x.exp == y.exp && x.coefficient == y.coefficient; });
+	};
+	auto radius = [](const int Z) { return Z < 114 ? constants::covalent_radii[Z] : 1.5; };
+	atom_also.assign(wavy_in.get_ncen(), {});
+	ivec n_shell(sub_models.size(), 0);
+	int n_mean = 0;
+	std::set<std::pair<int, int>> other_basis;
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int Za = wavy_in.get_atom_charge(a), own = atom_model[a];
+		if (own < 0) continue;
+		std::vector<std::pair<int, double>> shell;  // model, x to its nearest atom
+		for (int b = 0; b < wavy_in.get_ncen(); b++)
+		{
+			const int Zb = wavy_in.get_atom_charge(b), m = element_model[Zb - 1];
+			if (m < 0 || m == own || sub_index[m][a] < 0) continue;
+			const double x = array_length(wavy_in.get_atom_pos(a), wavy_in.get_atom_pos(b)) / constants::ang2bohr(radius(Za) + radius(Zb));
+			// Below half the radius sum b is no bond partner but a co-sited atom (EXYZ, EADP mixed sites) or another
+			// disorder part: x = 0 made the weight 1/x^2 infinite and the mean NaN, and it handed a to b's model.
+			if (x > 1.3 || x < 0.5) continue;
+			if (!same_basis(m, own, Za - 1)) { other_basis.insert({ m, Za }); continue; }
+			auto it = std::find_if(shell.begin(), shell.end(), [m](const auto& s) { return s.first == m; });
+			if (it == shell.end()) shell.push_back({ m, x });
+			else it->second = std::min(it->second, x);
+		}
+		if (shell.empty()) continue;
+		atom_model[a] = shell[0].first;
+		atom_in_model[a] = sub_index[shell[0].first][a];
+		if (shell.size() > 1)
+			for (const auto& [m, x] : shell) atom_also[a].push_back({ m, sub_index[m][a], 1.0 / (x * x) });
+		for (const auto& s : shell) n_shell[s.first]++;
+		n_mean += shell.size() > 1;
+	}
+	// The alternatives of an atom: the files of its model's element (the leads, for a lead) in the other subgroups,
+	// in the basis and core its element has here. merge_predictions gives it to the one it resembles most.
+	atom_alt.assign(wavy_in.get_ncen(), {});
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int own = atom_model[a];
+		if (own < 0 || !atom_also[a].empty()) continue;
+		const int Zf = salted_element_file_Z(sub_models[own]->get_salted_filename());
+		for (int m = 0; m < (int)sub_models.size(); m++)
+			if (sub_index[m][a] >= 0 && salted_element_file_Z(sub_models[m]->get_salted_filename()) == Zf && same_basis(m, own, wavy_in.get_atom_charge(a) - 1)
+				&& sub_models[m]->config.ecp_mode == sub_models[own]->config.ecp_mode)
+				atom_alt[a].push_back({ m, sub_index[m][a] });
+		if (atom_alt[a].size() < 2) atom_alt[a].clear();
+	}
+
+	for (int m = 0; m < (int)sub_models.size(); m++)
+	{
+		svec elements;
+		int n = 0;
+		for (int Z = 0; Z < 118; Z++)
+			if (element_model[Z] == m) elements.push_back(constants::atnr2letter(Z + 1));
+		for (int a = 0; a < wavy_in.get_ncen(); a++)
+			if (atom_model[a] == m && element_model[wavy_in.get_atom_charge(a) - 1] == m) n++;
+		std::cout << "Model " << model_name(m) << " predicts " << n << " atom(s): ";
+		for (const auto& e : elements) std::cout << e << " ";
+		if (n_shell[m] > 0) std::cout << "+ " << n_shell[m] << " first-shell atom(s)";
+		std::cout << std::endl;
+	}
+	if (n_mean > 0)
+		std::cout << n_mean << " first-shell atom(s) are bonded to the elements of two or more models and take their mean, weighted by 1/(d/(r_a + r_b))^2." << std::endl;
+	for (const auto& [m, Z] : other_basis)
+		std::cout << "Model " << model_name(m) << " has its own basis for " << constants::atnr2letter(Z)
+				  << ", so its first-shell " << constants::atnr2letter(Z) << " atoms stay with the model that owns the element." << std::endl;
+
+	// Only an atom that no model handles goes to the spherical fill.
+	std::vector<char> use_thakkar(wavy_in.get_ncen(), 0);
+	int n_uncovered = 0;
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+		if (atom_model[a] < 0) { use_thakkar[a] = 1; ++n_uncovered; }
+	if (n_uncovered > 0)
+	{
+		std::cout << "No model predicts " << n_uncovered
+			<< " atom(s); they are filled with spherical Thakkar densities." << std::endl;
+		spherical_fill_used = true;
+		opt_in.needs_Thakkar_fill = true;
+		opt_in.spherical_fill_charges.clear();
+		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
+		for (int a = wavy_in.get_ncen() - 1; a >= 0; a--)
+			if (use_thakkar[a])
+			{
+				wavy.erase_atom(a);
+				atom_model.erase(atom_model.begin() + a);
+				atom_in_model.erase(atom_in_model.begin() + a);
+				atom_also.erase(atom_also.begin() + a);
+				atom_alt.erase(atom_alt.begin() + a);
+			}
+	}
+
+	// Each atom has the core of the model that predicts it (none for an all-electron one)
+	int ecp_mode = 0;
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		const SALTEDPredictor& sub = *sub_models[atom_model[a]];
+		if (sub.config.ecp_mode == 0) continue;
+		err_checkf(ecp_mode == 0 || ecp_mode == sub.config.ecp_mode,
+			"The models of this folder were trained with different ECPs", std::cout);
+		ecp_mode = sub.config.ecp_mode;
+		wavy.set_atom_ECP_electrons(a, sub.wavy.get_atom_ECP_electrons(atom_in_model[a]));
+	}
+	if (ecp_mode > 0) wavy.set_has_ECPs(true, false, ecp_mode);
+
+	natoms = wavy.get_ncen();
+	if (wavy.get_nmo() != 0) wavy.clear_MOs();
+	wavy.delete_basis_set();
+
+	// Each element keeps the basis of the model that predicts it; anything else
+	// would read that model's coefficients with the wrong radial functions.
+	auto merged = std::make_shared<BasisSet>();
+	std::string name;
+	for (int Z = 0; Z < 118; Z++)
+	{
+		const int m = element_model[Z];
+		if (m < 0) continue;
+		const std::span<const SimplePrimitive> prims = (*sub_models[m]->get_model_basis())[Z];
+		if (prims.empty()) continue;
+		merged->set_count_for_element(Z, (int)prims.size());
+		for (const auto& p : prims) merged->add_owned_primitive(p);
+	}
+	for (const auto& sub : sub_models)
+		name += (name.empty() ? "" : "_plus_") + sub->get_dfbasis_name();
+	merged->set_name(name);
+	load_basis_into_WFN(wavy, merged);
+	model_basis = merged;
+	bbasis_set_loaded = true;
+	config.dfbasis = name;
+	for (const auto& sub : sub_models)
+		config.salted_filename += (config.salted_filename.empty() ? "" : "+")
+			+ sub->get_salted_filename().string();
+}
+
+vec SALTEDPredictor::merge_predictions()
+{
+	const int nm = (int)sub_models.size();
+	// The l = 0 similarity of the alternatives first, on their atoms only: the pick decides what is predicted
+	std::vector<ivec> at(nm);
+	for (const auto& alt : atom_alt)
+		for (const auto& c : alt) at[c.first].push_back(c.second);
+	// the l = 0 blocks the score reads are kept for the prediction, which takes them once (unless a run's store holds them)
+	std::vector<std::shared_ptr<SALTED_model_store>> score_store(nm);
+	for (int m = 0; m < nm; m++)
+	{
+		if (at[m].empty()) continue;
+		std::sort(at[m].begin(), at[m].end());
+		at[m].erase(std::unique(at[m].begin(), at[m].end()), at[m].end());
+		auto& sub = *sub_models[m];
+		if (sub.store.expired()) sub.store = score_store[m] = std::make_shared<SALTED_model_store>();
+		sub.centres = at[m];
+		sub.score_only = true;
+		sub.setup_atomic_environment();
+		sub.read_model_data();
+		sub.predict();
+		sub.shrink_intermediate_vectors();
+		sub.score_only = false;
+		if (score_store[m]) score_store[m]->keep = false;
+	}
+	// Subgroups: an atom goes to the alternative whose reference environments it is closest to, the default on a tie
+	// ponytail: cosines of models with different rcut/sig/neighspe are compared as they are; rescale per model if that biases the pick
+	ivec moved(sub_models.size(), 0);
+	vec s_new(sub_models.size(), 0.0), s_old(sub_models.size(), 0.0);
+	auto score = [&](const std::pair<int, int>& c) {
+		const vec& s = sub_models[c.first]->env_score;
+		return c.second < (int)s.size() ? s[c.second] : -1.0;
+	};
+	for (int a = 0; a < (int)atom_alt.size(); a++)
+	{
+		if (atom_alt[a].empty()) continue;
+		const std::pair<int, int> own{ atom_model[a], atom_in_model[a] };
+		std::pair<int, int> best = own;
+		for (const auto& c : atom_alt[a])
+			if (score(c) > score(best)) best = c;
+		if (best == own) continue;
+		moved[best.first]++;
+		s_new[best.first] += score(best);
+		s_old[best.first] += score(own);
+		atom_model[a] = best.first;
+		atom_in_model[a] = best.second;
+	}
+	for (int m = 0; m < (int)sub_models.size(); m++)
+		if (moved[m] > 0)
+			std::cout << "SOAP similarity: " << moved[m] << " atom(s) to " << (sub_models[m]->SALTED_DIR.filename() / sub_models[m]->get_salted_filename()).string()
+					  << " (closest reference " << s_new[m] / moved[m] << " vs " << s_old[m] / moved[m] << " in the default)" << std::endl;
+	// Each model predicts the atoms it keeps, all of its structure as neighbours; one that keeps all runs as before
+	std::vector<ivec> need(nm);
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		need[atom_model[a]].push_back(atom_in_model[a]);
+		for (const auto& [m2, p2, w] : atom_also[a]) need[m2].push_back(p2);
+	}
+	std::vector<vec> parts(nm);
+	std::vector<ivec> offsets(nm);
+	for (int m = 0; m < nm; m++)
+	{
+		if (need[m].empty()) continue;
+		std::sort(need[m].begin(), need[m].end());
+		need[m].erase(std::unique(need[m].begin(), need[m].end()), need[m].end());
+		auto& sub = sub_models[m];
+		sub->centres = (int)need[m].size() == sub->wavy.get_ncen() ? ivec() : need[m];
+		parts[m] = sub->gen_SALTED_densities();
+		offsets[m] = coef_offsets(sub->wavy);
+		err_checkf(parts[m].size() == (size_t)offsets[m].back(),
+			"Model " + sub->get_salted_filename().string() + " predicted " + std::to_string(parts[m].size())
+			+ " coefficients for a basis of " + std::to_string(offsets[m].back()) + " - model and basis do not belong together", std::cout);
+	}
+	vec coefs;
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		const int m = atom_model[a], p = atom_in_model[a];
+		err_checkf(offsets[m][p + 1] <= (int)parts[m].size(),
+			"Predicted coefficients are shorter than the basis of " + sub_models[m]->get_salted_filename().string(), std::cout);
+		const size_t first = coefs.size();
+		coefs.insert(coefs.end(), parts[m].begin() + offsets[m][p], parts[m].begin() + offsets[m][p + 1]);
+		// A first-shell atom of several models: same basis (build_merged), so the blocks add element by element
+		if (atom_also[a].empty()) continue;
+		double wsum = 0.0;
+		std::fill(coefs.begin() + first, coefs.end(), 0.0);
+		for (const auto& [m2, p2, w] : atom_also[a])
+		{
+			for (size_t i = first; i < coefs.size(); i++) coefs[i] += w * parts[m2][offsets[m2][p2] + (i - first)];
+			wsum += w;
+		}
+		for (size_t i = first; i < coefs.size(); i++) coefs[i] /= wsum;
+	}
+	const ivec merged_offsets = coef_offsets(wavy);
+	err_checkf(coefs.size() == (size_t)merged_offsets.back(),
+		"Stitched coefficients do not fit the combined basis", std::cout);
+
+	return coefs;
+}
+
+std::vector<salted_novelty> SALTEDPredictor::kernel_novelty(const WFN& full, const double eigcut, const bool eig)
+{
+	auto pass = [eigcut, eig](SALTEDPredictor& p, const ivec& c) {
+		const ivec c0 = p.centres;
+		const double e0 = p.novelty_eigcut;
+		p.centres = c;
+		p.score_only = true;
+		p.novelty_eigcut = eigcut;
+		p.novelty_eig = eig;
+		p.setup_atomic_environment();
+		p.read_model_data();
+		err_checkf(!p.env_folded, (p.SALTED_DIR / p.config.salted_filename).string()
+			+ " keeps no reference features (ENVW, folded at zeta = 1): the novelty needs FEATS or FEATL, take the unfolded model", std::cout);
+		const int n = p.wavy.get_ncen();
+		p.kmax0.assign(n, NAN);
+		p.self0.assign(n, NAN);
+		p.nov0.assign(n, NAN);
+		p.nearest0.assign(n, -1);
+		p.split0.assign(n, {});
+		p.absent0.assign(n, {});
+		p.unrep0.assign(n, {});
+		p.unrep_model0.clear();
+		p.path0.clear();
+		p.predict();
+		p.shrink_intermediate_vectors();
+		p.score_only = false;
+		p.centres = c0;
+		p.novelty_eigcut = e0;
+		p.novelty_eig = false;
+	};
+	// (model, index there, role) per atom of wavy, model -1 for this one
+	std::vector<std::vector<std::tuple<int, int, std::string>>> cand(wavy.get_ncen());
+	if (sub_models.empty())
+	{
+		pass(*this, {});
+		for (int a = 0; a < wavy.get_ncen(); a++) cand[a].push_back({ -1, a, "assigned" });
+	}
+	else
+	{
+		std::vector<ivec> need(sub_models.size());
+		for (int a = 0; a < wavy.get_ncen(); a++)
+		{
+			need[atom_model[a]].push_back(atom_in_model[a]);
+			for (const auto& [m, p, w] : atom_also[a]) need[m].push_back(p);
+			for (const auto& [m, p] : atom_alt[a]) need[m].push_back(p);
+		}
+		for (int m = 0; m < (int)sub_models.size(); m++)
+		{
+			if (need[m].empty()) continue;
+			std::sort(need[m].begin(), need[m].end());
+			need[m].erase(std::unique(need[m].begin(), need[m].end()), need[m].end());
+			pass(*sub_models[m], need[m]);
+		}
+		for (int a = 0; a < wavy.get_ncen(); a++)
+		{
+			// assigned as merge_predictions picks: the alternative with the closest reference, the default on a tie
+			std::pair<int, int> own{ atom_model[a], atom_in_model[a] };
+			for (const auto& c : atom_alt[a])
+				if (sub_models[c.first]->env_score[c.second] > sub_models[own.first]->env_score[own.second]) own = c;
+			cand[a].push_back({ own.first, own.second, "assigned" });
+			for (const auto& [m, p, w] : atom_also[a])
+				if (std::make_pair(m, p) != own) cand[a].push_back({ m, p, "shared" });
+			for (const auto& c : atom_alt[a])
+				if (c != own) cand[a].push_back({ c.first, c.second, "alternative" });
+		}
+	}
+	const ivec idx = map_atoms(full, wavy);
+	// the filter hands an atom of a model's element with nothing within rcut to the fill too
+	auto known = [this](const std::string& e) {
+		if (sub_models.empty()) return std::find(config.species.begin(), config.species.end(), e) != config.species.end();
+		for (const auto& s : sub_models)
+			if (std::find(s->config.species.begin(), s->config.species.end(), e) != s->config.species.end()) return true;
+		return false;
+	};
+	std::vector<salted_novelty> rows;
+	for (int a = 0; a < full.get_ncen(); a++)
+	{
+		salted_novelty r;
+		r.atom = a;
+		r.label = full.get_atom_label(a);
+		r.element = constants::atnr2letter(full.get_atom_charge(a));
+		if (idx[a] < 0) { r.status = known(r.element) ? "empty environment" : "filled"; rows.push_back(r); continue; }
+		for (const auto& [m, p, role] : cand[idx[a]])
+		{
+			const SALTEDPredictor& s = m < 0 ? *this : *sub_models[m];
+			r.model = (s.SALTED_DIR / s.config.salted_filename).generic_string();
+			r.role = role;
+			r.kmax0 = s.kmax0[p];
+			r.cosine = s.env_score[p];
+			r.nearest = s.nearest0[p];
+			r.self = s.self0[p];
+			r.nov0 = s.nov0[p];
+			r.zeta = s.config.zeta;
+			r.split = s.split0[p];
+			r.absent = s.absent0[p];
+			r.unrepresented = s.unrep0[p];
+			r.model_unrepresented = s.unrep_model0;
+			if (s.path0.count(r.element)) r.path = s.path0.at(r.element);
+			r.status = r.self == 0.0 ? "empty environment" : std::isnan(r.nov0) ? "not computable" : "ok";
+			rows.push_back(r);
+		}
+	}
+	return rows;
+}
+
+std::vector<salted_novelty> salted_distance(const std::filesystem::path& model, const std::filesystem::path& xyz, const double eigcut, options& opt)
+{
+	WFN wavy(xyz);
+	opt.salted_model_dirs.clear();
+	opt.salted_model_dir = model;
+	SALTEDPredictor SP(wavy, opt);
+	const std::vector<salted_novelty> rows = SP.kernel_novelty(wavy, eigcut);
+	std::ostream& log = opt.log_file;
+	auto name = [](const std::string& m) { const std::filesystem::path p(m); return m.empty() ? std::string("-") : (p.parent_path().filename() / p.filename()).generic_string(); };
+	auto num = [](const double x) { std::ostringstream s; if (std::isnan(x)) s << "-"; else s << std::fixed << std::setprecision(6) << x; return s.str(); };
+	log << "SALTED kernel novelty at lambda = 0, eigcut " << eigcut << ": nov0 is 0 inside the span of the model's reference environments and 1 outside it\n"
+		<< std::left << std::setw(6) << "Atom" << std::setw(8) << "Label" << std::setw(4) << "El" << std::setw(32) << "Model" << std::setw(12) << "Role"
+		<< std::right << std::setw(10) << "kmax0" << std::setw(10) << "cosine" << std::setw(10) << "nov0" << "  status\n";
+	//two significant digits below 10, integers above
+	auto sig = [](const double v) { std::ostringstream s; if (v >= 9.95) s << std::llround(v); else if (v < 0.01) s << "<0.01"; else s << std::setprecision(2) << v; return s.str(); };
+	//v: name -> (share of the descriptor, share of nov0). The two the atom has whose fraction of nov0 exceeds their share of the
+	//descriptor most, the rest of those it has, then the ones it has nothing of (missing), as percentages of nov0
+	auto ranked = [&sig](const std::map<std::string, std::pair<double, double>>& v, const double nov, const svec& absent, const std::string& rest, const std::string& missing) {
+		std::vector<std::pair<double, std::string>> h, m;
+		for (const auto& [c, x] : v)
+			if (x.first > 0.0) h.push_back({ x.second / nov - x.first, c });
+			else if (x.second > 0.0) m.push_back({ x.second / nov, c });
+		std::sort(h.rbegin(), h.rend());
+		std::sort(m.rbegin(), m.rend());
+		std::ostringstream s;
+		int k = 0;
+		double o = 0.0, q = 0.0;
+		while (k < 2 && k < (int)h.size() && h[k].first > 0.0) k++;
+		for (int i = 0; i < (int)h.size(); i++)
+		{
+			const auto& x = v.at(h[i].second);
+			if (i >= k) o += x.second / nov;
+			else s << (i ? ", " : "") << h[i].second << " " << sig(100.0 * x.second / nov) << (i ? " % (" : " % of nov0 (") << sig(100.0 * x.first)
+				<< (i ? " %, " : " % of the descriptor, ") << sig(x.second / nov / x.first) << "x"
+				<< (std::find(absent.begin(), absent.end(), h[i].second) != absent.end() ? ", absent)" : ")");
+		}
+		if (k < (int)h.size()) s << (k ? ", its other " : "its ") << rest << " " << sig(100.0 * o) << " %";
+		for (int i = 0; i < (int)m.size(); i++)
+			if (i < 2) s << (i ? ", " : "; " + missing + ": ") << m[i].second << " " << sig(100.0 * m[i].first) << " %";
+			else q += m[i].first;
+		if (m.size() > 2) s << ", others " << sig(100.0 * q) << " %";
+		return s.str();
+	};
+	//element shares of the descriptor and of nov0: channel (e, e) counts to e, (e, f) half to each
+	auto elements = [](const salted_novelty& r) {
+		std::map<std::string, std::pair<double, double>> s;
+		for (const auto& [c, v] : r.split)
+			for (const std::string& e : { c.substr(0, c.find('-')), c.substr(c.find('-') + 1) })
+			{
+				s[e].first += 0.5 * v.first;
+				s[e].second += 0.5 * v.second;
+			}
+		return s;
+	};
+	std::set<std::string> no_split;
+	for (const auto& r : rows)
+	{
+		log << std::left << std::setw(6) << r.atom + 1 << std::setw(8) << r.label << std::setw(4) << r.element << std::setw(32) << name(r.model)
+			<< std::setw(12) << (r.role.empty() ? "-" : r.role) << std::right << std::setw(10) << num(r.kmax0) << std::setw(10) << num(r.cosine)
+			<< std::setw(10) << num(r.nov0) << "  " << r.status << "\n";
+		if (r.status == "ok" && !(r.zeta >= 1.0 && r.zeta == std::floor(r.zeta))) no_split.insert(name(r.model) + " (zeta " + std::to_string(r.zeta) + ")");
+		if (r.split.empty() || !(r.nov0 > 1e-6)) continue;
+		log << "      from: " << ranked(r.split, r.nov0, r.absent, "channels", "missing neighbours") << "\n"
+			<< "      elements: " << ranked(elements(r), r.nov0, {}, "elements", "missing") << "\n";
+	}
+	std::map<std::string, std::vector<std::pair<double, int>>> el;
+	for (int i = 0; i < (int)rows.size(); i++)
+		if (rows[i].role == "assigned" && rows[i].status == "ok") el[rows[i].element].push_back({ rows[i].nov0, i });
+	log << "nov0 per element, assigned models:\n";
+	for (auto& [e, v] : el)
+	{
+		std::sort(v.begin(), v.end());
+		const size_t n = v.size();
+		const double med = n % 2 ? v[n / 2].first : 0.5 * (v[n / 2 - 1].first + v[n / 2].first);
+		const salted_novelty& top = rows[v.back().second];
+		log << "  " << std::left << std::setw(3) << e << "n = " << n << ", median " << num(med) << ", max " << num(top.nov0)
+			<< " (atom " << top.atom + 1 << ", " << top.label << ")\n";
+	}
+	for (const auto& m : no_split) log << "Channel split not available for " << m << ": its shares are sums of squares only for integer zeta\n";
+	//the channels f lists for the assigned rows, per element and channel with their atoms
+	auto channels = [&log, &rows](const std::string& title, svec salted_novelty::* f, const bool none) {
+		std::map<std::string, std::map<std::string, ivec>> by;
+		for (const auto& r : rows)
+			if (r.role == "assigned")
+				for (const auto& c : r.*f) by[r.element][c].push_back(r.atom + 1);
+		if (by.empty() && !none) return;
+		log << title << (by.empty() ? " none" : "");
+		for (const auto& [e, cs] : by)
+		{
+			log << (e == by.begin()->first ? " " : "; ") << e << ":";
+			for (const auto& [c, at] : cs)
+			{
+				log << (c == cs.begin()->first ? " " : ", ") << c << " (atom" << (at.size() > 1 ? "s " : " ");
+				for (int i = 0; i < (int)at.size(); i++) log << (i ? ", " : "") << at[i];
+				log << ")";
+			}
+		}
+		log << "\n";
+	};
+	channels("Channels absent from the kept features of the model's references:", &salted_novelty::absent, true);
+	channels("Channels the model keeps no features for:", &salted_novelty::unrepresented, false);
+	const std::filesystem::path csv = xyz.stem().string() + "_salted_distance.csv";
+	std::ofstream o(csv);
+	o << "atom,label,element,model,role,kmax0,cosine,nov0,status,nearest,p0p0\n" << std::setprecision(12);
+	auto cell = [&o](const double x) { if (!std::isnan(x)) o << x; o << ","; };
+	for (const auto& r : rows)
+	{
+		o << r.atom + 1 << "," << r.label << "," << r.element << "," << std::quoted(r.model, '"', '"') << "," << r.role << ",";
+		cell(r.kmax0);
+		cell(r.cosine);
+		cell(r.nov0);
+		o << r.status << ",";
+		if (r.nearest >= 0) o << r.nearest;
+		o << ",";
+		if (!std::isnan(r.self)) o << r.self;
+		o << "\n";
+	}
+	nlohmann::ordered_json j{ { "model", model.generic_string() }, { "xyz", xyz.generic_string() }, { "eigcut", eigcut },
+		{ "models", nlohmann::ordered_json::object() }, { "atoms", nlohmann::ordered_json::array() } };
+	for (const auto& r : rows)
+	{
+		nlohmann::ordered_json a{ { "atom", r.atom + 1 }, { "label", r.label }, { "element", r.element }, { "model", r.model }, { "role", r.role },
+			{ "kmax0", r.kmax0 }, { "cosine", r.cosine }, { "nov0", r.nov0 }, { "status", r.status },
+			{ "nearest", r.nearest >= 0 ? nlohmann::ordered_json(r.nearest) : nlohmann::ordered_json() }, { "p0p0", r.self },
+			{ "channels", nlohmann::ordered_json::object() }, { "elements", nlohmann::ordered_json::object() }, { "absent", r.absent },
+			{ "unrepresented", r.unrepresented } };
+		//share: the channel's part of nov0 (the shares sum to nov0), fraction: share / nov0, environment: |p0_c|^2 / p0.p0,
+		//excess: fraction - environment (summing to 0), enrichment: fraction / environment
+		auto enrich = [](const double f, const double e) { return e > 0.0 ? nlohmann::ordered_json(f / e) : nlohmann::ordered_json(); };
+		for (const auto& [c, v] : r.split)
+			a["channels"][c] = { { "share", v.second }, { "fraction", v.second / r.nov0 }, { "environment", v.first },
+				{ "excess", v.second / r.nov0 - v.first }, { "enrichment", enrich(v.second / r.nov0, v.first) },
+				{ "absent", std::find(r.absent.begin(), r.absent.end(), c) != r.absent.end() } };
+		for (const auto& [e, v] : elements(r))
+			a["elements"][e] = { { "share", v.second }, { "fraction", v.second / r.nov0 }, { "environment", v.first },
+				{ "excess", v.second / r.nov0 - v.first }, { "enrichment", enrich(v.second / r.nov0, v.first) } };
+		if (!r.model.empty())
+		{
+			nlohmann::ordered_json& m = j["models"][r.model];
+			m["zeta"] = r.zeta;
+			m["split"] = r.zeta >= 1.0 && r.zeta == std::floor(r.zeta);
+			m["unrepresented"] = r.model_unrepresented;
+			if (!r.path.empty()) m["path"][r.element] = r.path;
+		}
+		j["atoms"].push_back(a);
+	}
+	const std::filesystem::path json = xyz.stem().string() + "_salted_distance.json";
+	std::ofstream(json) << j.dump(1, '\t') << "\n";
+	log << "Wrote " << csv.string() << " and " << json.string() << std::endl;
+	return rows;
+}
+
+/// predict() only wants C_n = psi w_n per (species, l), psi = K V with K the kernel between the structure's
+// descriptors p and the model's sparse features F. VERSION 4 folds the weights into the projector,
+// VW = V W^T (PROJW, nmax columns instead of Mcut), and the features in as well:
+//  zeta = 1:  K = p F^T, so psi W^T = p (VW^T F)^T. ENVW holds VW^T F, nmax x ncut, in place of FEATS and the
+//             projector; the kernel product of the run makes nmax columns, nothing else is left of the model.
+//  zeta != 1: above l = 0, K[(a,m),(M,m')] = k0(a,M) (p F^T)[(a,m),(M,m')] with k0 = (p0 F0^T)^(zeta - 1), so
+//             psi W^T[(a,m), n] = sum_f p[(a,m), f] H[a, n ncut + f] with H = k0 G and
+//             G[M, n ncut + f] = sum_m' VW[(M,m'), n] F[(M,m'), f].
+//             GENV holds G, Mspe x nmax ncut, from the lambda on where nmax <= 2l + 1, so it is never larger than
+//             the features it replaces and the kernel takes nmax / (2l + 1)^2 of the flops; FEATL and PROJW keep
+//             the lambdas below, l = 0 always (k0 is made from it). V6: features 524 -> 216 MB.
+// Input is an unfolded file or one with PROJW only. salted/pack_model.py writes the same blocks. The sums are plain loops and VW takes one BLAS thread (a
+// threaded GEMM sums in an order set by the thread count), so a file folds the same everywhere. The run ends here
+void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out)
+{
+	MKL_Set_Num_Threads(1);
+	SALTED_BINARY_FILE file(in);
+	err_checkf(file.has_block("FEATS"), in.string() + " is folded already", std::cout);
+	SALTEDConfig config;
+	file.populate_config(config);
+	const std::shared_ptr<BasisSet> basis = file.basis_set_defined() ? file.read_basis_set() : BasisSetLibrary::get_basis_set(config.dfbasis);
+	std::unordered_map<std::string, int> lmax, nmax;
+	SALTED_Utils::set_lmax_nmax(lmax, nmax, *basis, config.species);
+	const std::string proj_key = file.has_block("PROJW") ? "PROJW" : "PROJ";
+	const vec weights = proj_key == "PROJ" ? file.read_weights() : vec{};
+	const auto proj = file.index_lambda_based_data(proj_key);
+	const auto feat = file.index_lambda_based_data("FEATS");
+	const bool zeta1 = config.zeta == 1.0;
+
+	// Lambda-based blocks as SALTED writes them: datatype word, species count, then per species its tag,
+	// lambda count and one 2D dataset per lambda
+	std::string envw, genv, featl, projw;
+	auto put = [](std::string& b, const auto v) { b.append(reinterpret_cast<const char*>(&v), sizeof(v)); };
+	for (std::string* b : { &envw, &genv, &featl, &projw })
+	{
+		put(*b, int32_t(3));   // the datatype word; nothing reads it
+		put(*b, int32_t(0));   // species count, counted up below
+	}
+	auto species = [&put](std::string& b, std::string tag, const int nlam) {
+		int32_t n;
+		std::memcpy(&n, b.data() + sizeof(int32_t), sizeof(n));
+		n++;
+		std::memcpy(b.data() + sizeof(int32_t), &n, sizeof(n));
+		tag.resize(5, '\0');
+		b += tag;
+		put(b, int32_t(nlam));
+	};
+	auto matrix = [&put](std::string& b, const dMatrix2& m) {
+		put(b, int32_t(2));
+		put(b, uint32_t(m.extent(0)));
+		put(b, uint32_t(m.extent(1)));
+		if (m.extent(0) * m.extent(1) != 0)
+			b.append(reinterpret_cast<const char*>(m.data()), m.extent(0) * m.extent(1) * sizeof(double));
+	};
+	std::string report;
+	size_t isize = 0;
+	for (const std::string& spe : config.species)
+	{
+		int nlam = 0;
+		while (nlam < lmax.at(spe) + 1)
+		{
+			const auto it = proj.find(spe + std::to_string(nlam));
+			if (it == proj.end() || it->second.cols == 0) break;
+			nlam++;
+		}
+		if (nlam == 0) continue;
+		// G from lambda L on; nmax falls and 2l + 1 grows with l, so this is where it starts to fit
+		int L = nlam;
+		while (!zeta1 && L > 1 && nmax.at(spe + std::to_string(L - 1)) <= 2 * L - 1) L--;
+		if (zeta1)
+			species(envw, spe, nlam);
+		else
+		{
+			species(genv, spe, nlam);
+			species(featl, spe, L);
+			species(projw, spe, L);
+			report += " " + spe + (L < nlam ? " l>=" + std::to_string(L) : " none");
+		}
+		for (int l = 0; l < nlam; l++)
+		{
+			const std::string key = spe + std::to_string(l);
+			dMatrix2 VW = file.load_block(proj.at(key));
+			if (proj_key == "PROJ")
+			{
+				err_checkf(isize + nmax.at(key) * VW.extent(1) <= weights.size(), "The weights end before the projectors of " + key, std::cout);
+				// nmax rows of V's width, n-major as the flat weights lie
+				dMatrix2 Wt(nmax.at(key), VW.extent(1));
+				std::copy_n(weights.data() + isize, Wt.extent(0) * Wt.extent(1), Wt.data());
+				isize += Wt.extent(0) * Wt.extent(1);
+				VW = dot(VW, Wt, false, true);
+			}
+			const auto ft = feat.find(key);
+			const size_t d = 2 * l + 1;
+			err_checkf(ft != feat.end() && ft->second.rows == VW.extent(0) && ft->second.rows % d == 0,
+				"The features of " + key + " do not fit its projector", std::cout);
+			const dMatrix2 F = file.load_block(ft->second);
+			const size_t nm = VW.extent(1), nc = F.extent(1), M = F.extent(0) / d;
+			if (zeta1)
+			{
+				dMatrix2 E(nm, nc);
+				for (size_t r = 0; r < F.extent(0); r++)
+					for (size_t n = 0; n < nm; n++)
+						for (size_t f = 0; f < nc; f++)
+							E(n, f) += VW(r, n) * F(r, f);
+				matrix(envw, E);
+			}
+			else if (l < L)
+			{
+				matrix(genv, dMatrix2{});
+				matrix(featl, F);
+				matrix(projw, VW);
+			}
+			else
+			{
+				dMatrix2 G(M, nm * nc);
+				for (size_t e = 0; e < M; e++)
+					for (size_t m = 0; m < d; m++)
+						for (size_t n = 0; n < nm; n++)
+							for (size_t f = 0; f < nc; f++)
+								G(e, n * nc + f) += VW(e * d + m, n) * F(e * d + m, f);
+				matrix(genv, G);
+			}
+		}
+	}
+	// As in read_model_data: weights left over mean nmax is not the trained basis'
+	err_checkf(proj_key != "PROJ" || isize == weights.size(), "The model's basis does not fit its weights (" + std::to_string(isize)
+		+ " used, " + std::to_string(weights.size()) + " stored): its BASIS block is not the set it was trained with", std::cout);
+	std::set<std::string> drop{ "FEATS", proj_key };
+	if (file.has_block("WEIGH")) drop.insert("WEIGH");   // in VW now
+	if (zeta1)
+		file.write_with_blocks(out, 4, drop, { { "ENVW", envw } });
+	else
+		file.write_with_blocks(out, 4, drop, { { "FEATL", featl }, { "PROJW", projw }, { "GENV", genv } });
+	std::cout << "Wrote " << out.string() << ": weights and features folded in, "
+			  << (zeta1 ? "zeta = 1, ENVW" : "GENV for" + report) << std::endl;
+}
+
+void calculateConjugate(SALTEDDescriptors& v2)
+{
+#pragma omp parallel for
+	for (int i = 0; i < static_cast<int>(v2.values().size()); ++i)
+	{
+		v2.values()[i] = std::conj(v2.values()[i]);
+	}
+}
+
+void SALTEDPredictor::setup_atomic_environment()
+{
+	SALTED_Utils::set_lmax_nmax(lmax, nmax, *get_model_basis(), config.species);
+
+	// The element from the nuclear charge, never the atom label: a .wfx names its atoms "O1", "H2", which
+	// matched no species and left nothing to predict. Deuterium is read with Z = 1 and so already arrives as H.
+	// The k-th species atom of the featomic system is atom k of wavy
+	atomic_symbols.clear();
+	atom_idx.clear();
+	natom_dict.clear();
+	std::vector<int32_t> sel;
+	for (int i = 0, k = 0; i < featomic_system.size(); i++)
+	{
+		const std::string label = constants::Labels[featomic_system.types()[i]];
+		if (std::find(config.species.begin(), config.species.end(), label) == config.species.end()) continue;
+		if (centres.empty() || std::binary_search(centres.begin(), centres.end(), k)) {
+			atomic_symbols.emplace_back(label);
+			if (!centres.empty()) sel.push_back(i);
+		}
+		k++;
+	}
+	// The atoms featomic makes a descriptor centre of; counted here, from the same symbols, so the two cannot disagree
+	natoms = static_cast<int>(atomic_symbols.size());
+
+	// Print all Atomic symbols
+	if (debug)
+	{
+		std::cout << "Atomic symbols: ";
+		for (const auto &symbol : atomic_symbols)
+		{
+			std::cout << symbol << " ";
+		}
+		std::cout << std::endl;
+	}
+
+	for (int i = 0; i < natoms; i++)
+	{
+		atom_idx[atomic_symbols[i]].push_back(i);
+		natom_dict[atomic_symbols[i]] += 1;
+	}
+
+
+	SALTED_Utils::FeatomicHyperParameters hp{
+		.cutoff_radius = config.rcut1,
+		.max_radial = config.nrad1,
+		.max_angular = config.nang1,
+		.atomic_gaussian_width = config.sig1,
+		.center_atom_weight = 1.0,
+		.species = config.species,
+		.neighspe = config.neighspe1,
+		.radial_basis = {
+			.type = "Gto",
+			.spline_accuracy = 1e-6
+		},
+		.cutoff_function = {
+			.type = "ShiftedCosine",
+			.width = 0.1
+		}
+	};
+
+	// RASCALINE (Generate descriptors)
+	const auto _t_desc = std::chrono::steady_clock::now();
+	v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp, sel);
+
+	if ((config.nrad2 != config.nrad1) || (config.nang2 != config.nang1) || (config.sig2 != config.sig1) || (config.rcut2 != config.rcut1) || (config.neighspe2 != config.neighspe1))
+	{
+		hp.max_radial = config.nrad2;
+		hp.max_angular = config.nang2;
+		hp.atomic_gaussian_width = config.sig2;
+		hp.cutoff_radius = config.rcut2;
+		hp.neighspe = config.neighspe2;
+		v2 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp, sel);
+	}
+	else
+	{
+		// Same hyperparameters: v2 would duplicate v1 exactly, so record that instead.
+		// equicomb then reads conj(v1); conjugation only flips the sign of the imaginary
+		// part, exact in IEEE, so the result is bit-identical
+		v2_is_conj_of_v1 = true;
+		v2.clear();
+	}
+
+	// Conjugate v2 once here rather than per use in equicomb; skipped when v2 is conj(v1)
+	if (ProgressBar::report_counts)
+		std::cout << "[stages] featomic descriptors "
+				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_desc).count()
+				  << " s" << std::endl;
+	if (!v2_is_conj_of_v1)
+		calculateConjugate(v2);
+	std::cout << "Descriptor sets " << (v2_is_conj_of_v1 ? "identical: sharing one copy"
+														: "differ: two copies held") << std::endl;
+	// END RASCALINE
+}
+
+
+void SALTEDPredictor::read_model_data() {
+	const auto _t_model = std::chrono::steady_clock::now();
+	const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
+	// Kept open for the whole prediction (and the run's later parts); the matrices are fetched lambda by lambda
+	const std::shared_ptr<SALTED_model_store> s = store.lock();
+	if (s) {
+		std::shared_ptr<SALTED_BINARY_FILE>& f = s->files[_SALTEDpath];
+		if (!f) f = std::make_shared<SALTED_BINARY_FILE>(_SALTEDpath);
+		model_file = f;
+	}
+	else model_file = std::make_shared<SALTED_BINARY_FILE>(_SALTEDpath);
+	SALTED_BINARY_FILE &file = *model_file;
+	file.readers = omp_get_max_threads();
+	const size_t dataset_bytes0 = file.dataset_bytes;
+	if (config.field) {
+		err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
+	}
+	env_folded = file.has_block("ENVW");
+	projector_folded = env_folded || file.has_block("PROJW");
+	if (!projector_folded) weights = file.read_weights();
+	wigner3j = file.read_wigners();
+
+	if (config.average) av_coefs = file.read_averages();
+	if (config.sparsify) vfps = file.read_fps();
+	eager_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_model).count();
+	eager_bytes += file.dataset_bytes - dataset_bytes0;
+
+
+	// Only present species need their model data; absent ones are needed for their
+	// shape alone, because `weights` is one flat vector laid out over every species
+	// the model knows and the absent widths in front shift a present species' offset
+	std::unordered_set<std::string> present;
+	for (const std::string &spe : config.species)
+		if (atom_idx.find(spe) != atom_idx.end()) present.insert(spe);
+
+	// Indexing only, no payload: offset and shape per (species, lambda). The matrices
+	// are read in read_model_lambda() and dropped again, each block used once per run
+	feat_index = file.index_lambda_based_data(env_folded ? "ENVW" : file.has_block("FEATL") ? "FEATL" : "FEATS");
+	if (!env_folded) proj_index = file.index_lambda_based_data(projector_folded ? "PROJW" : "PROJ");
+	if (file.has_block("GENV"))
+		for (const auto &[k, ref] : file.index_lambda_based_data("GENV"))
+			if (ref.rows != 0) g_index[k] = ref;   // 0 x 0 below the lambda G starts at
+	err_checkf(!(env_folded && config.zeta != 1.0) && !(!g_index.empty() && config.zeta == 1.0),
+		_SALTEDpath.string() + " was folded for another zeta than its CONFG names", std::cout);
+	model_species = present;
+	// A (species, l) without its blocks would leave its coefficients unset
+	for (const std::string &spe : present)
+		for (int l = 0; l < lmax[spe] + 1; ++l)
+		{
+			const std::string k = spe + std::to_string(l);
+			err_checkf(g_index.count(k) || (feat_index.count(k) && (env_folded || proj_index.count(k))),
+				_SALTEDpath.string() + " holds no features or projector for " + spe + " l = " + std::to_string(l), std::cout);
+		}
+
+	// From the shapes alone: Mspe, the number of sparse environments of a present
+	// species, and the projector width of every species the model knows
+	for (const auto &[k, ref] : proj_index)
+		proj_dims[k] = { ref.rows, ref.cols };
+	for (const std::string &spe : present)
+	{
+		const auto it = feat_index.find(spe + "0");
+		if (it != feat_index.end()) Mspe[spe] = static_cast<int>(it->second.rows);
+	}
+	// Where each present (species, l) starts in the flat weights, which run species, l, n over
+	// every species the model knows; predict() contracts psi_nm with that block
+	if (!projector_folded)
+	{
+		size_t isize = 0;
+		for (const std::string &spe : config.species)
+			for (int l = 0; l < lmax[spe] + 1; ++l)
+			{
+				const std::string k = spe + std::to_string(l);
+				const auto dim_it = proj_dims.find(k);
+				if (dim_it == proj_dims.end() || dim_it->second[1] == 0)
+				{
+					if (!present.count(spe))
+					{
+						std::cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2.\n";
+						std::cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!\n";
+					}
+					break;
+				}
+				if (present.count(spe)) weight_offset[k] = isize;
+				isize += dim_it->second[1] * nmax[k];
+			}
+		// The weights run over exactly these blocks; fewer means nmax is not the trained basis'
+		// (an uncontracted-trained model repacked with the contracted set: cc-pvtz-jkfit Br 16,14,12,10,7 vs 14,13,11,9,4)
+		err_checkf(isize == weights.size(), "The model's basis does not fit its weights (" + std::to_string(isize) + " used, "
+			+ std::to_string(weights.size()) + " stored): its BASIS block is not the set it was trained with", std::cout);
+	}
+
+	if (ProgressBar::report_counts)
+	{
+		auto mb = [](const size_t doubles) { return doubles * sizeof(double) / 1048576.0; };
+		size_t pes = 0, vm = 0, wg = 0;
+		std::map<int, size_t> per_lam;
+		for (const std::string &spe : present)
+			for (int lam = 0; lam < lmax[spe] + 1; lam++)
+			{
+				const std::string k = spe + std::to_string(lam);
+				const auto f = feat_index.find(k), pr = proj_index.find(k), g = g_index.find(k);
+				const size_t p = (g != g_index.end()) ? g->second.rows * g->second.cols
+								 : (f == feat_index.end()) ? 0 : f->second.rows * f->second.cols;
+				const size_t v = (pr == proj_index.end()) ? 0 : pr->second.rows * pr->second.cols;
+				pes += p; vm += v; per_lam[lam] += p + v;
+			}
+		for (const auto &[lam, w] : wigner3j) wg += w.size();
+		size_t worst = 0;
+		for (const auto &[lam, sz] : per_lam) worst = std::max(worst, sz);
+		std::cout << "[model] features " << mb(pes) << " MB + projectors " << mb(vm)
+				  << " MB + wigner " << mb(wg) << " MB + weights " << mb(weights.size())
+				  << " MB = " << mb(pes + vm + wg + weights.size()) << " MB if held whole;"
+				  << " lazily, the largest lambda is " << mb(worst) << " MB" << std::endl;
+		std::cout << "[model] indexed in "
+				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_model).count()
+				  << " s" << std::endl;
+		std::cout << "[model] per lambda:";
+		for (const auto &[lam, sz] : per_lam) std::cout << " l" << lam << "=" << mb(sz);
+		std::cout << " MB" << std::endl;
+	}
+}
+
+
+// Model matrices are loaded per lambda and dropped after use: nothing rereads them, the weight
+// offsets come from the projector shapes
+SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
+{
+	lambda_blocks out;
+	if (!model_file) return out;
+	const std::shared_ptr<SALTED_model_store> s = store.lock();
+	const std::filesystem::path path = SALTED_DIR / config.salted_filename;
+	std::vector<std::string> keys;
+	std::vector<SALTED_BINARY_FILE::block_ref> refs;   // projector, features per key
+	for (const std::string &spe : model_species)
+	{
+		if (lam > lmax.at(spe)) continue;
+		const std::string key = spe + std::to_string(lam);
+		const auto g = g_index.find(key);
+		const auto pr = proj_index.find(key);
+		const auto ft = feat_index.find(key);
+		// G and ENVW carry their projector; an empty ref reads as a 0 x 0 matrix
+		if (g == g_index.end() && (ft == feat_index.end() || (!env_folded && pr == proj_index.end()))) continue;
+		if (s) {
+			const auto held = s->blocks.find({ path, key });
+			if (held != s->blocks.end()) {
+				out.emplace_back(key, held->second.first, held->second.second);
+				if (!s->keep) s->blocks.erase(held);
+				continue;
+			}
+		}
+		keys.push_back(key);
+		refs.push_back(g != g_index.end() || env_folded ? SALTED_BINARY_FILE::block_ref{} : pr->second);
+		refs.push_back(g != g_index.end() ? g->second : ft->second);
+	}
+	std::vector<dMatrix2> blocks = model_file->load_blocks(refs);
+	for (std::size_t k = 0; k < keys.size(); k++)
+	{
+		const salted_block V = std::make_shared<const dMatrix2>(std::move(blocks[2 * k])), F = std::make_shared<const dMatrix2>(std::move(blocks[2 * k + 1]));
+		if (s && s->keep) s->blocks[{ path, keys[k] }] = { V, F };
+		out.emplace_back(keys[k], V, F);
+	}
+	return out;
+}
+
+void SALTEDPredictor::install_model_lambda(lambda_blocks blocks, const int lam)
+{
+	for (auto &[key, V, feats] : blocks)
+	{
+		if (power_env_sparse.find(key) != power_env_sparse.end()) continue;
+		Vmat[key] = V;
+		// ENVW has V^T F already, G is used as it is (predict)
+		if (config.zeta == 1.0 && V->extent(0) != 0)
+		{
+			if (lam == 0) ref0[key] = feats;   // the kernel itself is never formed at zeta = 1, env_score wants it
+			power_env_sparse[key] = std::make_shared<const dMatrix2>(dot(*V, *feats, true, false));
+		}
+		else
+			power_env_sparse[key] = feats;
+	}
+}
+
+void SALTEDPredictor::share_model(const std::shared_ptr<SALTED_model_store>& s)
+{
+	store = s;
+	for (auto& sub : sub_models) sub->share_model(s);
+}
+
+void SALTEDPredictor::free_model_lambda(const int lam)
+{
+	if (!model_file) return;
+	for (const std::string &spe : model_species)
+	{
+		const std::string key = spe + std::to_string(lam);
+		power_env_sparse.erase(key);
+		Vmat.erase(key);
+	}
+}
+
+vec SALTEDPredictor::predict()
+{
+	using namespace std;
+#ifdef NOSPHERA2_USE_GPU
+	struct salted_gpu_cache_scope {
+		salted_gpu_cache_scope() { salted_gpu_clear_cache(); }
+		~salted_gpu_cache_scope() { salted_gpu_clear_cache(); }
+	} gpu_cache_scope;
+#endif
+	const auto _t_predict_start = std::chrono::steady_clock::now();
+	auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
+	{ return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
+	double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_wait = 0.0, _t_model_install = 0.0;
+	// the file may be shared with earlier parts: this prediction's reads are what its counters gain
+	const double lazy_s0 = model_file->lazy_s;
+	const size_t lazy_bytes0 = model_file->lazy_bytes, lazy_blocks0 = model_file->lazy_blocks;
+	bool gpu_equicomb = false;
+#ifdef NOSPHERA2_USE_GPU
+	gpu_equicomb = equicomb_gpu_enabled() && salted_gpu_available();
+	//Context creation started with the run; the first kernel would otherwise pay for it
+	if (gpu_equicomb)
+		sf_gpu_warmup_wait();
+#endif
+	const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
+	// The (l1, l2) pairs and complex-to-real matrix of every lambda, which the norm wants up front
+	std::vector<ivec2> llvec_all(lmax_max + 1);
+	std::vector<cvec2> c2r_all(lmax_max + 1);
+	for (int lam = 0; lam <= lmax_max; lam++)
+	{
+		ivec2 llvec;
+		for (int l1 = 0; l1 < config.nang1 + 1; l1++)
+			for (int l2 = 0; l2 < config.nang2 + 1; l2++)
+				// keep only even combination to enforce inversion symmetry
+				if ((lam + l1 + l2) % 2 == 0 && abs(l2 - lam) <= l1 && l1 <= (l2 + lam))
+					llvec.push_back({ l1, l2 });
+		llvec_all[lam] = transpose<int>(llvec);
+		c2r_all[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+	}
+	// Every lambda's norm in one pass over the atoms, with no density matrices kept for all of
+	// them; the device takes them too. rel_power divides every lambda by the lambda = 0 length,
+	// so it needs that norm alone, for the dense path as well
+	const bool rel_power = config.normalisation == "rel_power";
+	vec2 norms;
+	if (config.sparsify || rel_power)
+	{
+		const auto _t_norm = std::chrono::steady_clock::now();
+		const int nlam = rel_power ? 1 : lmax_max + 1;
+		std::vector<const vec *> w3j_all(nlam);
+		for (int lam = 0; lam < nlam; lam++)
+			w3j_all[lam] = &wigner3j[lam];
+		// Positions of size L (Angstrom) are rounded to about eps L, which breaks a site symmetry by that much;
+		// features that vanish by it then carry a squared norm of about (eps L)^2 of the atom's total power
+		double L = 1.0;
+		for (size_t i = 0; i < 3 * featomic_system.size(); i++)
+			L = std::max(L, std::abs(featomic_system.positions()[i]));
+		const double noise = 100.0 * std::numeric_limits<double>::epsilon() * L;
+		norms = equicomb_norms(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, w3j_all,
+			std::vector<ivec2>(llvec_all.begin(), llvec_all.begin() + nlam), std::vector<cvec2>(c2r_all.begin(), c2r_all.begin() + nlam),
+			v2_is_conj_of_v1, noise * noise);
+		norms.resize(lmax_max + 1, norms[0]);
+		const double norm_s = _elapsed(_t_norm);
+		_t_equicomb += norm_s;
+		throughput::record_time("SALTED equicomb", false, 1000.0 * norm_s);
+		if (ProgressBar::report_counts)
+			std::cout << "[equicomb] norms of lambda 0.." << lmax_max << ": " << 1000.0 * norm_s << " ms" << std::endl;
+	}
+	// Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
+	ivec featsize(lmax_max + 1);
+	std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
+	for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
+		psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
+	// The only quantity that crosses lambda: set at lam = 0, reused above it when zeta != 1
+	std::vector<dMatrix2> kernell0(config.species.size());
+	env_score.assign(wavy.get_ncen(), -1.0);
+	// One output buffer for every lambda, sized for the largest: a fresh one per lambda is a serial
+	// zero fill of all of it, and the sparse equicomb writes every element it returns
+	vec p;
+	if (config.sparsify)
+	{
+		size_t n = 0;
+		for (int lam = 0; lam <= lmax_max; lam++)
+			n = std::max(n, (size_t)natoms * ((size_t)2 * lam + 1) * vfps[lam].size());
+		p.resize(n);
+	}
+	for (int lam = 0; lam <= lmax_max; lam++)
+	{
+		const auto _t_eq = std::chrono::steady_clock::now();
+		ivec2 &llvec_t = llvec_all[lam];
+		cvec2 &c2r = c2r_all[lam];
+		const int llmax = static_cast<int>(llvec_t[0].size());
+		featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
+		if (config.sparsify)
+		{
+			int nfps = static_cast<int>(vfps[lam].size());
+			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p, v2_is_conj_of_v1,
+				norms.empty() ? nullptr : norms[lam].data());
+			featsize[lam] = nfps;
+		}
+		else
+		{
+			p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
+			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1,
+				rel_power ? norms[lam].data() : nullptr);
+		}
+		_t_equicomb += _elapsed(_t_eq);
+		// Read in line by the OpenMP team, not beside the kernels: never more than -cpus threads busy
+		const auto _t_wait = std::chrono::steady_clock::now();
+		lambda_blocks blocks = read_model_lambda(lam);
+		_t_model_wait += _elapsed(_t_wait);
+		const auto _t_install = std::chrono::steady_clock::now();
+		install_model_lambda(std::move(blocks), lam);
+		_t_model_install += _elapsed(_t_install);
+		const auto _t_kn = std::chrono::steady_clock::now();
+#if defined(NSA2_OPENBLAS) && !defined(NSA2_ARMPL) && !defined(__ANDROID__)
+		// pch.h keeps a pthreads OpenBLAS serial, as it cannot see an enclosing OpenMP region
+		// (Android's OpenMP OpenBLAS keeps the count pch.h caps to cpu0's cluster, so not there).
+		// This loop is outside one (its parallel for calls no BLAS), so its GEMMs may take every core
+		struct blas_threads_scope {
+			explicit blas_threads_scope(const int n) { openblas_set_num_threads(n); }
+			~blas_threads_scope() { openblas_set_num_threads(1); }
+		} blas_threads(omp_get_max_threads());
+#endif
+		// Species-outer within the group, so a species keeps its sparse matrices hot
+		for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
+		{
+			const string spe = config.species[spe_idx];
+			if (atom_idx.find(spe) == atom_idx.end()) continue;
+			if (lam > lmax[spe]) continue;
+
+			int lam2_1 = 2 * lam + 1;
+			int row_size = featsize[lam] * lam2_1; // Size of a block of rows
+
+			dMatrix2 pvec_lam(atom_idx[spe].size() * lam2_1, featsize[lam]);
+			dMatrixRef2 _pvec(p.data(), natoms, featsize[lam] * lam2_1);
+			double* pvec_ptr = pvec_lam.data();
+			for (const int idx : atom_idx[spe])
+			{
+				auto _temp = Kokkos::submdspan(_pvec, idx, Kokkos::full_extent);
+				std::copy(_temp.data_handle(), _temp.data_handle() + row_size, pvec_ptr);
+				pvec_ptr += row_size;
+			}
+			const string key = spe + to_string(lam);
+			if (g_index.count(key))
+			{
+				// GENV (fold_salted_file): psi W^T[(a,m), n] = sum_f p[(a,m), f] H[a, n ncut + f] with H = k0 G,
+				// no kernel and no k0 scaling over (2l + 1)^2 blocks
+				const dMatrix2 H = dot(kernell0[spe_idx], *power_env_sparse[key], false, false);
+				const size_t nm = nmax[key], nc = featsize[lam];
+				err_checkf(H.extent(1) == nm * nc, "The GENV block of " + key + " does not fit the descriptors", std::cout);
+				dMatrix2 psi(pvec_lam.extent(0), nm);
+#pragma omp parallel for
+				for (int r = 0; r < (int)psi.extent(0); r++)
+				{
+					const size_t a = r / lam2_1;
+					for (size_t n = 0; n < nm; n++)
+					{
+						double s = 0.0;
+						for (size_t f = 0; f < nc; f++) s += pvec_lam(r, f) * H(a, n * nc + f);
+						psi(r, n) = s;
+					}
+				}
+				psi_nm[spe_idx][lam] = std::move(psi);
+				continue;
+			}
+			//The regression GEMM stays on the CPU: the device barely wins, because fp64 runs
+			//at a sixty-fourth rate on a consumer part and each call ships its own operands.
+			//It would pay on a datacentre part.
+			dMatrix2 kernel_nm = dot(pvec_lam, *power_env_sparse[spe + to_string(lam)], false, true);
+			if (lam == 0)
+			{
+				// Each atom's closest reference environment as a cosine in the sparsified feature space (the stored
+				// norms are those of the full one), so models with different FPS selections compare
+				const dMatrix2 k1 = config.zeta == 1 && ref0.count(key) ? dot(pvec_lam, *ref0[key], false, true) : dMatrix2();
+				const dMatrix2& k = config.zeta == 1 ? k1 : kernel_nm;
+				const dMatrix2& R = config.zeta != 1 ? *power_env_sparse[key] : ref0.count(key) ? *ref0[key] : k1;
+				auto norm = [](const dMatrix2& A, const int r) { double s = 0.0; for (int f = 0; f < (int)A.extent(1); f++) s += A(r, f) * A(r, f); return std::sqrt(s); };
+				vec rn(k.extent(1));
+				for (int j = 0; j < (int)k.extent(1); j++) rn[j] = norm(R, j);
+				for (int i = 0; i < (int)k.extent(0); i++)
+				{
+					double s = -1.0;
+					const double pn = norm(pvec_lam, i);
+					for (int j = 0; j < (int)k.extent(1); j++) s = std::max(s, k(i, j) / (pn * rn[j] + 1e-300));
+					env_score[centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]]] = s;
+				}
+				if (novelty_eigcut >= 0.0 && R.extent(0) > 0)
+				{
+					// K_MM = (F0 F0^T)^zeta = U diag(e) U^T, V = U diag(e)^-1/2 over e > eigcut: V V^T is its pseudo-inverse and
+					// |k0^zeta V|^2 the part of the atom's own kernel (p0.p0)^zeta the references span
+					const auto _t_eig = std::chrono::steady_clock::now();
+					const int M = (int)R.extent(0);
+					dMatrix2 RR = dot(R, R, false, true), kz = k;
+					const dMatrix2 K = elementWiseExponentiation(RR, config.zeta);
+					// every e > eigcut exactly when K_MM - eigcut I is positive definite; then V V^T = K_MM^-1 and
+					// |k0^zeta V|^2 = k0^zeta K_MM^-1 k0^zeta from the Cholesky factor of K_MM
+					vec U(K.data(), K.data() + (size_t)M * M), e(M), y;
+					for (int j = 0; j < M; j++) U[(size_t)j * (M + 1)] -= novelty_eigcut;
+					bool chol = !novelty_eig && cholesky_factor(U, M) == 0;
+					U.assign(K.data(), K.data() + (size_t)M * M);
+					if (chol) chol = cholesky_factor(U, M) == 0;
+					const bool ok = chol || try_make_Eigenvalues(U, e);
+					int r = 0;
+					for (int j = 0; j < M; j++) r += ok && (chol || e[j] > novelty_eigcut);
+					dMatrix2 V(M, chol ? 0 : r);
+					for (int c = 0; c < (int)V.extent(1); c++)
+						for (int j = 0; j < M; j++) V(j, c) = U[(size_t)j * M + M - r + c] / std::sqrt(e[M - r + c]);
+					const double eig_s = _elapsed(_t_eig);
+					const auto _t_psi = std::chrono::steady_clock::now();
+					kz = elementWiseExponentiation(kz, config.zeta);
+					if (chol)
+					{
+						// the rows of k0^zeta are the right-hand sides one after another
+						y.assign(kz.data(), kz.data() + kz.extent(0) * M);
+						cholesky_solve(U, M, y, kz.extent(0));
+					}
+					const dMatrix2 psi = V.extent(1) > 0 ? dot(kz, V, false, false) : dMatrix2(k.extent(0), 0);
+					for (int i = 0; i < (int)k.extent(0); i++)
+					{
+						const int a = centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]];
+						double pp = 0.0, q = 0.0;
+						int j0 = 0;
+						for (int f = 0; f < (int)pvec_lam.extent(1); f++) pp += pvec_lam(i, f) * pvec_lam(i, f);
+						for (int c = 0; c < (int)psi.extent(1); c++) q += psi(i, c) * psi(i, c);
+						if (chol) for (int j = 0; j < M; j++) q += kz(i, j) * y[(size_t)i * M + j];
+						for (int j = 1; j < M; j++) if (k(i, j) > k(i, j0)) j0 = j;
+						kmax0[a] = k(i, j0);
+						nearest0[a] = j0;
+						self0[a] = pp;
+						nov0[a] = ok && pp > 0.0 ? 1.0 - q / std::pow(pp, config.zeta) : NAN;
+					}
+					const double psi_s = _elapsed(_t_psi);
+					const auto _t_split = std::chrono::steady_clock::now();
+					path0[spe] = chol ? "Cholesky" : "eigendecomposition";
+					const double z = config.zeta;
+					const int n = (int)k.extent(0), nr2 = config.nspe2 * config.nrad2;
+					// feature g = (n1 nr2 + n2) llmax + l, n1 = s1 nrad1 + n over neighspe1 (featomic keeps the order of the selected keys), n2 alike
+					auto rank = [this](const std::string& x) {
+						const int i = (int)(std::find(config.neighspe1.begin(), config.neighspe1.end(), x) - config.neighspe1.begin());
+						return i < config.nspe1 ? i : config.nspe1 + (int)(std::find(config.neighspe2.begin(), config.neighspe2.end(), x) - config.neighspe2.begin());
+					};
+					auto channel = [&rank](std::string s1, std::string s2) { if (rank(s2) < rank(s1)) std::swap(s1, s2); return s1 + "-" + s2; };
+					std::map<std::string, ivec> cols;
+					for (int f = 0; f < (int)pvec_lam.extent(1); f++)
+					{
+						const int64_t g = config.sparsify ? vfps[0][f] : f;
+						if (g >= (int64_t)llmax * config.nspe1 * config.nrad1 * nr2) continue;
+						cols[channel(config.neighspe1[g / ((int64_t)llmax * nr2) / config.nrad1], config.neighspe2[(g / llmax) % nr2 / config.nrad2])].push_back(f);
+					}
+					// the channels the FPS kept no feature of, and per atom those its neighbour densities within rcut (the centre's own among them) have
+					std::set<std::string> um;
+					for (const auto& s1 : config.neighspe1)
+						for (const auto& s2 : config.neighspe2)
+							if (!cols.count(channel(s1, s2))) um.insert(channel(s1, s2));
+					unrep_model0.assign(um.begin(), um.end());
+					const double* pos = featomic_system.positions();
+					auto has = [](const svec& v, const std::string& s) { return std::find(v.begin(), v.end(), s) != v.end(); };
+					ivec fi;
+					for (int j = 0; j < (int)featomic_system.size(); j++)
+						if (has(config.species, constants::Labels[featomic_system.types()[j]])) fi.push_back(j);
+					for (int i = 0; i < n && !um.empty(); i++)
+					{
+						const int a = centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]], c = fi[a];
+						std::set<std::string> n1, n2, u;
+						for (int j = 0; j < (int)featomic_system.size(); j++)
+						{
+							const double d = std::hypot(pos[3 * j] - pos[3 * c], pos[3 * j + 1] - pos[3 * c + 1], pos[3 * j + 2] - pos[3 * c + 2]);
+							const std::string l = constants::Labels[featomic_system.types()[j]];
+							if (d < config.rcut1 && has(config.neighspe1, l)) n1.insert(l);
+							if (d < config.rcut2 && has(config.neighspe2, l)) n2.insert(l);
+						}
+						for (const auto& s1 : n1)
+							for (const auto& s2 : n2)
+								if (um.count(channel(s1, s2))) u.insert(channel(s1, s2));
+						unrep0[a].assign(u.begin(), u.end());
+					}
+					int nch = 0;
+					if (ok && z >= 1.0 && z == std::floor(z))
+					{
+						// h_c(x, y) = (x_c.y_c) (x.y)^(zeta-1) over the neighbour pair channels c sums to the kernel, so with
+						// alpha = K_MM^+ k0^zeta the residual |phi(p) - sum_m alpha_m phi(f_m)|^2 = nov0 self^zeta splits into
+						// A_c = h_c(p, p) - 2 sum_m alpha_m h_c(p, f_m) + alpha^T (G_c o G^(zeta-1)) alpha, G_c = F_c F_c^T,
+						// each a sum of squares over the tensor blocks for integer zeta
+						dMatrix2 At(n, M), kz1(z == 1.0 ? 0 : n, M);
+						if (chol) std::copy(y.begin(), y.end(), At.data());
+						else if (r > 0) At = dot(psi, V, false, true);
+						const dMatrix2 Gz = z == 1.0 ? dMatrix2() : elementWiseExponentiation(RR, z - 1.0);
+						vec pp(n, 0.0), Gc(z == 1.0 ? 0 : (size_t)M * M), HA(z == 1.0 ? 0 : (size_t)n * M);
+						for (int i = 0; i < n; i++)
+						{
+							for (int f = 0; f < (int)pvec_lam.extent(1); f++) pp[i] += pvec_lam(i, f) * pvec_lam(i, f);
+							if (z != 1.0) for (int m = 0; m < M; m++) kz1(i, m) = std::pow(k(i, m), z - 1.0);
+						}
+						for (const auto& [name, cs] : cols)
+						{
+							const int w = (int)cs.size();
+							dMatrix2 Pc(n, w), Fc(M, w);
+							double sp = 0.0, sf = 0.0;
+							for (int i = 0; i < n; i++) for (int j = 0; j < w; j++) sp += std::abs(Pc(i, j) = pvec_lam(i, cs[j]));
+							for (int m = 0; m < M; m++) for (int j = 0; j < w; j++) sf += std::abs(Fc(m, j) = R(m, cs[j]));
+							if (sp == 0.0 && sf == 0.0) continue;
+							nch++;
+							vec A(n, 0.0);
+							if (sf > 0.0)
+							{
+								const dMatrix2 S = dot(Pc, Fc, false, true);
+								if (z == 1.0)
+								{
+									// alpha^T G_c alpha = |F_c^T alpha|^2
+									const dMatrix2 B = dot(At, Fc, false, false);
+									for (int i = 0; i < n; i++) for (int j = 0; j < w; j++) A[i] += B(i, j) * B(i, j);
+								}
+								else
+								{
+									// G_c o G^(zeta-1) on the lower triangle, the one syrk writes and symm reads
+									cblas_dsyrk(CblasRowMajor, CblasLower, CblasNoTrans, M, w, 1.0, Fc.data(), w, 0.0, Gc.data(), M);
+#pragma omp parallel for
+									for (int m = 0; m < M; m++)
+										for (int x = 0; x <= m; x++) Gc[(size_t)m * M + x] *= Gz(m, x);
+									cblas_dsymm(CblasRowMajor, CblasRight, CblasLower, n, M, 1.0, Gc.data(), M, At.data(), M, 0.0, HA.data(), M);
+									for (int i = 0; i < n; i++) for (int m = 0; m < M; m++) A[i] += At(i, m) * HA[(size_t)i * M + m];
+								}
+#pragma omp parallel for
+								for (int i = 0; i < n; i++)
+									for (int m = 0; m < M; m++) A[i] -= 2.0 * At(i, m) * S(i, m) * (z == 1.0 ? 1.0 : kz1(i, m));
+							}
+							for (int i = 0; i < n; i++)
+							{
+								const int a = centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]];
+								if (std::isnan(nov0[a])) continue;
+								double pc = 0.0;
+								for (int j = 0; j < w; j++) pc += Pc(i, j) * Pc(i, j);
+								split0[a][name] = { pc / pp[i], (A[i] + pc * std::pow(pp[i], z - 1.0)) / std::pow(pp[i], z) };
+								if (sf == 0.0 && pc > 0.0) absent0[a].push_back(name);
+							}
+						}
+					}
+					if (ProgressBar::report_counts)
+						std::cout << "[novelty] " << spe << (chol ? ": K_MM Cholesky " : ": K_MM eigendecomposition ") << eig_s << " s (rank " << r << " of " << M
+								  << "), psi " << psi_s << " s, channel split " << _elapsed(_t_split) << " s (" << nch << " channels)" << std::endl;
+				}
+			}
+
+			if (config.zeta == 1)
+			{
+				psi_nm[spe_idx][lam] = std::move(kernel_nm);
+			}
+			else {
+
+				if (lam == 0)
+				{
+					// Every lambda above scales by k0^(zeta-1), so that power is taken once, here
+					kernell0[spe_idx] = elementWiseExponentiation(kernel_nm, config.zeta - 1);
+					kernel_nm = elementWiseExponentiation(kernel_nm, config.zeta);
+				}
+				else
+				{
+					const dMatrix2 &k0 = kernell0[spe_idx];
+					const int n_at = (int)natom_dict[spe];
+					const size_t n_env = Mspe[spe];
+#pragma omp parallel for
+					for (int i1 = 0; i1 < n_at; ++i1)
+					{
+						for (size_t i2 = 0; i2 < n_env; ++i2)
+						{
+							const double scale_factor = k0(i1, i2);
+							size_t base_i = i1 * lam2_1;
+							size_t base_j = i2 * lam2_1;
+							for (size_t i = 0; i < lam2_1; ++i)
+							{
+								for (size_t j = 0; j < lam2_1; ++j)
+								{
+									kernel_nm(base_i + i, base_j + j) *= scale_factor;
+								}
+							}
+						}
+					}
+				}
+				psi_nm[spe_idx][lam] = dot(kernel_nm, *Vmat[spe + to_string(lam)], false, false);
+			}
+		}
+		_t_kernels += _elapsed(_t_kn);
+		free_model_lambda(lam);
+		if (score_only) return {};
+	}
+	const auto _t_assemble = std::chrono::steady_clock::now();
+	unordered_map<string, dMatrix1> C{};
+	unordered_map<string, int> ispe{};
+	for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
+	{
+		const string spe = config.species[spe_idx];
+		if (atom_idx.find(spe) == atom_idx.end()) continue;
+		ispe[spe] = 0;
+		for (int l = 0; l < lmax[spe] + 1; ++l)
+		{
+			const string key = spe + to_string(l);
+			const dMatrix2 &psi = psi_nm[spe_idx][l];
+			const size_t Mcut = psi.extent(1);
+			err_checkf(!projector_folded || Mcut == size_t(nmax[key]),
+				"The folded model holds " + std::to_string(Mcut) + " radial functions for " + key + ", its basis " + std::to_string(nmax[key]), std::cout);
+			for (int n = 0; n < nmax[key]; ++n)
+			{
+				if (projector_folded)
+				{
+					// The weights are in the PROJW projector (fold_salted_file): column n is C_n
+					dMatrix1 c(psi.extent(0));
+					for (size_t i = 0; i < psi.extent(0); i++) c(i) = psi(i, n);
+					C[key + to_string(n)] = std::move(c);
+					continue;
+				}
+				dMatrix1 weights_subset(Mcut);
+				const double *w = weights.data() + weight_offset.at(key) + n * Mcut;
+				std::copy(w, w + Mcut, weights_subset.data());
+				C[key + to_string(n)] = dot(psi, weights_subset, false);
+			}
+		}
+	}
+	psi_nm.clear();
+	psi_nm.shrink_to_fit();
+
+
+	int Tsize = 0;
+	for (int iat = 0; iat < natoms; iat++)
+	{
+		string spe = atomic_symbols[iat];
+		for (int l = 0; l < lmax[spe] + 1; l++)
+		{
+			for (int n = 0; n < nmax[spe + to_string(l)]; n++)
+			{
+				Tsize += 2 * l + 1;
+			}
+		}
+	}
+
+	// A BASIS block that does not describe what the model predicts is broken; name the disagreeing species
+	// rather than fail later on a total count.
+	if (bbasis_set_loaded)
+	{
+		std::vector<atom> at;
+		for (const int a : centres) at.push_back(wavy.get_atom(a));
+		const aux_density_table t(centres.empty() ? *wavy.get_atoms_ptr() : at);
+		if (Tsize != t.n_coef)
+		{
+			std::cout << "The model predicts " << Tsize << " coefficients, the basis in the model file holds "
+					  << t.n_coef << ":" << std::endl;
+			std::unordered_set<std::string> reported;
+			for (int iat = 0; iat < natoms; iat++)
+			{
+				const std::string& spe = atomic_symbols[iat];
+				if (!reported.insert(spe).second) continue;
+				int model_size = 0;
+				for (int l = 0; l < lmax[spe] + 1; l++)
+					model_size += nmax[spe + to_string(l)] * (2 * l + 1);
+				const int basis_size = (iat + 1 < natoms ? t.coef_off[t.sh_start[iat + 1]] : t.n_coef)
+									 - t.coef_off[t.sh_start[iat]];
+				std::cout << "   " << spe << ": predicted " << model_size << ", basis " << basis_size
+						  << (model_size == basis_size ? "" : "   <-- mismatch") << std::endl;
+				if (model_size == basis_size) continue;
+				// The short angular momentum is what has to be fixed in the model file.
+				ivec basis_l;
+				const int sh1 = (iat + 1 < natoms ? t.sh_start[iat + 1] : t.n_sh);
+				for (int s = t.sh_start[iat]; s < sh1; s++)
+				{
+					if ((int)basis_l.size() <= t.sh_l[s]) basis_l.resize(t.sh_l[s] + 1, 0);
+					basis_l[t.sh_l[s]]++;
+				}
+				for (int l = 0; l <= std::max(lmax[spe], (int)basis_l.size() - 1); l++)
+					std::cout << "      l = " << l << ": model "
+							  << (l <= lmax[spe] ? nmax[spe + to_string(l)] : 0) << " shells, basis "
+							  << (l < (int)basis_l.size() ? basis_l[l] : 0) << " shells" << std::endl;
+			}
+			err_checkf(false, "SALTED model and the basis set in its file do not belong together", std::cout);
+		}
+	}
+
+	vec Av_coeffs(Tsize, 0.0);
+
+	// fill vector of predictions
+	int i = 0;
+	vec pred_coefs(Tsize, 0.0);
+	for (int iat = 0; iat < natoms; ++iat)
+	{
+		string spe = atomic_symbols[iat];
+		for (int l = 0; l < lmax[spe] + 1; ++l)
+		{
+			for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
+			{
+				// for (int ind = 0; ind < 2 * l + 1; ++ind)
+				//{
+				//     pred_coefs[i + ind] = C[spe + to_string(l) + to_string(n)][ispe[spe] * (2 * l + 1) + ind];
+				// }
+				std::copy_n(C[spe + to_string(l) + to_string(n)].data() + ispe[spe] * (2 * l + 1), 2 * l + 1, pred_coefs.begin() + i);
+
+				if (config.average && l == 0)
+				{
+					Av_coeffs[i] = av_coefs[spe][n];
+				}
+				i += 2 * l + 1;
+			}
+		}
+		ispe[spe] += 1;
+	}
+
+	if (config.average)
+	{
+		for (i = 0; i < Tsize; i++)
+		{
+			pred_coefs[i] += Av_coeffs[i];
+		}
+	}
+
+	//std::cout << "          ... done!\nNumber of predicted coefficients: " << pred_coefs.size() << endl;
+	// npy::npy_data<double> coeffs;
+	// coeffs.data = pred_coefs;
+	// coeffs.fortran_order = false;
+	// coeffs.shape = { unsigned long(pred_coefs.size()) };
+	// npy::write_npy("folder_model.npy", coeffs);
+	if (ProgressBar::report_counts)
+	{
+		const double total = _elapsed(_t_predict_start), assemble = _elapsed(_t_assemble);
+		auto part = [total](const char* what, const double s) { std::cout << " + " << what << " " << s << " s (" << 100.0 * s / total << "%)"; };
+		std::cout << "[stages] predict " << total << " s = equicomb " << _t_equicomb << " s (" << 100.0 * _t_equicomb / total << "%)";
+		part("kernels", _t_kernels);
+		part("model wait", _t_model_wait);
+		part("model install", _t_model_install);
+		part("assemble", assemble);
+		std::cout << " + rest " << total - _t_equicomb - _t_kernels - _t_model_wait - _t_model_install - assemble << " s" << std::endl;
+		std::cout << "[model] payload read " << model_file->lazy_s - lazy_s0 << " s, " << model_file->lazy_bytes - lazy_bytes0
+				  << " bytes in " << model_file->lazy_blocks - lazy_blocks0 << " blocks; eager blocks " << eager_s << " s, " << eager_bytes << " bytes" << std::endl;
+	}
+	return pred_coefs;
+}
+
+vec SALTEDPredictor::gen_SALTED_densities()
+{
+	using namespace std;
+	citations::cite(citations::Method::SALTED, std::cout);
+	if (!sub_models.empty())
+		return merge_predictions();
+	if (coef_file != "")
+	{
+		vec coefs{};
+		std::cout << "Reading coefficients from file: " << coef_file << endl;
+		read_npy<double>(coef_file, coefs);
+		vec double_coefs(coefs.size());
+		for (int i = 0; i < coefs.size(); i++)
+		{
+			double_coefs[i] = static_cast<double>(coefs[i]);
+		}
+		return double_coefs;
+	}
+
+	// Run generation of tsc file
+	_time_point start;
+	if (debug)
+		start = get_time();
+
+	setup_atomic_environment();
+
+
+	read_model_data();
+
+
+	vec coefs = predict();
+	// Only the centres were predicted: their blocks at their place in the whole structure, zero elsewhere
+	if (!centres.empty() && !score_only)
+	{
+		const ivec off = coef_offsets(wavy);
+		vec full(off.back(), 0.0);
+		for (int r = 0, i = 0; r < (int)centres.size(); r++)
+		{
+			const int a = centres[r], n = off[a + 1] - off[a];
+			std::copy(coefs.begin() + i, coefs.begin() + i + n, full.begin() + off[a]);
+			i += n;
+		}
+		coefs.swap(full);
+	}
+	shrink_intermediate_vectors();
+	return coefs;
+}
+
+void SALTEDPredictor::shrink_intermediate_vectors()
+{
+	v1.clear();
+	v2.clear();
+	weights.clear();
+	Vmat.clear();
+	natom_dict.clear();
+	lmax.clear();
+	nmax.clear();
+	Mspe.clear();
+	vfps.clear();
+	wigner3j.clear();
+	av_coefs.clear();
+	power_env_sparse.clear();
+	ref0.clear();
+	featsize.clear();
+	v1.shrink_to_fit();
+	v2.shrink_to_fit();
+	weights.shrink_to_fit();
+	std::unordered_map<std::string, salted_block> umap;
+	std::unordered_map<std::string, int> umap2;
+	std::unordered_map<std::string, dMatrix1> umap3;
+	Vmat.swap(umap);
+	natom_dict.swap(umap2);
+	lmax.swap(umap2);
+	nmax.swap(umap2);
+	power_env_sparse.swap(umap);
+};

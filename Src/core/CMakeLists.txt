@@ -5,12 +5,21 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cxx"
 )
-
-list(
-    FILTER NOSPHERA2_CORE_SOURCES
-    EXCLUDE
-    REGEX "[/\\\\](vec_nos_math|mat_nos_math)\\.cpp$"
-)
+#The sources live in subsystem folders but keep the order of the flat folder they came from (by file name), so
+#the objects reach the archive and the link in the same order as before.
+set(_keyed "")
+foreach(_src ${NOSPHERA2_CORE_SOURCES})
+    get_filename_component(_name "${_src}" NAME)
+    list(APPEND _keyed "${_name}|${_src}")
+endforeach()
+list(SORT _keyed)
+list(TRANSFORM _keyed REPLACE "^[^|]*[|]" "")
+set(NOSPHERA2_CORE_SOURCES ${_keyed})
+#Every folder is on the include path, so an include names the file alone, as in the flat folder.
+set(NOSPHERA2_CORE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
+foreach(_dir base wfn integration tsc xcw salted nbo analysis properties gpu)
+    list(APPEND NOSPHERA2_CORE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
+endforeach()
 
 #The two GPU host files are for particular builds only. The shim stands in for the HIP
 #runtime wherever HIP kernels are compiled in; the dispatcher exists only when both backends
@@ -39,16 +48,16 @@ file(
 #.hip file in the build tree that includes the .cu: the extension makes it HIP to CMake, the
 #include makes it the same text, and the depfile keeps a kernel edit rebuilding both halves.
 set(NOSPHERA2_CORE_GPU_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/xcw_grid_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/aux_density_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/spherical_density_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/esp_gpu.cu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/basin_field_gpu.cu")
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/sf_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/itensor_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/xcw_grid_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/salted_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/grid_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/blas_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/aux_density_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/spherical_density_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/esp_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu/basin_field_gpu.cu")
 if(NOSPHERA2_USE_CUDA)
     list(APPEND NOSPHERA2_CORE_SOURCES ${NOSPHERA2_CORE_GPU_SOURCES})
 endif()
@@ -154,7 +163,7 @@ add_library(
 
 nosphera2_enable_optimizations(NoSpherA2Core)
 
-#The commit goes into the build-date line (convenience.cpp); read at every build, not at configure,
+#The commit goes into the build-date line (banner.cpp); read at every build, not at configure,
 #so a tree built again after a commit or checkout cannot carry the old hash.
 find_package(Git QUIET)
 set(NOSPHERA2_GIT_COMMIT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/git_commit.h")
@@ -169,7 +178,7 @@ add_dependencies(NoSpherA2Core NoSpherA2GitCommit)
 target_include_directories(NoSpherA2Core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 if(MSVC)
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/structure_factors.cpp" PROPERTIES COMPILE_OPTIONS "/bigobj")
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/xcw/structure_factors.cpp" PROPERTIES COMPILE_OPTIONS "/bigobj")
 endif()
 
 add_library(
@@ -232,7 +241,7 @@ if(NOSPHERA2_USE_HIP)
     #The runtime shim is ordinary C++ that needs the HIP headers for the prototypes it
     #defines - the headers only, not hip::host, whose link interface is the runtime library
     #this file exists to avoid.
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/hip_runtime_shim.cpp" PROPERTIES
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/gpu/hip_runtime_shim.cpp" PROPERTIES
         INCLUDE_DIRECTORIES "${hip_INCLUDE_DIR}"
         COMPILE_DEFINITIONS "__HIP_PLATFORM_AMD__=1")
     if(NOT WIN32)
@@ -248,6 +257,10 @@ if(NOSPHERA2_USE_HIP)
             list(APPEND _hip_arch_flags "--offload-arch=${_arch}")
         endforeach()
         set(_hip_ns_flags "")
+        set(_hip_inc_flags "")
+        foreach(_dir ${NOSPHERA2_CORE_INCLUDE_DIRS})
+            list(APPEND _hip_inc_flags -I "${_dir}")
+        endforeach()
         if(NOSPHERA2_USE_CUDA)
             set(_hip_ns_flags "-DNOSPHERA2_GPU_BACKEND_NS=nosphera2_hip")
         endif()
@@ -261,7 +274,7 @@ if(NOSPHERA2_USE_HIP)
                     "$<IF:$<CONFIG:Debug>,-O0,-O3>" "$<$<CONFIG:Debug>:-g>"
                     "-fms-runtime-lib=$<IF:$<CONFIG:Debug>,dll_dbg,dll>"
                     -DNOSPHERA2_USE_GPU -DNOSPHERA2_USE_HIP -D__HIP_PLATFORM_AMD__=1 ${_hip_ns_flags}
-                    -I "${CMAKE_CURRENT_SOURCE_DIR}" -I "${PROJECT_SOURCE_DIR}/Src"
+                    ${_hip_inc_flags} -I "${PROJECT_SOURCE_DIR}/Src"
                     -isystem "${hip_INCLUDE_DIR}"
                     -MD -MF "${_obj}.d" -c "${_src}" -o "${_obj}"
                 DEPFILE "${_obj}.d"
@@ -286,10 +299,12 @@ target_compile_features(
         cxx_std_20
 )
 
+list(TRANSFORM NOSPHERA2_CORE_INCLUDE_DIRS PREPEND "$<BUILD_INTERFACE:" OUTPUT_VARIABLE _core_include_dirs)
+list(TRANSFORM _core_include_dirs APPEND ">")
 target_include_directories(
     NoSpherA2Core
     PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
+        ${_core_include_dirs}
         "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/Src>"
 )
 
@@ -310,8 +325,8 @@ if(APPLE)
     #has no unified memory and keeps the CPU path.
     if(NOSPHERA2_USE_METAL)
         enable_language(OBJCXX)
-        target_sources(NoSpherA2Core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/itensor_metal.mm")
-        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/itensor_metal.mm"
+        target_sources(NoSpherA2Core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/gpu/itensor_metal.mm")
+        set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/gpu/itensor_metal.mm"
             PROPERTIES COMPILE_OPTIONS "-fobjc-arc" SKIP_PRECOMPILE_HEADERS ON)
         target_compile_definitions(NoSpherA2Core PRIVATE NOSPHERA2_USE_METAL)
         target_link_libraries(NoSpherA2Core PRIVATE "-framework Metal" "-framework MetalPerformanceShaders" "-framework Foundation")
@@ -332,7 +347,7 @@ if(APPLE)
     #macOS ucontext.h refuses to compile without _XOPEN_SOURCE, and only with it does ucontext_t carry
     #the storage getcontext writes the registers into. It has to be set before the first system
     #header, and the PCH (stdlib.h -> sys/signal.h) would define ucontext_t without that storage first.
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/fiber_loop.cpp"
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/base/fiber_loop.cpp"
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON COMPILE_DEFINITIONS "_XOPEN_SOURCE=700;_DARWIN_C_SOURCE")
 elseif(NOSPHERA2_OPENBLAS)
     target_link_libraries(NoSpherA2Core PUBLIC nosphera2_openblas)

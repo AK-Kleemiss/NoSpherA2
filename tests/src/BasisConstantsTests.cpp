@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/atoms.h"
-#include "core/wfn_class.h"
-#include "core/basis_set.h"
-#include "core/integration_params.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/atoms.h"
+#include "core/wfn/wfn_class.h"
+#include "core/wfn/basis_set.h"
+#include "core/integration/integration_params.h"
 #include <occ/gto/io/json_basis.h>
 #include <occ/gto/shell.h>
 #include <occ/core/atom.h>

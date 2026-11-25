@@ -8,8 +8,8 @@
 ## Build & test commands (agents can run these automatically)
 | Platform | Command | What it does |
 |----------|---------|--------------|
-| **Windows** | `cmd /c "\"%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat\" -arch=x64 && cmake --preset release-windows && cmake --build --preset release-windows"` | Initializes the MSVC x64 environment, then configures + builds NoSpherA2. |
-| **Linux** | `cmake --preset release-linux && cmake --build --preset release-linux` | Configures + builds NoSpherA2. |
+| **Windows** | `cmd /c "\"%VSINSTALLDIR%\Common7\Tools\VsDevCmd.bat\" -arch=x64 && cmake --preset release-windows && cmake --build --preset release-windows"` | Initializes the VS x64 environment (MSVC headers + SDK; `clang-cl`/`lld-link` come from `.mambaenv/llvm`), then configures + builds NoSpherA2. |
+| **Linux** | `cmake --preset release-linux && cmake --build --preset release-linux` | Configures + builds NoSpherA2 with clang/lld (clang/lld from `.mambaenv/llvm`, installed by the bootstrap). |
 | **macOS** | `cmake --preset release-macos-arm64 && cmake --build --preset release-macos-arm64` | Configures + builds NoSpherA2 for a specific arch. |
 | **All** | `ctest --preset <preset>` | Runs the configured CTest suite for the selected preset. |
 
@@ -18,6 +18,7 @@ Use `cmake --list-presets=all` for the full preset list; host-conditional preset
 ## Important build notes for AI agents
 - **Submodule handling**: run `git submodule update --init --recursive` before any build.
 - **Static linking**: most third-party libraries (`featomic`, `libcint`, `occ`) are linked statically. OCC links against shared oneTBB, so the matching TBB runtime is copied beside the executable (`tbb12.dll`, `libtbb.so*`, or `libtbb.dylib`). Do not build or link `tbbmalloc_proxy` for NoSpherA2.
+- **Compilers**: the presets and all CI artifacts use the clang family — `clang-cl` on Windows x64 (ARM64 keeps `cl`), `clang`/`clang++` + lld on Linux, Apple clang on macOS. GCC is a test-only CI job. Clang, lld and the LLVM tools come from the micromamba bootstrap (`environment-llvm-*.yaml`, `.mambaenv/llvm`; aarch64 in `.mambaenv/env`). Delete a `CMakeCache.txt` configured before the switch.
 - **Windows environment**: initialize the VS Developer environment (`VsDevCmd.bat -arch=x64`) in the same shell before running CMake/CTest. Missing standard headers (`cstddef`, `windows.h`) or `kernel32.lib` mean the environment was not initialized.
 - **IDE work**: the `.vscode/` setup (CMake Tools with the presets) is the supported IDE flow on Windows, Linux and macOS. The Visual Studio solution was removed in October 2026.
 - **In-process tests**: tests documented as in-process (e.g. `alanine_integrated_occ`) stay in-process in the gtest binary; do not add subprocess fallbacks.

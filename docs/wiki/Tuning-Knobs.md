@@ -8,6 +8,9 @@ They are set on the command line:
 ```
 
 * `-tune` is repeatable; a bare `NAME` means `NAME=1`.
+* `-tune list` prints every knob below with its default and stops. A name
+  that is not below is still set, and the console (stderr) says it is no
+  knob this build documents.
 * Knobs are applied before any other option is parsed, live only in the
   process, and are restored when the run ends, so one in-process run (the DLL,
   the test binary) never leaks a knob into the next. They used to be environment
@@ -22,9 +25,11 @@ against its reference, to time one stage, or to make a rare branch testable.
 A knob that changes results says so in the table; a run that sets one is not a
 default run.
 
-The source column names the file that reads the knob (under `Src/core/`).
+The source column names the file that reads the knob (in one of the folders of `Src/core/`, where file names are unique).
 `python scripts/check_tuning_knobs.py` lists any knob in the sources that this
-page does not mention, and any name here that no source reads any more.
+page does not mention, and any name here that no source reads any more. The
+first two columns are also the table `-tune list` prints (`documented_knobs` in
+`Src/core/base/tuning.cpp`), and the script checks that the two agree.
 
 ## XCW (X-ray constrained wavefunctions)
 
@@ -92,10 +97,10 @@ page does not mention, and any name here that no source reads any more.
 
 | Knob | Default | Effect | Source |
 | --- | --- | --- | --- |
-| `NOS_SF_DIRECT` | off | Direct sum for every atom instead of Fourier-Bessel on the prototype shells. | `scattering_factors.cpp` |
-| `NOS_SF_FB_L=<L>` | D/2 | Fourier-Bessel expansion order instead of half the prototype's largest Lebedev degree; forces every atom onto Fourier-Bessel. | `scattering_factors.cpp` |
-| `NOS_SF_FB_EXACT` | off | Fourier-Bessel without the \|k\| interpolation table; forces every atom onto Fourier-Bessel. | `scattering_factors.cpp` |
-| `NOS_SF_FB_FORCE` | off | Fourier-Bessel for every atom, also where the direct sum would be faster. | `scattering_factors.cpp` |
+| `NOS_SF_DIRECT` | off | Direct sum for every atom instead of Fourier-Bessel on the prototype shells. | `sf_kernels.cpp` |
+| `NOS_SF_FB_L=<L>` | D/2 | Fourier-Bessel expansion order instead of half the prototype's largest Lebedev degree; forces every atom onto Fourier-Bessel. | `sf_kernels.cpp` |
+| `NOS_SF_FB_EXACT` | off | Fourier-Bessel without the \|k\| interpolation table; forces every atom onto Fourier-Bessel. | `sf_kernels.cpp` |
+| `NOS_SF_FB_FORCE` | off | Fourier-Bessel for every atom, also where the direct sum would be faster. | `sf_kernels.cpp` |
 | `NOS_GRID_OLD_FLOOR` | off | `lebedev_low` as the innermost angular floor for every element, not only from K on. | `AtomGrid.cpp` |
 | `NOS_MBIS_BECKE` | off | MBIS/EMBIS moments summed over every grid with Becke weights instead of each atom's own grid with the atom weights. | `AtomGrid.cpp`, `GridManager.cpp` |
 | `NOS_EXP_CRT` | off | The CRT `exp` in MBIS/EMBIS instead of the four-wide `exp_kernel` (within 1 ulp). | `AtomGrid.cpp` |
@@ -110,49 +115,49 @@ page does not mention, and any name here that no source reads any more.
 | `NOSPHERA2_GPU_BATCH=<n>` | fits the card | Cap the atoms per structure-factor batch, to exercise batching on a card large enough not to need it. | `sf_gpu.cu` |
 | `NOSPHERA2_GRID_LOCAL=1` | off | Force the local (near-centre) grid-weight kernel that only molecules wider than a few hundred centres reach. | `grid_gpu.cu` |
 | `NOSPHERA2_BLAS_GPU_MIN_FLOP` | 4e9 x fp64 ratio / 64 | Flop count above which `-gpu_blas` sends a product to the device. `-gflops` re-derives it. | `blas_gpu.cu` |
-| `NOS_BASIN_GPU_MIN_US` | `15` | The basin field goes to the device only if one host evaluation costs at least this many microseconds. | `b2c.cpp` |
-| `NOS_BASIN_GPU_FIBERS` | `256` | Trajectories each device feed advances together. | `b2c.cpp` |
+| `NOS_BASIN_GPU_MIN_US` | `15` | The basin field goes to the device only if one host evaluation costs at least this many microseconds. | `basin_integration.cpp` |
+| `NOS_BASIN_GPU_FIBERS` | `256` | Trajectories each device feed advances together. | `basin_integration.cpp` |
 | `NOS_BASIN_GPU_PROFILE` | off | Time the device basin-field kernels. | `basin_field_gpu.cu` |
 
 ## Basin integration (QTAIM, ELI-D)
 
 | Knob | Default | Effect | Source |
 | --- | --- | --- | --- |
-| `NOS_BASIN_SKIP` | `5e-5` | Electrons per molecule the lightest points may move instead of being climbed; `0` climbs every point. | `b2c.cpp` |
-| `NOS_BASIN_STEP_CAP` | `2000` | Steps one trajectory may take before it is given up (at least 100). | `b2c.cpp` |
-| `NOS_BASIN_STEP_RELAX` | `1.5` | Factor by which a shortened step grows back toward the base step, in [1, 4]. | `b2c.cpp` |
-| `NOS_BASIN_SHRINK` | on | A floor step that fails to rise halves and tries again; `0` turns it off. | `b2c.cpp` |
-| `NOS_BASIN_SHRINK_FLOOR` | `0.0625` | Fraction of the base step below which a failing step stops halving, in (0, 1]. 1/64 clears more stalls but splits near-degenerate lone pairs. | `b2c.cpp` |
-| `NOS_ADP_CAP` | `8` | Adaptive step: at most this many times the validated floor step. | `b2c.cpp` |
-| `NOS_ADP_GROW` | `0.99999` | Adaptive step: midpoint cosine that earns a doubling. | `b2c.cpp` |
-| `NOS_ADP_KEEP` | `0.999` | Adaptive step: below this cosine the step is thrown away and retaken at the floor. | `b2c.cpp` |
-| `NOS_ADP_REACH` | `0.25` | Adaptive step: fraction of the distance to the nearest maximum. | `b2c.cpp` |
-| `NOS_BETA_MARGIN` | `0.9` | Beta spheres stay within this fraction of the smallest sampled safe radius, at most 1. | `b2c.cpp` |
-| `NOS_BASIN_MEMO` | on | Streaming runs memoise visited voxels' basins; `0` turns it off. | `b2c.cpp` |
-| `NOS_BASIN_MEMO_MB` | `256` | Memory of that memo in MB. | `b2c.cpp` |
-| `NOS_BASIN_ROTATE` | on | Rotate the angular grids of the basin-integration grid; `0` turns it off. | `b2c.cpp` |
+| `NOS_BASIN_SKIP` | `5e-5` | Electrons per molecule the lightest points may move instead of being climbed; `0` climbs every point. | `basin_integration.cpp` |
+| `NOS_BASIN_STEP_CAP` | `2000` | Steps one trajectory may take before it is given up (at least 100). | `basin_integration.cpp` |
+| `NOS_BASIN_STEP_RELAX` | `1.5` | Factor by which a shortened step grows back toward the base step, in [1, 4]. | `basin_integration.cpp` |
+| `NOS_BASIN_SHRINK` | on | A floor step that fails to rise halves and tries again; `0` turns it off. | `basin_integration.cpp` |
+| `NOS_BASIN_SHRINK_FLOOR` | `0.0625` | Fraction of the base step below which a failing step stops halving, in (0, 1]. 1/64 clears more stalls but splits near-degenerate lone pairs. | `basin_integration.cpp` |
+| `NOS_ADP_CAP` | `8` | Adaptive step: at most this many times the validated floor step. | `basin_integration.cpp` |
+| `NOS_ADP_GROW` | `0.99999` | Adaptive step: midpoint cosine that earns a doubling. | `basin_integration.cpp` |
+| `NOS_ADP_KEEP` | `0.999` | Adaptive step: below this cosine the step is thrown away and retaken at the floor. | `basin_integration.cpp` |
+| `NOS_ADP_REACH` | `0.25` | Adaptive step: fraction of the distance to the nearest maximum. | `basin_integration.cpp` |
+| `NOS_BETA_MARGIN` | `0.9` | Beta spheres stay within this fraction of the smallest sampled safe radius, at most 1. | `basin_integration.cpp` |
+| `NOS_BASIN_MEMO` | on | Streaming runs memoise visited voxels' basins; `0` turns it off. | `basin_integration.cpp` |
+| `NOS_BASIN_MEMO_MB` | `256` | Memory of that memo in MB. | `basin_integration.cpp` |
+| `NOS_BASIN_ROTATE` | on | Rotate the angular grids of the basin-integration grid; `0` turns it off. | `basin_integration.cpp` |
 | `NOS_BASIN_SCAN_REVERSE` | off | Scan seed voxels in the opposite order (diagnostic; results must not change). | `b2c.cpp` |
-| `NOS_ELI_SHELL_DIST` | `1.2` | Bohr within which near-degenerate ELI-D shell maxima merge into one basin, in [0, 10); `0` turns the merge off. | `bondwise_analysis.cpp` |
-| `NOS_ELI_SHELL_TOL` | `0.05` | Relative value difference up to which those maxima count as degenerate, in [0, 1). | `bondwise_analysis.cpp` |
-| `NOS_ELI_SHELL_SADDLE` | `0.99` | Two shell maxima join when the ELI-D between them never drops below this times the lower one, in [0, 1). | `b2c.cpp` |
-| `NOS_ELI_SHELL_PERSIST` | `5e-4` | Shell persistence: two shell maxima of one atom join when the arc between them dips less than this; `0` turns it off. Measured safe window 5e-4 to 6e-4. | `b2c.cpp` |
-| `NOS_ELI_SHELL_SADDLE_LOG` | off | Log each shell join and persistence decision. | `b2c.cpp` |
+| `NOS_ELI_SHELL_DIST` | `1.2` | Bohr within which near-degenerate ELI-D shell maxima merge into one basin, in [0, 10); `0` turns the merge off. | `eli_analysis.cpp` |
+| `NOS_ELI_SHELL_TOL` | `0.05` | Relative value difference up to which those maxima count as degenerate, in [0, 1). | `eli_analysis.cpp` |
+| `NOS_ELI_SHELL_SADDLE` | `0.99` | Two shell maxima join when the ELI-D between them never drops below this times the lower one, in [0, 1). | `basin_unify.cpp` |
+| `NOS_ELI_SHELL_PERSIST` | `5e-4` | Shell persistence: two shell maxima of one atom join when the arc between them dips less than this; `0` turns it off. Measured safe window 5e-4 to 6e-4. | `basin_unify.cpp` |
+| `NOS_ELI_SHELL_SADDLE_LOG` | off | Log each shell join and persistence decision. | `basin_unify.cpp` |
 
 ## Bonding analysis (RGBI, NAO, NBO)
 
 | Knob | Default | Effect | Source |
 | --- | --- | --- | --- |
-| `NOS_RGBI_PINV_CUTOFF` | `1e-5` | Singular values below which RGBI pseudo-inverses cut, > 0. Out of range stops the run. | `bondwise_analysis.cpp` |
-| `NOS_RGBI_PAIR_TOL` | `1e-4` | Window in which RGBI pairs ionic eigenvalues and spares lone pairs, in (0, 1). | `bondwise_analysis.cpp` |
-| `NOS_RGBI_GROUP_LP` | `0.99` | RGBI groups drop ionic pairs as lone pairs above this, in (0, 2). | `bondwise_analysis.cpp` |
-| `NOS_RGBI_PAIR_LP` | `0.999` | RGBI atom pairs drop ionic pairs as lone pairs above this, in (0, 2). | `bondwise_analysis.cpp` |
-| `NOS_RGBI_NONREL_FREEATOM` | off | Non-relativistic free atoms instead of sf-X2C-1e for all-electron atoms (comparison only). | `bondwise_analysis.cpp` |
-| `NOS_RGBI_FREE_ATOM_MAXITER=<n>` | occ's default | Cap the free-atom SCF iterations, so the unconverged warning is testable. | `bondwise_analysis.cpp` |
-| `NOS_RGBI_NO_FREEATOM_CACHE` | off | Recompute every free atom, neither reading nor writing either cache. | `bondwise_analysis.cpp` |
-| `NOS_FREEATOM_CACHE_DIR=<dir>` | `~/.cache/NoSpherA2/free_atom_cache` | Directory of the free-atom disk cache; empty or `off` disables the disk cache alone. | `bondwise_analysis.cpp` |
-| `NOS_RGBI_PARALLEL_FREEATOM` | off | Compute the free-atom SCFs concurrently up front; the serial loop then finds them cached. Opt-in because occ's SCF is not shown re-entrant. | `bondwise_analysis.cpp` |
-| `NOS_RGBI_NO_PIN` | off | Do not pin occ to one thread for the free atoms (measures the pin's cost; open shells may then vary). | `bondwise_analysis.cpp` |
-| `NOS_RGBI_DEBUG` | off | One line per free atom: cache hits, SCF energies, timings. | `bondwise_analysis.cpp` |
+| `NOS_RGBI_PINV_CUTOFF` | `1e-5` | Singular values below which RGBI pseudo-inverses cut, > 0. Out of range stops the run. | `rgbi.cpp` |
+| `NOS_RGBI_PAIR_TOL` | `1e-4` | Window in which RGBI pairs ionic eigenvalues and spares lone pairs, in (0, 1). | `rgbi.cpp` |
+| `NOS_RGBI_GROUP_LP` | `0.99` | RGBI groups drop ionic pairs as lone pairs above this, in (0, 2). | `rgbi.cpp` |
+| `NOS_RGBI_PAIR_LP` | `0.999` | RGBI atom pairs drop ionic pairs as lone pairs above this, in (0, 2). | `rgbi.cpp` |
+| `NOS_RGBI_NONREL_FREEATOM` | off | Non-relativistic free atoms instead of sf-X2C-1e for all-electron atoms (comparison only). | `rgbi.cpp` |
+| `NOS_RGBI_FREE_ATOM_MAXITER=<n>` | occ's default | Cap the free-atom SCF iterations, so the unconverged warning is testable. | `rgbi.cpp` |
+| `NOS_RGBI_NO_FREEATOM_CACHE` | off | Recompute every free atom, neither reading nor writing either cache. | `rgbi.cpp` |
+| `NOS_FREEATOM_CACHE_DIR=<dir>` | `~/.cache/NoSpherA2/free_atom_cache` | Directory of the free-atom disk cache; empty or `off` disables the disk cache alone. | `rgbi.cpp` |
+| `NOS_RGBI_PARALLEL_FREEATOM` | off | Compute the free-atom SCFs concurrently up front; the serial loop then finds them cached. Opt-in because occ's SCF is not shown re-entrant. | `rgbi.cpp` |
+| `NOS_RGBI_NO_PIN` | off | Do not pin occ to one thread for the free atoms (measures the pin's cost; open shells may then vary). | `rgbi.cpp` |
+| `NOS_RGBI_DEBUG` | off | One line per free atom: cache hits, SCF energies, timings. | `rgbi.cpp` |
 | `NBO_BOND_FLOOR` | `0.15` | Minority-centre share below which a two-centre NBO candidate is no bond. | `nbo.cpp` |
 | `NBO_JSON_DIGITS` | `10` | Significant digits in the NBO JSON, 1 to 20. | `nbo_run.cpp` |
 | `NAO_PRENAO_NET` | off | Net-density pre-NAO diagnostic. | `nao.cpp` |

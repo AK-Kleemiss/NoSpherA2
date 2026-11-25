@@ -1,7 +1,7 @@
 #include "pch.h"
 #include <gtest/gtest.h>
 
-#include "core/basis_set.h"
+#include "core/wfn/basis_set.h"
 #include <occ/io/xyz.h>
 #include <occ/qm/hf.h>
 #include <occ/qm/integral_engine_df.h>

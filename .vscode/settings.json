@@ -21,7 +21,7 @@
     "editor.insertSpaces": true,
     "terminal.integrated.scrollback": 100000,
     // A terminal for running cmake/ctest by hand on Windows, where Ninja needs
-    // the MSVC environment. Adjust the Visual Studio path to your install.
+    // the VS environment (MSVC headers and SDK; clang-cl comes from .mambaenv/llvm). Adjust the Visual Studio path to your install.
     "terminal.integrated.profiles.windows": {
         "VS x64 Developer PowerShell": {
             "source": "PowerShell",

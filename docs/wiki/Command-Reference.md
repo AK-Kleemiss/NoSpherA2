@@ -1,23 +1,35 @@
 # Command reference
 
 Every flag below was read out of the option parser in
-`Src/core/convenience.cpp` (`options::digest_io_options`,
+`Src/core/options_parse.cpp` (`options::digest_io_options`,
 `digest_run_options`, `digest_partition_options`, `digest_property_options`,
-`digest_ri_options`, `digest_xcw_options`, `digest_dev_options` and
-`options::look_for_debug`). Defaults come from `struct options` and
-`struct properties_options` in `Src/core/convenience.h`.
+`digest_ri_options`, `digest_xcw_options`, `digest_dev_options`) and
+`options::look_for_debug` in `Src/core/base/convenience.cpp`. Defaults come from
+`struct options` in `Src/core/options.h` and `struct properties_options` in
+`Src/core/properties/properties_options.h`.
 
 Notation: `<x>` is required, `[x]` optional, `x|y` alternatives. Angstrom is
 the unit unless stated otherwise.
 
 Either separator works in every flag: `-rgbi_groups` and `-rgbi-groups` are the
-same option, and the spelling in the tables is the canonical one. Case is not
+same option (the `-nbo_*`/`-nrt_*` sub-options too), and the spelling in the tables is the canonical one. Case is not
 normalised, so where a flag has an upper-case form it is listed separately.
 
 **Before you compose a long command line, read
 [flag order matters](Troubleshooting.md#flag-order-matters).** Several options
-run inside the parser and stop it, so options placed after them are silently
-ignored.
+run inside the parser and stop it, so options placed after them are ignored
+(the console names them on stderr, the log does not).
+
+**Input forms.** Every analysis that reads one wavefunction takes it either way: right after its flag
+(`-topology water.gbw`, `-npa water.gbw`) or from `-wfn` (`-wfn water.gbw -topology`), with `-wfn`
+before or after the flag. Optional values then follow the flag directly: `-eli_analysis water.gbw 0.1 3`
+and `-wfn water.gbw -eli_analysis 0.1 3` are the same run. A file after a flag that used to read only
+`-wfn` (the cube flags, `-npa`, `-npa_summary`, `-ibo`) is taken when it exists and has an extension
+the wavefunction reader knows; if `-wfn` names a different file the run is refused. With both forms
+given, the flags that always took a file (`-topology`, `-eli_analysis`, `-nbo`, ...) and `-rgbi`, `-eqc`,
+`-fukui_analysis` keep the order rule they had. The multi-file options (`-qtaim_eli`, `-polarizabilities`,
+`-interaction_energy`, `-hirshfeld_surface`, `-atom_dens_diff`, ...) and `-nbo_parse` (an NBO output, not a
+wavefunction) take their files only after the flag.
 
 ## Contents
 
@@ -54,8 +66,8 @@ need the virtuals).
 | `-d <dir>` | 1 | Directory the basis-set files are looked up in. |
 | `-coef <file> [aux basis...]` | 1+ | Pre-computed density-fitting coefficient file (`.npy`) and the auxiliary basis set(s) it was fitted in, read as `-ri_fit` reads them (`auto_aux` when none is given). With `-ECP N`, or a wavefunction whose reader found ECPs, the coefficients are taken as the fit of the valence density: the table, the charge table and the `.tshb` add the mode-N core alike. |
 | `-fchk <file>` | 1 | Write a Gaussian-format checkpoint file. |
-| `-wfn_cif <file>` | 1 | Write the wavefunction geometry and basis into a CIF. |
-| `-gbw2wfn <file>` | 1 | Convert an ORCA `.gbw` into a `.wfn`. |
+| `-wfn_cif` | 0 | Write the basis set and the wavefunction as CIF loops. With `-gbw2wfn` or `-fchk` into `<wfn stem>.cif` beside the input; in a table run into `test.wfn_cif`, which also carries the form-factor table. `-tshb` then writes the table instead (log: `-tshb: the table is written instead, -cif needs the table`). |
+| `-gbw2wfn` | 0 | Convert the `-wfn` wavefunction into `converted.wfn`, `occupied.wfn` and `converted.wfx`. |
 | `-convert_to_47 <wfn>` | 1 + sub-options | Write an NBO `.47` archive from a contracted-basis wavefunction. |
 | `-cube_convert <in> <out>` | 2 | Text `.cube` <-> binary `.cubeb`. The output format follows the extension of `<out>`. One-shot. |
 | `-combine_mos <a> <b>` | 2 | Combine the MO sets of two wavefunctions; select with `-cmos1`/`-cmos2`. One-shot. |
@@ -222,24 +234,24 @@ is a separate flag and several can be written in one run.
 | --- | --- | --- | --- |
 | `-resolution <d>` | 1 | `0.1` | Grid spacing. |
 | `-radius <r>` | 1 | `2.0` | Grid extent past the atoms; also the hard cut-off radius. |
-| `-rho` | 0 | off | Electron density cube. |
-| `-lap` | 0 | off | Laplacian of the density. |
-| `-eli` | 0 | off | ELI-D cube. |
-| `-eli_spin` | 0 | off | Spin-resolved ELI-D cubes from one pass: `<stem>_eli_aa.cube`, `_eli_bb.cube`, `_eli_triplet.cube` (aa only for a closed shell, which equals `-eli`); 0 where a spin channel has no density. `scripts/vmd/eli_spin.py` turns them into a VMD scene. |
-| `-elf` | 0 | off | Electron localisation function. |
-| `-esp` | 0 | off | Electrostatic potential. |
-| `-rdg` | 0 | off | Reduced density gradient (NCI). |
-| `-def` | 0 | off | Static deformation density. Also `-DEF`. |
-| `-HDEF` | 0 | off | Hirshfeld deformation density. Also `-hdef`. |
+| `-rho [wfn]` | 0-1 | off | Electron density cube. `<wfn>` or `-wfn`, as for every cube flag below. |
+| `-lap [wfn]` | 0-1 | off | Laplacian of the density. |
+| `-eli [wfn]` | 0-1 | off | ELI-D cube. |
+| `-eli_spin [wfn]` | 0-1 | off | Spin-resolved ELI-D cubes from one pass: `<stem>_eli_aa.cube`, `_eli_bb.cube`, `_eli_triplet.cube` (aa only for a closed shell, which equals `-eli`); 0 where a spin channel has no density. `scripts/vmd/eli_spin.py` turns them into a VMD scene. |
+| `-elf [wfn]` | 0-1 | off | Electron localisation function. |
+| `-esp [wfn]` | 0-1 | off | Electrostatic potential. |
+| `-rdg [wfn]` | 0-1 | off | Reduced density gradient (NCI). |
+| `-def [wfn]` | 0-1 | off | Static deformation density. Also `-DEF`. |
+| `-HDEF [wfn]` | 0-1 | off | Hirshfeld deformation density. Also `-hdef`. |
 | `-MO <n>\|all` | 1 | | One molecular orbital, or every one. Repeat for several. |
 | `-ibo_cube <list>` | 1 | | Runs `-ibo` and writes `<wfn>_IBO_<n>.cube` for the IBOs in `<list>`: the numbers `-ibo` prints, `all`, or `C2:C3` (every bond-like IBO between atoms 2 and 3, labels 1-based, element optional), comma-separated, e.g. `6,C2:C3`. Same grid as `-MO`. |
-| `-s_rho` | 0 | off | Spin density. |
-| `-fukui` | 0 | off | Fukui function. Also `-Fukui`. Needs the virtual orbitals. |
+| `-s_rho [wfn]` | 0-1 | off | Spin density. |
+| `-fukui [wfn]` | 0-1 | off | Fukui function. Also `-Fukui`. Needs the virtual orbitals. |
 | `-esp_isosurface [v]` | 0-1 | `0.002` when bare, else off | ESP mapped onto a density isosurface at value `v`. |
 | `-hirshfeld_surface <asu.xyz> <pack.xyz>` | 2 | | Hirshfeld surface of the asymmetric unit against its packing environment. Writes `.obj` and `Hirshfeld_surface.dat`. |
 | `-cubeb` | 0 | off | Write cubes in the binary `.cubeb` format. |
 | `-cube <file>` | 1 | | Read a density cube instead of computing one. Also `-cube_density`. |
-| `-rho_cube <wfn>` | 1 | | Density cube for a wavefunction and nothing else. Set `-radius`/`-resolution` **before** this flag. One-shot. |
+| `-rho_cube [wfn]` | 0-1 | | Density cube for `<wfn>` or `-wfn` and nothing else. Set `-radius`/`-resolution` **before** this flag. One-shot. |
 | `-density_difference <wfn2>` | 1 | | Subtract the density of a second wavefunction from the first. |
 | `-atom_dens <wfn> [alpha_MOs] [beta_MOs]` | 1-3 | | Spherically averaged atomic density; MO lists are comma-separated. One-shot. |
 | `-atom_dens_diff <wfn1> <wfn2>` | 2 | | Difference of two spherically averaged densities. One-shot. |
@@ -250,9 +262,9 @@ is a separate flag and several can be written in one run.
 | `-dipole_moments` | 0 | | Dipole moments of the wavefunction. One-shot, output goes to the log. |
 | `-polarizabilities <7 wfn files>` | 7 | | Polarisability from seven finite-field wavefunctions. |
 | `-e_field <F>` | 1 | `0.005` | Field strength used by the finite-field jobs. |
-| `-laplacian_bonds <wfn>` | 1 | | Laplacian profiles along each bond. One-shot. |
-| `-laplacian_bond_paths <wfn>` | 1 | | rho and Laplacian along the traced QTAIM bond paths (bond critical point uphill to both nuclei), one `<wfn>_bond_path_<a>_<b>.dat` per bond point; logs BPL and GPL. One-shot. |
-| `-fukui_analysis [wfn]` | 0-1 | | Condensed Fukui indices, printed to the console. |
+| `-laplacian_bonds [wfn]` | 0-1 | | Laplacian profiles along each bond of `<wfn>` or `-wfn`. One-shot. |
+| `-laplacian_bond_paths [wfn]` | 0-1 | | `<wfn>` or `-wfn`. rho and Laplacian along the traced QTAIM bond paths (bond critical point uphill to both nuclei), one `<wfn>_bond_path_<a>_<b>.dat` per bond point; logs BPL and GPL. One-shot. |
+| `-fukui_analysis [wfn]` | 0-1 | | Condensed Fukui indices of `<wfn>` or `-wfn`, printed to the console. |
 | `-promol_nci <f1.xyz> <f2.xyz> [f3.xyz ...] [rcut1] [rcut2] [rho_max] [rdg_max] [colour_max]` | 2+ | `0.95 0.75 0.5 1.0 0.015` | Intermolecular NCI from promolecular densities of two or more fragments. |
 | `-promol_nci_single_thread` | 0 | off | Serialise the promolecular NCI loop. |
 | `-fractal <cube>` | 1 | | Fractal-dimension analysis of a cube. |
@@ -271,11 +283,11 @@ delocalisation indices (LI/DI).
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `-topology <wfn>` | 1 | | Every critical point of rho — nuclear, bond, ring, cage — with the Poincare-Hopf check. Console output. One-shot. |
-| `-eli_analysis <wfn> <resolution> <radius>` | 3 | | QTAIM + ELI-D basins, populations, LI/DI. |
+| `-topology [wfn]` | 0-1 | | `<wfn>` or `-wfn`. Every critical point of rho — nuclear, bond, ring, cage — with the Poincare-Hopf check. Console output. One-shot. |
+| `-eli_analysis [wfn] [<resolution> <radius>]` | 0-3 | `0.05` / `3.0` | QTAIM + ELI-D basins of `<wfn>` or `-wfn`, populations, LI/DI. Without `<wfn>` a number that names no file is the resolution. Sets `-resolution` and `-radius`, overwriting ones written before it. |
 | `-eli_contributions` | 0 | off (on in `-fba`) | With `-eli_analysis`, always in `-fba`: split every ELI-D basin population into its contributors, as a table with one column each for QTAIM atoms (Raub-Jansen: each ELI-D integration point goes to the QTAIM basin it lies in), Pipek-Mezey IBOs, Boys IBOs and NLMOs. For a single determinant an orbital's share is n_i ∫_Ω \|φ_i\|², so each column sums to the basin population. The orbital columns need a closed-shell wavefunction with occupations 0/2 (an open shell prints QTAIM only); the IBO columns need ORCA phases and MINAO for every element, the NLMO column a spherical basis on every atom. A skipped column says why. All columns number atoms from 0, as the QTAIM and ELI-D tables do; repeated LP/BD labels carry (1), (2), ... |
-| `-eli_family <wfn> [points]` | 1-2 | | ELI-D alpha/beta/triplet and ELI-q as point values. Console output. One-shot. ELIA and ELI-q_s,2 need the 2-RDM: an ORCA CAS/CI `.gbw` with its `PrintWF det` output as `<stem>.out` beside it; see [Correlated wavefunctions](Correlated-Wavefunctions.md#6-what-is-exact-what-is-approximate-what-is-refused). |
-| `-fba <wfn>` | 1 | | Full bonding analysis in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT, plus the `-eli_contributions` table. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; the exact DI/λ needs an ORCA CAS/CI `PrintWF det` output as `<stem>.out` beside the `.gbw`. See [Correlated wavefunctions](Correlated-Wavefunctions.md). |
+| `-eli_family [wfn] [points]` | 0-2 | | ELI-D alpha/beta/triplet and ELI-q of `<wfn>` or `-wfn` as point values; with `-wfn` the points file must not carry a wavefunction extension. Console output. One-shot. ELIA and ELI-q_s,2 need the 2-RDM: an ORCA CAS/CI `.gbw` with its `PrintWF det` output as `<stem>.out` beside it; see [Correlated wavefunctions](Correlated-Wavefunctions.md#6-what-is-exact-what-is-approximate-what-is-refused). |
+| `-fba [wfn]` | 0-1 | | Full bonding analysis of `<wfn>` or `-wfn` in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT, plus the `-eli_contributions` table. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; the exact DI/λ needs an ORCA CAS/CI `PrintWF det` output as `<stem>.out` beside the `.gbw`. See [Correlated wavefunctions](Correlated-Wavefunctions.md). |
 | `-qtaim_eli <rho.cube> <eli.cube> <atoms> [bg]` | 3-4 | `bg 0` | Mask an ELI-D cube to the QTAIM basins of the listed atoms. `<atoms>` is comma-separated, **0-based**. One-shot. |
 | `-qtaim_eli <wfn> <atoms> [res] [radius] [bg]` | 2-5 | | The same, computing both fields from a wavefunction. One-shot. |
 | `-basin_grid <n>` | 1 | `1` | Basin-integration grid level. |
@@ -312,10 +324,10 @@ transfer and E2(D), and the DI uses the Mueller pair density; see
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `-nbo <wfn>` | 1 | | NBO search, hybrids, E2 and NRT in house. |
-| `-nbo_external <wfn>` | 1 | | Write a `.47`, run external `gennbo`, parse the output. |
+| `-nbo [wfn]` | 0-1 | | NBO search, hybrids, E2 and NRT in house, on `<wfn>` or `-wfn`. |
+| `-nbo_external [wfn]` | 0-1 | | For `<wfn>` or `-wfn`: write a `.47`, run external `gennbo`, parse the output. |
 | `-nbo_parse <file>` | 1 | | Parse an existing `gennbo` output. |
-| `-convert_to_47 <wfn>` | 1 | | Write the `.47` archive and stop. |
+| `-convert_to_47 [wfn]` | 0-1 | | Write the `.47` archive of `<wfn>` or `-wfn` and stop. |
 | `-nbo_keywords <"...">` | 1 | | Extra `$NBO` keylist entries. |
 | `-nbo_exe <path>` | 1 | | The `gennbo` executable. On Windows, `wsl:<path>` names a binary inside WSL. |
 | `-nbo_dir <dir>` | 1 | | Working directory for the external run. |
@@ -341,10 +353,10 @@ transfer and E2(D), and the DI uses the Mueller pair density; see
 | `-nrt_no_mirror` | 0 | mirror on | Native: switches off what is otherwise default since 2026-10-14 (formerly opt-in `-nrt_mirror`, still accepted): a single move that adds no formal-charge separation (sum over atoms of \|valence electrons - Lewis electron count\|), such as the allyl cation's bond shift, counts as a whole resonance arrow instead of a dropped intermediate; symmetry images complete the candidate set even where the walk passed them as intermediates; the walk from a symmetry reference of the parent explores the structures the parent's walk already reached. With it allyl's and the allyl cation's mirror bonds are equal (without: 0.744/0.721 in the minority spin, 1.463/1.445 in the cation; NBO 7 weighs the two mirror structures equally), a cation distorted by 0.006 A stays within the symmetric fit's 0.1 % range, and grown Ni(CO)4 keeps Td. Mean \|dBO\| against NBO 7 over the 41 v2 molecules: 0.0356 with, 0.0384 without (LiF 0.997 against 0.000, NaCl 0.000 against 1.000, CF3 beta 0.031 against 0.167); r2SCAN 0.0451 against 0.0477. Grown thiophene finds 50 % more structures with it. |
 | `-nrt_stall <n>` | 1 | `0` = off | Native: a structure's orbital sweeps stop once Anderson mixing has not lowered the largest vector change by 0.1 % for `n` sweeps, instead of running to the cap of 200; the log counts the structures stopped this way. With `n` = 20, CPU time of single runs: Ni(CO)4 -41 %, SF6 -23 %, PF5 -20 %; 29 of the 41 v2 molecules give identical output, ten move by at most 1.6e-6 in D(w), BF4- by 5.5e-5, and Ni(CO)4 ends 0.05 % higher with bond orders moved by up to 0.0017; agreement with NBO 7 (mean \|dBO\| 0.0384 -> 0.0383) unchanged. Grown Ni(CO)4 (`-nrt_target 0`) ends 0.12 % higher with bond orders moved by up to 0.006. |
 | `-nrt_parent <file.json>` | 1 | search's own | Native only, closed shell, implies `-nrt`: the NBO search places this Lewis structure (NBO's `$CHOOSE`) and NRT starts from it. JSON `{"format": "NoSpherA2 Lewis structure", "version": 1, "atoms": N, "lone_pairs": {"O1": 2}, "bonds": [["O1", "H2", 1]]}`: atoms as element + 1-based index or a bare index, valence lone pairs only, bond orders 1-3; a `.native.nbo.json` is read through its `"parent_lewis"`. Refused with a one-line reason on an unknown label, wrong element, duplicate bond, order outside 1-3, an electron count that does not add up, `three_centre` or `alpha`/`beta` entries, or a bond beyond `-nrt_bond_scale`. The log compares its rho(NL) with the search's own best structure. |
-| `-npa` | 0 | off | Natural population analysis with the per-orbital table. |
-| `-npa_summary` | 0 | off | NPA, totals only. |
-| `-ibo` | 0 | off | IAO charges and IBOs (Pipek-Mezey-like, exponent 4, 2x2 Jacobi), listed as core / lone pair / bond-like / delocalised with IAO and Mulliken populations per atom. Closed-shell `.gbw` or spherical `.molden`; refuses unrestricted. `-ibo_cube` writes them as cubes. |
-| `-rgbi` | 0 | off | Resonance-group bond indices. |
+| `-npa [wfn]` | 0-1 | off | Natural population analysis with the per-orbital table. |
+| `-npa_summary [wfn]` | 0-1 | off | NPA, totals only. |
+| `-ibo [wfn]` | 0-1 | off | IAO charges and IBOs (Pipek-Mezey-like, exponent 4, 2x2 Jacobi), listed as core / lone pair / bond-like / delocalised with IAO and Mulliken populations per atom. Closed-shell `.gbw` or spherical `.molden`; refuses unrestricted. `-ibo_cube` writes them as cubes. |
+| `-rgbi [wfn]` | 0-1 | off | Resonance-group bond indices of `<wfn>` or `-wfn`. |
 | `-rgbi_groups <"i,j,k"> [...]` | 1+ | | Explicit atom groups (comma-separated, per group). |
 | `-rgbi_basis nao\|ano` | 1 | `ano` | Orbital basis used for RGBI. |
 | `-rgbi_no_sym` | 0 | off | Disable symmetry use in RGBI. |
@@ -405,6 +417,7 @@ available from it.
 | `-ri_cube <...>` | | | Cube of the fitted density. Also `-RI_CUBE`. |
 | `-SALTED <model>` | 1 | | Predict the density with a SALTED model — a directory or a `.salted` file. Also `-salted`. |
 | `-SALTED_COEFS` | 0 | | Predict and write the coefficients only. Needs `-wfn` (or `-xyz`) first. One-shot. Also `-salted_coefs`. |
+| `-SALTED_distance <model> <xyz> [eigcut]` | 2-3 | | How far each atom of `<xyz>` lies outside the training span of `<model>` (a `.salted` file or a folder, models chosen per atom as `-SALTED` does): the lambda = 0 kernel novelty `nov0` = 1 - \|k0^zeta V\|^2 / (p0.p0)^zeta, 0 inside the span of the model's reference environments and towards 1 outside it, with V V^T the pseudo-inverse of (F0 F0^T)^zeta over eigenvalues above `eigcut` (default `1e-10`, SALTED's; not stored in the file). Also the largest kernel `kmax0` and the cosine to the closest reference environment. One row per atom (1-based) and model: `assigned` is the model `-SALTED` predicts the atom with; for an atom predicted as a first-shell mean of several models it is the first of them and the others are listed as `shared`; a subgroup's model for the same element is an `alternative`. An atom of an element no model has is `filled`, an atom of a model's element with nothing within the cutoff `empty environment` (both go to the spherical fill, `nov0` is printed as `-`). Prints the table and the per-element median and maximum, and writes `<xyz stem>_salted_distance.csv` in the working directory (the model path quoted, with forward slashes; adding the reference row of `kmax0` and p0.p0). For an integer zeta nov0 is also split exactly over the neighbour-pair channels of the lambda = 0 features (the unordered pair of neighbour elements a feature multiplies; the atom's own element is one of its neighbours, since the centre counts in its own density): channel c gets h_c(r, r) / (p0.p0)^zeta of the atom's residual r outside the span of the references, with h_c(x, y) = (x_c.y_c)(x.y)^(zeta-1). The shares are never negative and sum to nov0; at zeta = 1 they are the channel blocks of the linear residual. Under each `ok` row two lines say where the novelty lies, every number a percentage of nov0 unless marked otherwise. `from:` names the (at most two) channels the atom has whose fraction of nov0 most exceeds their share of the atom's own descriptor, its `environment` \|p0_c\|^2 / p0.p0: the excess, fraction - environment, sums to 0 over the channels, and a positive one marks a channel that carries more of the novelty than of the descriptor. Each comes with its fraction, its environment and the ratio of the two, and with `absent` when the references are zero on it (below). The channels are not ranked by their raw fraction because the atom itself counts in its own element's neighbour density: the self channel (C-C for a C) holds most of the descriptor (64-99 % on the phosphazene demo) and so a large fraction of nov0 even where the references cover it (P-P is 48 % of P1's nov0 there, against 88 % of its descriptor; the self channel has the largest fraction in 28 of the 45 atoms and a negative excess in all of them). Nor by the ratio, which a channel with almost no weight in the descriptor would top. The atom's remaining channels follow as `its other channels`. `missing neighbours` are channels on which the atom's features are exactly zero while their share is positive: the combination of reference environments closest to the atom has those neighbours and the atom does not. The two largest are named, the rest given as `others`; all percentages on the line add up to 100 up to rounding. `elements:` does the same for elements (channel (e, e) counts fully to e, (e, f) half to each, for the fraction and the environment alike), with the elements the atom has nothing of as `missing`. Numbers below 10 are printed with two significant digits, values under 0.01 as `<0.01`. On the phosphazene demo with comboV9_4, N8 reads `from: N-P 26 % of nov0 (5.5 % of the descriptor, 4.8x), Cl-Cl 5.7 % (0.77 %, 7.4x, absent), its other channels 56 %; missing neighbours: N-C 4 %, C-C 3.1 %, others 4.9 %`. A closing line names the channels an atom has on which every reference environment of its element is zero among the features the model kept (`Channels absent from the kept features of the model's references: Cl: H-N (atoms 4, 6), N-N (atoms 4, 5, 6, 7), ...` on the same demo); a reference with that element barely inside its cutoff counts as having the channel. A channel the model's FPS kept no feature of cannot be absent this way and is reported apart, from the geometry: an atom has channel (a, b) when a and b both lie within rcut of it (the atom itself counts for its own element; with both neighbour lists where they differ), and a further line, printed only when there are any, names those channels per element (`Channels the model keeps no features for: Cl: N-Cl (atoms 4, 5, 6, 7); H: N-Cl (atom 33); N: N-Cl (atoms 8, 9, 10); P: N-Cl (atoms 1, 2)`). They add nothing to the shares and do not change nov0. For a non-integer zeta there is no split (its shares are no sums of squares). Also writes `<xyz stem>_salted_distance.json`: every row of the CSV, the channel shares per pair (`share` of nov0, `fraction` of nov0, `environment` = \|p0_c\|^2 / p0.p0, `excess` = fraction - environment, `enrichment` = fraction / environment or null where the environment is 0, `absent`) and per element (`share`, `fraction`, `environment`, `excess`, `enrichment`), the absent channels, the atom's channels the model keeps no features for (`unrepresented`), and per model its zeta, every channel it keeps no features for (`unrepresented`) and per species whether K_MM took the Cholesky or the eigendecomposition path. An `eigcut` that is not a number stops. Needs the model's features: a model folded at zeta = 1 (`ENVW`) stops. `-no_gpu_salted` must come before it. One-shot. |
 | `-SALTED_Training` | 0 | | Generate SALTED training data. Needs `-wfn` and `-ri_fit` first. One-shot. |
 | `-interaction_energy <A> <B>` | 2 | | Electrostatic interaction between two fitted densities. With `-SALTED` both are predicted, otherwise both are RI-fitted. One-shot. |
 | `-interaction_energy <A> <A.npy> <B> <B.npy>` | 4 | | The same from pre-computed coefficient files. One-shot. |
@@ -602,7 +615,7 @@ interface and can change without notice.
 | --- | --- |
 | `-test` | Run the built-in test suite. |
 | `-profiling [root]` | Profiling run; `root` defaults to `tests`. Also `-profile`. |
-| `-tune NAME[=VALUE]` | Set a developer knob for this run; a bare `NAME` means `1`. Every knob is listed in [Tuning knobs](Tuning-Knobs.md). |
+| `-tune NAME[=VALUE]` | Set a developer knob for this run; a bare `NAME` means `1`. Every knob is listed in [Tuning knobs](Tuning-Knobs.md); `-tune list` prints them with their defaults and stops. |
 | `-partitioning_test` | Partitioning regression test. |
 | `-test_RI` | RI-fitting regression test. |
 | `-RI_WFN_DIFF` | Compare a fitted density against the wavefunction it came from. |
@@ -610,3 +623,6 @@ interface and can change without notice.
 | `-lahvatest`, `-lukas_test` | Ad-hoc development tests. |
 | `-rkpts`, `-skpts` | Read / save the k-point set. |
 | `-out <file>` | Rename the log file (read before the parser, so position-independent). |
+| `-h [word]` | The help, or only its sections whose title contains `word` (`-h gpu`, `-h bonding`); also `--h`, `-help`, `--help`. Printed to the console. |
+| `-mask <file.fab>` | Solvent-mask contribution read when the XCW settings file has the `mask` keyword. |
+| `-beta_spheres` | The default; undoes `-no_beta_spheres`. |

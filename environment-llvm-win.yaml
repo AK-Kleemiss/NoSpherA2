@@ -1,0 +1,11 @@
+name: llvm
+channels:
+   - conda-forge
+dependencies:
+   # clang-cl, lld-link, llvm-lib and llvm-profdata for the Windows x64 presets. A prefix of its own
+   # because conda-forge clang pulls llvm-openmp, which refuses to sit beside MKL's intel-openmp.
+   # The MSVC 14.5x STL wants clang >= 22; the MSVC headers and the SDK still come from VS.
+   - clang=22.1.8
+   - lld=22.1.8
+   - compiler-rt=22.1.8
+   - llvm-tools=22.1.8

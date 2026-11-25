@@ -1,14 +1,14 @@
 #include "pch.h"
-#include "core/tuning.h"
-#include "core/b2c.h"
-#include "core/wfn_class.h"
-#include "core/atoms.h"
-#include "core/constants.h"
-#include "core/cube.h"
-#include "core/fiber_loop.h"
-#include "core/properties.h"
+#include "core/base/tuning.h"
+#include "core/analysis/b2c.h"
+#include "core/wfn/wfn_class.h"
+#include "core/wfn/atoms.h"
+#include "core/base/constants.h"
+#include "core/properties/cube.h"
+#include "core/base/fiber_loop.h"
+#include "core/properties/properties.h"
 #ifdef NOSPHERA2_USE_GPU
-#include "core/aux_density_gpu.h"
+#include "core/gpu/aux_density_gpu.h"
 #endif
 
 #include <cstdlib>

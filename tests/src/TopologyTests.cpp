@@ -1,6 +1,6 @@
 #include "pch.h"
 
-#include "core/topology.h"
+#include "core/analysis/topology.h"
 
 //References whose topology symmetry fixes, not a golden file: six equal Gaussians on an octahedron
 //give 6 attractors, 12 bond, 8 ring and 1 cage point (vertices, edges, faces, centre), 6 - 12 + 8 - 1 = 1.

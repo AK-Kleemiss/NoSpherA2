@@ -1,11 +1,33 @@
 cmake_minimum_required(VERSION 3.25)
 
+# the presets name clang-cl / clang++ / lld bare; say where to get them before project() fails on it
+set(_nos_tools "${CMAKE_CXX_COMPILER}")
+if(CMAKE_LINKER_TYPE STREQUAL "LLD" AND NOT CMAKE_HOST_WIN32)
+    list(APPEND _nos_tools ld.lld)
+endif()
+foreach(_t IN LISTS _nos_tools)
+    if(_t AND NOT IS_ABSOLUTE "${_t}")
+        unset(_nos_found)
+        find_program(_nos_found "${_t}" NO_CACHE)
+        if(NOT _nos_found)
+            if(CMAKE_HOST_WIN32)
+                set(_h "Run cmake -P scripts/BootstrapMicromamba.cmake (it installs clang-cl into .mambaenv/llvm) and configure with a preset from an x64 Developer shell.")
+            elseif(CMAKE_HOST_APPLE)
+                set(_h "Install the Xcode command-line tools: xcode-select --install")
+            else()
+                set(_h "Run cmake -P scripts/BootstrapMicromamba.cmake (it installs clang and lld into .mambaenv/llvm) and configure with a preset.")
+            endif()
+            message(FATAL_ERROR "${_t} not found on PATH. ${_h}\nGCC builds are for testing only: -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_LINKER_TYPE=BFD")
+        endif()
+    endif()
+endforeach()
+
 project(NoSpherA2 LANGUAGES C CXX)
 
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 # Windows on ARM and Linux aarch64: OpenBLAS instead of oneMKL, and the compiler's own OpenMP
-# runtime (vcomp, libgomp) instead of libiomp5
+# runtime (vcomp, LLVM libomp) instead of libiomp5
 if((WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
    OR (LINUX AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64"))
     set(NOSPHERA2_OPENBLAS ON)
@@ -141,9 +163,9 @@ if(NOSPHERA2_USE_CUDA)
 endif()
 
 #Both backends at once is a fat binary: each kernel source is compiled twice, once per
-#backend, into its own namespace (Src/core/gpu_api.h), and Src/core/gpu_dispatch.cpp forwards
+#backend, into its own namespace (Src/core/gpu/gpu_api.h), and Src/core/gpu/gpu_dispatch.cpp forwards
 #the global entry points to whichever backend has a device. Neither runtime is linked - CUDA's
-#is static, HIP's is opened by name (Src/core/hip_runtime_shim.cpp) - so the one binary runs
+#is static, HIP's is opened by name (Src/core/gpu/hip_runtime_shim.cpp) - so the one binary runs
 #on an NVIDIA machine, an AMD machine and a machine with no GPU at all. That is what the CI
 #ships (.github/workflows/c-cpp_all.yml).
 
@@ -170,7 +192,7 @@ macro(nosphera2_set_arch lang)
 endmacro()
 
 #Nothing delay-loads a GPU library any more: cuBLAS was the last CUDA one, and the HIP
-#runtime is opened by name (Src/core/hip_runtime_shim.cpp) rather than delay-loaded. Deleting
+#runtime is opened by name (Src/core/gpu/hip_runtime_shim.cpp) rather than delay-loaded. Deleting
 #the code that set these was not enough to stop them being used: they were cached, so a build
 #directory configured before that change kept handing the flag and delayimp to every link.
 #Cleared rather than left to rot, the same way an unusable cached compiler is above.
@@ -337,6 +359,26 @@ if(NOSPHERA2_USE_HIP)
         nosphera2_arch_managed(HIP)
         check_language(HIP)
         if(CMAKE_HIP_COMPILER)
+            #CMake has no LINKER_TYPE LLD for HIP and fails enable_language's own try-compile on it;
+            #ROCm's clang takes the same flag as the host clang
+            if(CMAKE_LINKER_TYPE STREQUAL "LLD" AND NOT DEFINED CMAKE_HIP_USING_LINKER_LLD)
+                set(CMAKE_HIP_USING_LINKER_LLD "-fuse-ld=lld")
+                list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_HIP_USING_LINKER_LLD)
+            endif()
+            #ROCm's clang takes the host's glibc and libstdc++; the objects it writes must match the sysroot
+            #and GCC the host clang links against (the bootstrap's glibc 2.28), or lld cannot resolve
+            #__isoc23_strtol and the GLIBC_2.34 references of the system libstdc++.so
+            if(LINUX AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+                execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -v "-###" -c -x c++ /dev/null
+                    ERROR_VARIABLE _nos_cxx_driver OUTPUT_QUIET)
+                if(_nos_cxx_driver MATCHES "\"-isysroot\" \"([^\"]+)\"")
+                    string(APPEND CMAKE_HIP_FLAGS_INIT " --sysroot=${CMAKE_MATCH_1}")
+                    if(_nos_cxx_driver MATCHES "Selected GCC installation: ([^\n]+)")
+                        string(APPEND CMAKE_HIP_FLAGS_INIT " --gcc-install-dir=${CMAKE_MATCH_1}")
+                    endif()
+                    message(STATUS "HIP compiles against the host clang's sysroot and GCC:${CMAKE_HIP_FLAGS_INIT}")
+                endif()
+            endif()
             enable_language(HIP)
             set(CMAKE_HIP_STANDARD 17)
             set(CMAKE_HIP_STANDARD_REQUIRED ON)
@@ -345,7 +387,7 @@ if(NOSPHERA2_USE_HIP)
             #carries a HIP object, directly or through a static library (hip-lang::device,
             #CMakeHIPInformation.cmake), and a binary that needs libamdhip64.so to start is
             #a binary that does not start without ROCm. NONE names no runtime library at
-            #all; Src/core/hip_runtime_shim.cpp supplies the entry points and opens the real
+            #all; Src/core/gpu/hip_runtime_shim.cpp supplies the entry points and opens the real
             #library by name when there is one.
             set(CMAKE_HIP_RUNTIME_LIBRARY NONE)
         endif()
@@ -390,7 +432,7 @@ if(NOSPHERA2_USE_HIP)
         #Nothing links the HIP runtime, on either route. ROCm's lib/bin directory is not on
         #the path of a machine that has the card but not the SDK, and a binary whose loader
         #wants libamdhip64.so / amdhip64_7.dll is rejected before main() (measured on the
-        #AMD node as STATUS_DLL_NOT_FOUND). Src/core/hip_runtime_shim.cpp defines the entry
+        #AMD node as STATUS_DLL_NOT_FOUND). Src/core/gpu/hip_runtime_shim.cpp defines the entry
         #points the kernel objects import and opens the library by name on the first call,
         #answering "no device" when it is absent. The name carries the HIP runtime's major
         #version, which is neither the ROCm release nor the clang version (ROCm 6.x ships
@@ -471,9 +513,10 @@ add_subdirectory(
 )
 
 # Patch libcint GCC ivdep pragmas for MSVC without modifying the submodule.
+# clang-cl defines _MSC_VER but gets C99 _Complex from cint.h, so its _MSC_VER branches must not see it
 if(MSVC)
     set(_libcint_ivdep_pragma
-        "#if defined(_MSC_VER)\n#pragma loop(ivdep)\n#elif defined(__GNUC__) || defined(__clang__)\n#pragma GCC ivdep\n#endif"
+        "#if defined(_MSC_VER) && !defined(__clang__)\n#pragma loop(ivdep)\n#elif defined(__GNUC__) || defined(__clang__)\n#pragma GCC ivdep\n#endif"
     )
 
     get_target_property(_cint_sources cint SOURCES)
@@ -482,6 +525,7 @@ if(MSVC)
         "src/cart2sph.c"
         "src/g1e_grids.c"
         "src/fblas.c"
+        "src/breit.c"
     )
         set(_libcint_ivdep_in
             "${CMAKE_CURRENT_SOURCE_DIR}/libcint/${_libcint_ivdep_source}"
@@ -497,6 +541,12 @@ if(MSVC)
             _libcint_ivdep_text
             "${_libcint_ivdep_text}"
         )
+        string(REPLACE "#ifdef _MSC_VER" "#if defined(_MSC_VER) && !defined(__clang__)"
+            _libcint_ivdep_text "${_libcint_ivdep_text}")
+        # UCRT's complex.h declares creal/cimag/conj for _Dcomplex only
+        string(REPLACE "#include <complex.h>"
+            "#include <complex.h>\n#if defined(_MSC_VER) && defined(__clang__)\n#define creal __builtin_creal\n#define cimag __builtin_cimag\n#define conj __builtin_conj\n#endif"
+            _libcint_ivdep_text "${_libcint_ivdep_text}")
 
         # write only on change: a fresh mtime recompiles cint after every configure
         set(_libcint_ivdep_old "")
@@ -601,6 +651,12 @@ endif()
 if(ANDROID AND CMAKE_SIZEOF_VOID_P EQUAL 4 AND TARGET libecpint_static)
     target_compile_options(libecpint_static PRIVATE -O1)
 endif()
+#scnlib hands clang-cl a bare PUBLIC /EHsc, which nvcc takes for a second input file
+if(MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND TARGET scn)
+    get_target_property(_scn_opts scn INTERFACE_COMPILE_OPTIONS)
+    list(TRANSFORM _scn_opts REPLACE "^/EHsc$" "$<$<COMPILE_LANGUAGE:CXX>:/EHsc>")
+    set_target_properties(scn PROPERTIES INTERFACE_COMPILE_OPTIONS "${_scn_opts}")
+endif()
 
 # ---------------------------------------------------------------------------
 # mdspan
@@ -685,7 +741,7 @@ if(NOSPHERA2_OPENBLAS AND NOT ANDROID AND NOSPHERA2_USE_ARMPL)
         get_filename_component(_armpl_root "${NOSPHERA2_ARMPL_INCLUDE_DIR}" DIRECTORY)
         # Static archives on both systems, so there is no ArmPL runtime to ship. Linux takes the
         # OpenMP build: like MKL it runs serial inside a parallel region and on -cpus threads
-        # outside one, on the system libgomp the rest of NoSpherA2 uses (the 247 MB shared one
+        # outside one, on the libomp the rest of NoSpherA2 uses (the 247 MB shared one
         # carries its own). Windows takes the serial /MD library.
         if(WIN32)
             # full name: CMake 4 tries .dll.lib first and would find the import library
@@ -727,7 +783,7 @@ elseif(NOSPHERA2_OPENBLAS AND LINUX)
         IMPORTED_LOCATION "${NOSPHERA2_OPENBLAS_LIB}"
         INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}"
         INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS
-        #MKL's libiomp5 used to supply the GOMP_* symbols; without it libgomp has to be linked
+        #MKL used to bring the OpenMP runtime (libiomp5); without it the compiler's own has to be linked
         INTERFACE_LINK_OPTIONS -fopenmp)
 elseif(ANDROID)
     # Static OpenBLAS built with the NDK (USE_OPENMP=1, C_LAPACK, LAPACKE) under NOSPHERA2_OPENBLAS_ROOT
@@ -792,7 +848,7 @@ else()
     #large products as one threaded call, the (T) loop as an OpenMP loop inside which MKL runs serially
     set_source_files_properties("${CMAKE_SOURCE_DIR}/occ/src/qm/cc/density.cpp" TARGET_DIRECTORY occ_cc_obj PROPERTIES
         COMPILE_DEFINITIONS "OCC_DENSITY_CBLAS;EIGEN_DONT_PARALLELIZE"
-        COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/openmp:experimental,-fopenmp>")
+        COMPILE_OPTIONS "$<IF:$<BOOL:${MSVC}>,/openmp:experimental,-fopenmp>")
     target_link_libraries(occ_cc PUBLIC MKL::MKL)
 endif()
 
@@ -818,6 +874,12 @@ function(enable_googletests)
     # For Windows: Prevent overriding the parent project's compiler/linker settings
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
+    #gtest builds with -WX on clang-cl too, and clang 20 flags its char8_t printer
+    if(MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        foreach(_t gtest gtest_main gmock gmock_main)
+            target_compile_options(${_t} PRIVATE -Wno-character-conversion -Wno-unknown-warning-option)
+        endforeach()
+    endif()
 endfunction()
 
 # ---------------------------------------------------------------------------

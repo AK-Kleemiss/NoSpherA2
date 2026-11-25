@@ -1,9 +1,9 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/basis_set.h"
-#include "core/wfn_class.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/basis_set.h"
+#include "core/wfn/wfn_class.h"
 
 #include <complex>
 #include <cstdio>
@@ -729,8 +729,10 @@ TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
 		readxyzMinMax_fromWFN(w, raw_opts, false);
 		for (int i = 0; i < 3; i++)
 		{
-			const int raw = (int)ceil(constants::bohr2ang(raw_opts.MinMax[3 + i] - raw_opts.MinMax[i]) / res);
-			EXPECT_EQ(raw_opts.NbSteps[i], raw) << "resolution " << res << " axis " << i;
+			//a span that is an exact multiple of res may round either way under fast-math (reciprocal division)
+			const double q = constants::bohr2ang(raw_opts.MinMax[3 + i] - raw_opts.MinMax[i]) / res;
+			const int raw = raw_opts.NbSteps[i];
+			EXPECT_TRUE(raw == (int)ceil(q - 1e-9) || raw == (int)ceil(q + 1e-9)) << "resolution " << res << " axis " << i;
 			EXPECT_EQ(opts.NbSteps[i], raw + (raw % 2)) << "resolution " << res << " axis " << i;
 			EXPECT_EQ(opts.NbSteps[i] % 2, 0) << "resolution " << res << " axis " << i;
 			const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];

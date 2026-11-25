@@ -1,12 +1,12 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/atoms.h"
-#include "core/wfn_class.h"
-#include "core/integration_params.h"
-#include "core/libCintKernels.h"
-#include "core/libCintMain.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/atoms.h"
+#include "core/wfn/wfn_class.h"
+#include "core/integration/integration_params.h"
+#include "core/integration/libCintKernels.h"
+#include "core/integration/libCintMain.h"
 #include "core/NoSpherA2.h"
 
 // free functions of libCintMain.cpp / integration_params.cpp that have no header declaration
@@ -770,5 +770,5 @@ TEST(LibcintDispatchIoTests, NoJobWritesHelpToTheRequestedLog)
 	const std::string text = read_file(log);
 	std::filesystem::remove(log);
 	EXPECT_NE(text.find("Did not understand the task to perform!"), std::string::npos);
-	EXPECT_NE(text.find("-h, --h, -help, --help"), std::string::npos);
+	EXPECT_NE(text.find("also --h, -help, --help"), std::string::npos);
 }

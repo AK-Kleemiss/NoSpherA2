@@ -1,0 +1,183 @@
+#pragma once
+
+#include <string.h>
+#include <string>
+#include <vector>
+
+class WFN;
+
+// Average an atom-centred AO matrix over the 48 operations of O_h.
+// Shells must be contiguous. Cartesian matrices use constants::type_vector;
+// spherical matrices use the libcint real-spherical ordering and phases.
+// Cartesian route only; O_h approximates the spherical average but keeps the molecule's orientation.
+void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
+	bool spherical = false);
+
+// Average an atom-centred AO matrix over all rotations. Real-spherical basis only; each shell's
+// 2l+1 components must be contiguous, their order and phase convention do not matter.
+void spherically_average_atomic_matrix(dMatrix2& matrix, const ivec& shell_angular_momenta);
+
+// Highest shell l of the basis, -1 if it has no shells; lets RGBI refuse l > h before any SCF.
+int highest_shell_angular_momentum(const WFN& wavy);
+
+// Drop the per-process cache of free-atom densities (one per element+basis).
+void clear_rgbi_free_atom_cache();
+
+// Inputs RGBI runs on (.gbw, .molden, pure-shell .fchk), excluding the refused extension, for a refusal message.
+// A .wfn/.wfx carries no shell structure and a cartesian .fchk no contracted density matrix.
+std::string rgbi_supported_input_phrase(const std::string& refused_extension);
+
+struct bond {
+	std::string label_1;
+	std::string label_2;
+	std::string label_3;
+	std::string filename;
+	bool success;
+	bool dens;
+	bool esp;
+};
+
+//structrue to contain multiple NAO atom sets and the overlap and density matrices
+class Roby_information {
+private:
+	// Structure to hold the NAOs
+	struct NAOResult {
+		vec eigenvalues;  // Occupancies
+		vec eigenvectors; // Coefficients
+		vec omitted_eigenvalues;
+		vec omitted_eigenvectors;
+		int atom_index = -1;
+		ivec matrix_elements;
+		vec sub_DM;
+		vec sub_OM;
+	};
+
+	struct bond_index_result {
+		double covalent;
+		double ionic;
+		double total;
+		double percent_covalent_Pyth;
+		double percent_covalent_Arakai;
+		double pair_population;
+		double population_first;
+		double population_second;
+		std::pair<int, int> atom_indices;
+		std::pair<int, int> atom_element_nr;
+	};
+
+	struct group_bond_index_result {
+		double covalent;
+		double ionic;
+		double total;
+		double percent_covalent_Pyth;
+		double percent_covalent_Arakai;
+		double pair_population;
+		double population_first;
+		double population_second;
+		int group_index_first;
+		int group_index_second;
+		ivec atoms_first;
+		ivec atoms_second;
+	};
+
+	std::vector<NAOResult> NAOs;
+	dMatrix2 overlap_matrix;
+	dMatrix2 density_matrix;
+	dMatrix2 total_NAOs;
+	std::vector<dMatrix2> projection_matrices;
+	std::vector<dMatrix2> overlap_matrices;
+	std::vector<bond_index_result> RGBI;
+	std::vector<group_bond_index_result> RGBI_groups;
+	ivec ano_fallback_atoms;
+	//The pseudo-inverse rank is set by a hard singular-value cutoff and can split symmetry-equivalent
+	//bonds; the last rank is kept so a bond whose rank sits at the cutoff, not at a spectral gap, is flagged.
+	double pinv_cutoff = 1E-5;  //NOS_RGBI_PINV_CUTOFF overrides it
+	//Width of the +/-1 window in find_eigenvalue_pairs: an eigenvalue this close to +/-1 is a lone pair left
+	//unpaired, and two summing to within it are a bond pair. H2O2 O-O Cov. moves 0.645 -> 0.818 at 2E-3.
+	double pair_tolerance = 1E-4;  //NOS_RGBI_PAIR_TOL overrides it
+	//Group path: an ionic pair whose positive eigenvalue exceeds this is a lone pair and skipped. Ionic
+	//eigenvalues lie in [-1, 1], so >= 1 switches the guard off. H2O2 O-O 0.800 vs 0.645.
+	double group_lone_pair_threshold = 0.99;  //NOS_RGBI_GROUP_LP overrides it
+	//Same guard on the atom-pair path, looser: 0.99 would also drop real d-backbonding pairs near 84 deg.
+	double pair_lone_pair_threshold = 0.999;  //NOS_RGBI_PAIR_LP overrides it
+	int last_pinv_n = 0, last_pinv_kept = 0;
+	double last_pinv_smallest_kept = 0.0, last_pinv_largest_dropped = 0.0;
+	std::vector<std::string> pinv_warnings;
+	//Roby-Gould atomic NOs: per atom, Loewdin S^-1/2, no interatomic orthogonalisation (unlike nao.h).
+	//keep_orbitals >= 0 fixes the subspace rank and ignores occupancy_cutoff, keeping indices continuous in geometry.
+	NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
+		const ivec& atom_indices, const ivec& shell_angular_momenta = {},
+		bool spherical = false, double occupancy_cutoff = 1.0 / 6.0,
+		int leading_orbitals_to_skip = 0, bool EVs = false, int keep_orbitals = -1);
+	double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
+	void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false,
+		bool legacy_occupancy_cutoff = false);
+	ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
+	void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
+		const vec& eigvals,
+		const ivec& pairs,
+		const int index_a,
+		const int index_b,
+		const ivec& pair_matrix_indices);
+	dMatrix2 build_group_PAS(const ivec& group_atom_indices, const ivec& bond_bf_indices, const dMatrix2& P_G);
+	void transform_group_Ionic_orbitals(dMatrix2& EVC, const vec& eigvals,
+		const ivec& pairs, const ivec& group_a_atoms, const ivec& group_b_atoms,
+		const ivec& bond_bf_indices, const dMatrix2& P_GA, const dMatrix2& P_GB);
+	void computeGroupAnalysis(const ivec2& group_defs, const vec& atom_pops, const ivec& atom_charges, const bool EVs);
+	std::map<char, dMatrix2> make_covalent_from_ionic(
+		const dMatrix2& theta_I,
+		const vec& eigvals,
+		const ivec& pairs,
+		bool EVs = false);
+	std::string make_theta_info(const WFN& wavy, const std::pair<int, int>& bond,
+		const vec& eigvals, const ivec& pairs, const dMatrix2& angles,
+		const vec& covalent_populations, const vec& ionic_populations) const;
+	double Roby_population_analysis(ivec atoms);
+public:
+	Roby_information() = default;
+	~Roby_information() = default;
+	Roby_information(const Roby_information&) = default;
+	Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false, bool legacy_occupancy_cutoff = false);
+
+};
+
+bond do_bonds(WFN& wavy, int mode_sel, bool mode_leng, bool mode_res, double res[], bool cub, double boxsize[], int atom1, int atom2, int atom3, const bool& debug, const bool& bohr, int runnumber, bool rho, bool rdg, bool eli, bool lap);
+int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr);
+
+//along_path: rho and its Laplacian on the traced bond path from each bond critical point instead of the straight line
+void bondwise_laplacian_plots(std::filesystem::path &wfn_name, const bool along_path = false);
+namespace topology { struct bond_path; }
+//rho and its Laplacian along each traced path to <stem>_bond_path_<a>_<b>.dat, a BPL/GPL line per path to log if given
+void write_bond_path_profiles(const WFN &wavy, const std::vector<topology::bond_path> &paths, const std::string &stem, std::ostream *log);
+void ELI_analysis(const WFN &wavy, options &opt);
+
+// QTAIM-guided ELI masking:
+//   Run QTAIM basin analysis on `rho`, keep ELI values only for voxels in the
+//   basins of `selected_indices` (0-based atom indices), set everything else to
+//   `background_value`, shrink the output grid to the tight bounding box of the
+//   selected region, and write the result to `output_path`.
+void QTAIM_ELI_mask(
+	cube& rho,
+	cube& eli,
+	WFN& parent_wfn,
+	const std::vector<atom>& atoms,
+	const ivec& selected_indices,
+	double background_value,
+	const std::filesystem::path& output_path,
+	bool debug,
+	std::ostream& log
+);
+
+// Dispatch helper: reads (or computes) rho/eli cubes then calls QTAIM_ELI_mask.
+//   If `eli_path` is empty, `rho_or_wfn` is treated as a wavefunction file and
+//   the cubes are generated on the fly.
+void run_QTAIM_ELI_mask(
+	const std::filesystem::path& rho_or_wfn,
+	const std::filesystem::path& eli_path,
+	const ivec& selected_indices,
+	double background_value,
+	options& opt,
+	std::ostream& log
+);
+
+#include "wfn_class.h"

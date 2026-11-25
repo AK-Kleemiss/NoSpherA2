@@ -212,7 +212,7 @@ def main(argv):
         "description": "NBO 7 reference results for the in-house NBO implementation in "
                        "NoSpherA2. One <name>.nbo.json per molecule, written by "
                        "`NoSpherA2 -nbo <name>.gbw -nbo_keywords \"NRT E2PERT\"`; the "
-                       "structures behind the keys are in Src/core/nbo_run.h. Compare a "
+                       "structures behind the keys are in Src/core/nbo/nbo_run.h. Compare a "
                        "candidate against these with compare_nbo.py.",
         "generated": datetime.date.today().isoformat(),
         "provenance": "Every field here is read back from the outputs the programs wrote: "

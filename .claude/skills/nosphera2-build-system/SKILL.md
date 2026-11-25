@@ -37,7 +37,7 @@ The top-level CMake project configures dependencies and then builds project targ
 
 - `libcint`, `occ`, `mdspan`, and `featomic/featomic` are consumed with `add_subdirectory`.
 - `BasisSetGenerator` builds `BasisSetConverter`, which generates `Src/basis_data.cpp`.
-- `Src/core` builds the static `NoSpherA2Core` target and alias `NoSpherA2::Core`.
+- `Src/core` builds the static `NoSpherA2Core` target and alias `NoSpherA2::Core`. Its sources sit in subsystem folders (`base`, `wfn`, `integration`, `tsc`, `xcw`, `salted`, `nbo`, `analysis`, `properties`, `gpu`), all on the PUBLIC include path (`NOSPHERA2_CORE_INCLUDE_DIRS`, also handed to the MSVC-host HIP compile), so a new folder goes into that list; the sources are ordered by file name, as in the flat folder.
 - `Src/dll` builds the shared library (`NoSpherA2.dll`, `libNoSpherA2.so`, `libNoSpherA2.dylib`) into `bin`; it carries all the code.
 - `app` builds the `NoSpherA2` executable, a launcher that loads that library from its own directory (`nosphera2_main`), so the exe never runs without it. Android links one static exe instead.
 - `tests/src` builds `NoSpherA2_Tests` when `NOSPHERA2_BUILD_TESTS=ON`.
@@ -73,9 +73,9 @@ When adding or changing tests, keep `tests/tests.toml`, `tests/src`, and `UNIT_T
 
 ## Windows Notes
 
-For preset builds on Windows, use an x64 Visual Studio Developer shell or another environment where Ninja can find `cl.exe` and the MSVC headers. Missing standard headers such as `stdlib.h`, `string.h`, or `stdio.h` usually indicate shell/toolchain setup, not a broken source rewrite.
+For preset builds on Windows, use an x64 Visual Studio Developer shell or another environment where Ninja can find `clang-cl`, `lld-link` and the MSVC headers. `release-windows`/`debug-windows` compile with `clang-cl` from `.mambaenv/llvm` (`environment-llvm-win.yaml`); the ARM64 presets keep `cl`. Linux presets use `clang`/`clang++` with `CMAKE_LINKER_TYPE=LLD` from `.mambaenv/llvm` (`environment-llvm-linux.yaml`: clang 19.1.7, glibc 2.28 sysroot, GCC 14 libstdc++ headers; aarch64 in `.mambaenv/env`); macOS uses Apple clang. GCC is a test-only override (`-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_LINKER_TYPE=BFD`). A build tree configured before the switch keeps its old compiler in `CMakeCache.txt`; delete the cache. Missing standard headers such as `stdlib.h`, `string.h`, or `stdio.h` usually indicate shell/toolchain setup, not a broken source rewrite.
 
-The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. IDE work on every platform goes through `.vscode/` (CMake Tools with the presets; `cmake.useVsDeveloperEnvironment` supplies the MSVC environment on Windows). In-process tests (e.g. `alanine_integrated_occ`) stay in-process in the gtest binary; do not add subprocess fallbacks for crashing tests.
+The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. IDE work on every platform goes through `.vscode/` (CMake Tools with the presets; `cmake.useVsDeveloperEnvironment` supplies the VS environment, `clang-cl` included, on Windows). In-process tests (e.g. `alanine_integrated_occ`) stay in-process in the gtest binary; do not add subprocess fallbacks for crashing tests.
 
 ## Dependency Boundaries
 

@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/atoms.h"
-#include "core/cell.h"
-#include "core/wfn_class.h"
-#include "core/mo_class.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/atoms.h"
+#include "core/xcw/cell.h"
+#include "core/wfn/wfn_class.h"
+#include "core/wfn/mo_class.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>

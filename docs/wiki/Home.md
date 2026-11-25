@@ -58,7 +58,7 @@ log.
 
 `.\NoSpherA2.exe -h` prints a self-contained help text with the same
 information in a single screenful-per-section form. It is generated from the
-same source tree as this wiki (`Src/core/convenience.cpp`), so when the two
+same source tree as this wiki (`Src/core/help_text.cpp`), so when the two
 disagree, trust `-h` on the binary you are running.
 
 ## Verbosity
@@ -86,7 +86,7 @@ partitioning scheme, the grid, the ECP treatment, each property, the NBO/NRT
 analysis, SALTED, the dispersion model, and so on. Copy those lines out of your
 log rather than guessing from a table here.
 
-The reference list lives in `Src/core/citations.cpp` (40 methods, DOIs
+The reference list lives in `Src/core/base/citations.cpp` (40 methods, DOIs
 Crossref-checked on 24 Sep 2026) and is the single place it is maintained. If a
 method you used did not print a citation, that is a bug worth reporting.
 

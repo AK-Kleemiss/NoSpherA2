@@ -1,11 +1,11 @@
 #include "pch.h"
 
-#include "core/convenience.h"
-#include "core/constants.h"
-#include "core/wfn_class.h"
-#include "core/cube.h"
-#include "core/isosurface.h"
-#include "core/npy.h"
+#include "core/base/convenience.h"
+#include "core/base/constants.h"
+#include "core/wfn/wfn_class.h"
+#include "core/properties/cube.h"
+#include "core/properties/isosurface.h"
+#include "core/base/npy.h"
 
 #include <atomic>
 #include <complex>
@@ -860,7 +860,7 @@ TEST(CubeIoTests, FractalDimensionOfAStep)
 	EXPECT_EQ(steps, 12);
 	EXPECT_EQ(map_min, 0.0);
 	EXPECT_EQ(map_max, 3.0);
-	const double a3 = std::pow(0.529177249, 3);
+	const double a3 = constants::bohr2ang_p(1.0, 3);
 	EXPECT_NEAR(e0, 48.0 * a3, 1e-6);
 	EXPECT_NEAR(e1, 96.0 * a3, 1e-6);
 	const double epsilon = std::log(144.0) / 3.0;
