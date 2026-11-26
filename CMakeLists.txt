@@ -852,6 +852,22 @@ else()
     target_link_libraries(occ_cc PUBLIC MKL::MKL)
 endif()
 
+# ---------------------------------------------------------------------------
+# molscf: the second SCF of the XCW fit (settings key `scf_backend dusk`), built when NOSPHERA2_DUSK_DIR names its source tree
+# ---------------------------------------------------------------------------
+set(NOSPHERA2_DUSK_DIR "" CACHE PATH "molscf source tree for the XCW scf_backend dusk; empty builds without it")
+set(MOLSCF_GTOINT_PREFIX "D:/Claude_SCF/extern/gtoint" CACHE PATH "gtoint install prefix")
+if(NOSPHERA2_DUSK_DIR AND NOT NOSPHERA2_OPENBLAS AND NOT APPLE)
+    #gtoint's package names the MKL and libiomp5md of the environment it was built in. Found here first, on MKL_DIR above, with
+    #its OpenMP runtime set to ours, molscf's own find_package sees these targets: one MKL and one libiomp5md in the link
+    find_package(gtoint CONFIG REQUIRED PATHS "${MOLSCF_GTOINT_PREFIX}" NO_DEFAULT_PATH)
+    set_target_properties(gtoint::gtoint_openmp PROPERTIES INTERFACE_COMPILE_OPTIONS ""
+        INTERFACE_LINK_LIBRARIES "${MICROMAMBA_ENV_PREFIX}/Library/lib/libiomp5md.lib")
+    set(MOLSCF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    add_subdirectory("${NOSPHERA2_DUSK_DIR}" "${CMAKE_BINARY_DIR}/_deps/molscf" EXCLUDE_FROM_ALL)
+    target_compile_options(molscf PRIVATE "SHELL:-Xclang -fopenmp")
+endif()
+
 
 # ---------------------------------------------------------------------------
 # Basis Set Generation

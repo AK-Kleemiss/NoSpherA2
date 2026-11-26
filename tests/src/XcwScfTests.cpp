@@ -784,3 +784,79 @@ TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
 		std::filesystem::remove_all(dir);
 	}
 }
+
+#ifdef NOSPHERA2_USE_DUSK
+//------------------------------------------------------------------
+//scf_backend dusk: the runs above on molscf's SCF, against the golden energy and against the occ backend
+
+TEST(XcwScfTests, DuskLambdaZeroIsTheHartreeFockEnergy)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 scf_backend dusk");
+	EXPECT_NE(run.out.find("XCW SCF backend: dusk (molscf)"), std::string::npos) << run.out;
+	const auto rows = lambda_rows(run.out);
+	ASSERT_EQ(rows.size(), 1u) << run.out;
+	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
+	EXPECT_TRUE(physical_criterion(rows[0].criterion)) << rows[0].criterion;
+	EXPECT_EQ(rows[0].penalty, "0.000");
+	EXPECT_EQ(rows[0].quant, rows[0].energy);
+	EXPECT_NE(run.log.find("Starting XCW SCF solver with lambda = 0.00000"), std::string::npos);
+	EXPECT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
+	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.tscb"));
+	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.wfn"));
+	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.fchk"));
+	std::filesystem::remove_all(dir);
+}
+
+//Both backends at lambda 0, 0.01 and 0.02 under very_tight: the same energies and criteria to what the table prints
+TEST(XcwScfTests, DuskScanMatchesOcc)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const std::string settings = "very_tight normal_conv params 177 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0.02";
+	const auto a = lambda_rows(run_on_p1(dir, settings + read_shared_eri(dir)).out);
+	const auto b = lambda_rows(run_on_p1(dir, settings + " scf_backend dusk").out);
+	ASSERT_EQ(a.size(), 3u);
+	ASSERT_EQ(b.size(), 3u);
+	for (size_t i = 0; i < a.size(); i++) {
+		EXPECT_EQ(a[i].lambda, b[i].lambda);
+		EXPECT_NEAR(a[i].d(a[i].energy), b[i].d(b[i].energy), 1e-6) << a[i].lambda;
+		EXPECT_NEAR(a[i].d(a[i].criterion), b[i].d(b[i].criterion), 1e-4) << a[i].lambda;
+		EXPECT_NEAR(a[i].d(a[i].quant), b[i].d(b[i].quant), 1e-6) << a[i].lambda;
+	}
+	std::filesystem::remove_all(dir);
+}
+
+TEST(XcwScfTests, DuskUnrestrictedClosedShellMatchesRestricted)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const auto u = lambda_rows(run_on_p1(dir, common + "f2 uhf start 0.01 step_size 0.01 end 0.01 scf_backend dusk").out);
+	const auto r = lambda_rows(run_on_p1(dir, common + "f2 rhf start 0.01 step_size 0.01 end 0.01 scf_backend dusk").out);
+	ASSERT_EQ(u.size(), 1u);
+	ASSERT_EQ(r.size(), 1u);
+	EXPECT_EQ(u[0].goof2, r[0].goof2);
+	EXPECT_NEAR(u[0].d(u[0].energy), r[0].d(r[0].energy), 1e-6);
+	std::filesystem::remove_all(dir);
+}
+
+//The perturbation as molscf sees it, through the AO storage change and occ's half density: dE_p/dD and its response
+//against central differences, the grid in double
+TEST(XcwScfTests, DuskPerturbationMatchesFiniteDifferences)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	set_tuning("NOSPHERA2_DUSK_FD_CHECK", "1");
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0.01 step_size 0.01 end 0.01 i_double scf_backend dusk");
+	set_tuning("NOSPHERA2_DUSK_FD_CHECK", nullptr);
+	ASSERT_EQ(occurrences(run.out, "dusk FD check "), 4u) << run.out;
+	for (size_t at = run.out.find("dusk FD check "); at != std::string::npos; at = run.out.find("dusk FD check ", at + 1)) {
+		const std::string line = run.out.substr(at, run.out.find('\n', at) - at);
+		std::cout << line << std::endl;
+		EXPECT_LT(number_after(line, " rel "), 1e-6) << line;
+		EXPECT_LT(number_after(line, "max|dF| "), 1e-4) << line;
+	}
+	std::filesystem::remove_all(dir);
+}
+#endif

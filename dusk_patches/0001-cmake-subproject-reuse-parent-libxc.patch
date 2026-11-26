@@ -1,0 +1,37 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ad02578..87a0309 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -12,7 +12,7 @@ set(MOLSCF_ENV_PREFIX "D:/Claude_Integration/.mambaenv/env" CACHE PATH "micromam
+ # gtoint's package config finds MKL (static, lp64, intel_thread) and carries the OpenMP flags + libiomp5md
+ # through gtoint::gtoint; point it at our env instead of the path it was built with.
+ set(MKL_DIR "${MOLSCF_ENV_PREFIX}/Library/lib/cmake/mkl" CACHE PATH "MKL CMake package directory")
+-set(MOLSCF_GTOINT_PREFIX "${CMAKE_SOURCE_DIR}/extern/gtoint" CACHE PATH "gtoint install prefix")
++set(MOLSCF_GTOINT_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/extern/gtoint" CACHE PATH "gtoint install prefix")
+ if(NOT EXISTS "${MOLSCF_GTOINT_PREFIX}")
+   # shortcut: git worktrees of this repo have no extern/ (git-ignored) and use the main checkout's install;
+   # remove when gtoint has a proper shared install location
+@@ -26,14 +26,21 @@ add_library(molscf STATIC ${MOLSCF_SOURCES})
+ add_library(molscf::molscf ALIAS molscf)
+ target_include_directories(molscf PUBLIC include)
+ target_include_directories(molscf PRIVATE src)
+-target_compile_definitions(molscf PRIVATE MOLSCF_DEFAULT_BASIS_DIR="${CMAKE_SOURCE_DIR}/data/basis")
++target_compile_definitions(molscf PRIVATE MOLSCF_DEFAULT_BASIS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data/basis")
+ target_link_libraries(molscf PUBLIC gtoint::gtoint)
+ if(MSVC)
+   target_compile_options(molscf PRIVATE /W4 /clang:-ffp-contract=off)
+   target_compile_definitions(molscf PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
+ endif()
+ 
+-if(MOLSCF_WITH_LIBXC)
++if(MOLSCF_WITH_LIBXC AND TARGET xc)
++  # a parent project builds libxc already (NoSpherA2 through occ): one libxc, its headers from the target's directories
++  get_target_property(_xc_src xc SOURCE_DIR)
++  get_target_property(_xc_bin xc BINARY_DIR)
++  target_include_directories(molscf PRIVATE "${_xc_src}/src" "${_xc_bin}/src" "${_xc_bin}")
++  target_link_libraries(molscf PUBLIC xc)
++  target_compile_definitions(molscf PUBLIC MOLSCF_WITH_LIBXC=1)
++elseif(MOLSCF_WITH_LIBXC)
+   enable_language(C)
+   include(FetchContent)
+   set(BUILD_TESTING OFF CACHE BOOL "" FORCE)

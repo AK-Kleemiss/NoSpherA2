@@ -1300,6 +1300,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		xcw_int_precision = stod(arguments[i + 1]);
 	else if (temp == "-xcw_strong_cutoff")
 		xcw_settings.xcw_strong_cutoff = stod(arguments[i + 1]);
+	else if (temp == "-scf_backend")
+		xcw_settings.scf_backend = arguments[i + 1];
 	else if (temp == "-no_gpu_itensor")
 		gpu_itensor = false;
 	else if (temp == "-gpu_cublas")
@@ -2518,6 +2520,11 @@ void options::loadXCWsettings() {
 			if (!(is >> path))
 				throw std::runtime_error("Expected a path after 'read_eri'");
 			eri_read_path = path;
+			};
+
+		handlers["scf_backend"] = [&](std::istream& is) {
+			if (!(is >> xcw_settings.scf_backend) || (xcw_settings.scf_backend != "occ" && xcw_settings.scf_backend != "dusk"))
+				throw std::runtime_error("Expected occ or dusk after 'scf_backend'");
 			};
 
 		handlers["i_double"] = [&](std::istream&) {

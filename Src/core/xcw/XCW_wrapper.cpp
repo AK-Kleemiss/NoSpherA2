@@ -474,6 +474,8 @@ void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const dou
 	}
 }
 
+static std::shared_ptr<BasisSet> fitting_set(const std::string& name, const std::vector<occ::core::Atom>& atoms, const BasisSet& orbital);
+
 //The OCC molecule, the orbital basis (and the density fitting basis when one is set) and the SCF solver
 occ::qm::HartreeFock XCW_wrapper::setup_system() {
 
@@ -483,9 +485,10 @@ occ::qm::HartreeFock XCW_wrapper::setup_system() {
 	const occ::qm::AOBasis occ_basis_set = sf.orbital_basis->to_AOBasis(mol.atoms());
 	occ::qm::HartreeFock hf(occ_basis_set);
 
+	const bool dusk = opt->xcw_settings.scf_backend == "dusk";
 	// Handles density fitting basis
 	sf.df_reserved_ = 0;
-	if (!opt->xcw_settings.df_basis_name.empty()) density_fitting(hf, opt->xcw_settings.df_basis_name, "of the Fock build", sf.free_memory());
+	if (!dusk && !opt->xcw_settings.df_basis_name.empty()) density_fitting(hf, opt->xcw_settings.df_basis_name, "of the Fock build", sf.free_memory());
 
 	if (opt->xcw_int_precision > 0.0) hf.set_precision(opt->xcw_int_precision);
 
@@ -495,21 +498,37 @@ occ::qm::HartreeFock XCW_wrapper::setup_system() {
 	scf_settings.gpu_eri = opt->gpu_itensor && opt->use_gpu;
 	scf_settings.no_date = opt->no_date;
 	scf_solver = XCW_solver(mol, occ_basis_set, scf_settings, writer, *this);
+	if (dusk) {
+#ifdef NOSPHERA2_USE_DUSK
+		molscf::Options o = dusk::scf_options(scf_settings);
+		o.incremental_fock = opt->xcw_incremental;
+		if (opt->xcw_int_precision > 0.0) o.integral_threshold = opt->xcw_int_precision;
+		o.threads = opt->threads;
+		dusk_ = std::make_unique<dusk_solver>(mol, occ_basis_set, *sf.orbital_basis, o, writer, static_cast<SCF_coupling&>(*this));
+		if (!opt->xcw_settings.df_basis_name.empty()) {
+			dusk_->scf.set_aux_basis(dusk::basis(*fitting_set(opt->xcw_settings.df_basis_name, mol.atoms(), *sf.orbital_basis), mol.atoms()));
+			dusk_->scf.options().jk = molscf::JKMethod::RI;
+		}
+		std::cout << "XCW SCF backend: dusk (molscf)" << std::endl;
+		writer.log << "XCW SCF backend: dusk (molscf); occ-only settings are ignored: damp, shift, diis_damping, diis_shift, check_hessian, hessian_df_basis, save_eri, read_eri" << std::endl;
+#else
+		err_checkf(false, "scf_backend dusk: this NoSpherA2 was built without molscf (configure with NOSPHERA2_DUSK_DIR)", std::cout);
+#endif
+	}
 	return hf;
 	// closing function
 }
 
-void XCW_wrapper::density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail) {
-	const occ::qm::AOBasis& basis = target.aobasis();
-	//a copy: the library's set is shared, and AutoAux adds the elements it lacks (U in def2-universal-jkfit)
+//The fitting set `name` for atoms: a copy, since the library's set is shared and AutoAux adds the elements it lacks (U in def2-universal-jkfit)
+static std::shared_ptr<BasisSet> fitting_set(const std::string& name, const std::vector<occ::core::Atom>& atoms, const BasisSet& orbital) {
 	std::shared_ptr<BasisSet> aux = std::make_shared<BasisSet>(*BasisSetLibrary::get_basis_set(name));
-	if (!std::all_of(basis.atoms().begin(), basis.atoms().end(), [&](const occ::core::Atom& a) { return aux->has_element(a.atomic_number); })) {
+	if (!std::all_of(atoms.begin(), atoms.end(), [&](const occ::core::Atom& a) { return aux->has_element(a.atomic_number); })) {
 		//gen_auto_aux reads the WFN-file convention, types from 1; the library stores l
 		WFN atoms_wfn(e_origin::NOT_YET_DEFINED);
-		for (const auto& a : basis.atoms()) {
+		for (const auto& a : atoms) {
 			const int i = atoms_wfn.get_ncen();
 			atoms_wfn.push_back_atom(constants::atnr2letter(a.atomic_number), a.x, a.y, a.z, a.atomic_number);
-			for (const SimplePrimitive& p : (*sf.orbital_basis)[a.atomic_number - 1])
+			for (const SimplePrimitive& p : orbital[a.atomic_number - 1])
 				atoms_wfn.push_back_atom_basis_set(i, p.exp, p.coefficient, p.type + 1, p.shell);
 		}
 		gen_missing_basis_auto_aux(atoms_wfn, aux);
@@ -517,6 +536,12 @@ void XCW_wrapper::density_fitting(occ::qm::HartreeFock& target, const std::strin
 	if (aux->get_name().find("jkfit") == std::string::npos)
 		std::cout << "WARNING: " << aux->get_name() << " is not a JK-fitting basis; Hartree-Fock exchange is fitted with it all the same. "
 			"def2-universal-jkfit serves the def2 family, cc-pvXz-jkfit the cc-pVXZ family." << std::endl;
+	return aux;
+}
+
+void XCW_wrapper::density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail) {
+	const occ::qm::AOBasis& basis = target.aobasis();
+	std::shared_ptr<BasisSet> aux = fitting_set(name, basis.atoms(), *sf.orbital_basis);
 	// Create a list storing all elements of the molecule
 	ivec elements;
 	for (const auto& a : basis.atoms())
@@ -567,6 +592,8 @@ void XCW_wrapper::report_lambda(const double lambda, const occ::qm::Wavefunction
 	writer.v.scale = sf.scatter_data.scale;
 	writer.v.extinction = sf.extinction_report();
 	writer.lambda_line();
+	writer.log << "XCW lambda " << std::fixed << std::setprecision(5) << lambda << " to all digits: criterion " << std::scientific << std::setprecision(12)
+		<< fit.criterion << " GooF2 " << fit.GooF2 << " energy " << writer.v.E_total << " target " << writer.v.quant << std::defaultfloat << std::endl;
 	last_row_ = writer.v;
 	if (write_result) {
 		const _time_point tscb_t0 = get_time();
@@ -725,11 +752,12 @@ bool XCW_wrapper::run_lambda(occ::qm::HartreeFock& hf, const double lambda, occ:
 	weight_count_ = 0;
 	weight_hold_ = weight_moved_ = false;
 	//DIIS iterations with damping, level shift and rescue, then TRAH steps where DIIS stalls
-	bool converged = scf_solver.run(hf, wfn, use_guess);
+	auto solve = [&](const bool guess) { return dusk_ ? dusk_->run(lambda, wfn, guess) : scf_solver.run(hf, wfn, guess); };
+	bool converged = solve(use_guess);
 	//shares held within a solve and refit to its density until that no longer moves F: the fixed point refitting at every
 	//evaluation goes for, with every solve one objective for TRAH to accept steps on
 	for (int round = 0; converged && weight_every_ < 0 && sf.XG.ws && lambda != 0.0 && round < 20 && refit_moves(wfn, lambda); round++)
-		converged = (weight_hold_ = true) && scf_solver.run(hf, wfn, true);
+		converged = (weight_hold_ = true) && solve(true);
 	if (converged) report_lambda(lambda, wfn, write_result);
 	//new_shelx / chebyshev_opt: a, b or A_r refit to this step's converged Fc, used from the next step on
 	if (converged && (scheme == ws::shelx_opt || scheme == ws::chebyshev_opt)) {
@@ -831,8 +859,8 @@ void XCW_wrapper::run() {
 		sf.write_F_calc("rcheck_Fcalc.txt");
 		return;
 	}
-	//the stored two-electron integrals and the density-fitted Hessian products of the SCF
-	setup_scf_integrals(hf);
+	//the stored two-electron integrals and the density-fitted Hessian products of the SCF; molscf makes its own
+	if (!dusk_) setup_scf_integrals(hf);
 	occ::qm::Wavefunction last_wfn, prev_wfn;
 	bool has_guess = read_start_guess(last_wfn);
 	const occ::Mat S_ao = hf.compute_overlap_matrix();
@@ -861,6 +889,8 @@ void XCW_wrapper::run() {
 		//after the first step, so that density-following shares are the scheme's
 		if (step == 0 && converged && tuning("NOSPHERA2_XCW_ADJOINT_CHECK"))
 			sf.check_adjoint();
+		if (step == 0 && converged && dusk_ && tuning("NOSPHERA2_DUSK_FD_CHECK"))
+			dusk_->fd_check(wfn, std::cout);
 		if (!converged && step > 0)
 			converged = approach_lambda(hf, lambda, min_lambda_step, last_lambda, last_wfn, wfn);
 		if (!converged) {
