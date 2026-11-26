@@ -547,7 +547,8 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
 	const double dr = 0.00008;
 	const long long int upper_r = 250000;
 	// Calcualte density on angular grid at each point of radial grid, average and integrate
-	long double tot_int2 = 0;
+	//not long double: a 16-byte omp reduction needs libatomic's __atomic_compare_exchange
+	double tot_int2 = 0;
 	vec radial_dens2(upper_r, 0.0);
 	ProgressBar *progress = new ProgressBar(upper_r, 85, "=", " ", "Calculating Densities");
 	std::cout << endl;
@@ -559,7 +560,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
 		radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 1200, 5800);
 		if (_r >= 1)
 		{
-			tot_int2 += (long double)radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
+			tot_int2 += radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
 		}
 		progress->update();
 	}

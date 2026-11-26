@@ -641,6 +641,10 @@ add_subdirectory(
     "${CMAKE_BINARY_DIR}/_deps/occ"
     EXCLUDE_FROM_ALL
 )
+#the shipped libtbb.so.12 would need GCC 14's GLIBCXX_3.4.32, which RHEL 9 does not have
+if(LINUX AND TARGET tbb)
+    target_link_options(tbb PRIVATE -static-libstdc++)
+endif()
 #libxc ignores CMAKE_POSITION_INDEPENDENT_CODE (it takes occ's BUILD_FPIC, OFF), but it is linked
 #into the shared library
 if(TARGET xc)
