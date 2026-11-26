@@ -1061,6 +1061,18 @@ namespace
 		EXPECT_EQ(parse_error("basis_set sto-3g broken_symmetry x"), "Could not read 'x' after 'broken_symmetry'");
 	}
 
+	// `rohf` runs in the unrestricted containers; the last of rhf, uhf, rohf wins
+	TEST(XcwSettingsTests, RohfIsUnrestrictedWithSharedOrbitals)
+	{
+		const options::XCW_settings r = parsed("basis_set sto-3g rohf");
+		EXPECT_EQ(r.hf_type, occ::qm::SpinorbitalKind::Unrestricted);
+		EXPECT_TRUE(r.rohf);
+		const options::XCW_settings u = parsed("basis_set sto-3g rohf uhf");
+		EXPECT_EQ(u.hf_type, occ::qm::SpinorbitalKind::Unrestricted);
+		EXPECT_FALSE(u.rohf);
+		EXPECT_FALSE(parsed("basis_set sto-3g rohf rhf").rohf);
+	}
+
 	// the switches and the keywords that carry a path, a model or a number
 	TEST(XcwSettingsTests, SwitchesPathsAndModels)
 	{

@@ -216,7 +216,7 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 			small_basis_guess(scf);
 		has_guess = true;
 		occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
-		if (settings.broken_symmetry > 0 && mo.kind == occ::qm::SpinorbitalKind::Unrestricted && mo.n_alpha == mo.n_beta && mo.n_alpha > 0) {
+		if (settings.broken_symmetry > 0 && !settings.rohf && mo.kind == occ::qm::SpinorbitalKind::Unrestricted && mo.n_alpha == mo.n_beta && mo.n_alpha > 0) {
 			//ORCA's GuessMix: the alpha HOMO and LUMO rotated by the angle, the beta orbitals left as they are
 			const double t = settings.broken_symmetry * constants::PI / 180.0;
 			const Eigen::Index n = mo.C.rows() / 2, h = static_cast<Eigen::Index>(mo.n_alpha) - 1;
@@ -304,6 +304,8 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 }
 
 double SCF_solver::compute_orbital_gradient(const scf_t& scf) {
+	occ::Vec h;
+	if (settings.rohf) return 0.5 * orbital_rotation_gradient(scf, h).norm();
 	if (settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
 		const occ::Mat& C = scf.molecular_orbitals().C;
 		const occ::Mat& Cocc = scf.molecular_orbitals().Cocc;
@@ -327,10 +329,11 @@ double SCF_solver::compute_orbital_gradient(const scf_t& scf) {
 
 //F C = e S C through the orthogonaliser's X, one spin block at a time: X^T F X diagonalised
 //by MKL, C = X C'. occ's MolecularOrbitals::update does the same with Eigen, which occ
-//compiles serial; the occupation, smearing and density steps stay occ's.
-void SCF_solver::solve_orbitals(scf_t& scf, const occ::Mat& F) const {
+//compiles serial; the occupation, smearing and density steps stay occ's. ROHF: the mean of the blocks, in both
+void SCF_solver::solve_orbitals(scf_t& scf, const occ::Mat& F_in) const {
 	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
 	const occ::Mat& X = scf.ctx.orthogonalizer.transformation_matrix();
+	const occ::Mat F = settings.rohf ? occ::Mat((0.5 * (F_in.topRows(X.rows()) + F_in.bottomRows(X.rows()))).replicate(2, 1)) : F_in;
 	const int n = static_cast<int>(X.rows()), m = static_cast<int>(X.cols()), nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1, ldf = static_cast<int>(F.rows());
 	occ::Mat FX(n, m), Fp(m, m);
 	mo.C.resize(static_cast<Eigen::Index>(nb) * n, m);
@@ -360,10 +363,9 @@ void SCF_solver::solve_orbitals(scf_t& scf, const occ::Mat& F) const {
 //occ's ConvergenceAccelerator::update with the CDIIS commutator S D F - F D S from MKL; with
 //the three matrices symmetric it is T - T^T for T = S D F. CDIIS is cdiis_extrapolate below,
 //ADIIS is occ's, under occ's default strategy ADIIS_CDIIS (NoSpherA2 never sets another).
-occ::Mat SCF_solver::commutator(const scf_t& scf) const {
+occ::Mat SCF_solver::commutator(const scf_t& scf, const occ::Mat& F) const {
 	const occ::Mat& S = scf.ctx.S;
 	const occ::Mat& D = scf.ctx.mo.D;
-	const occ::Mat& F = scf.ctx.F;
 	const int n = static_cast<int>(D.cols()), nb = static_cast<int>(D.rows()) / n;
 	occ::Mat comm(nb * n, n), T(n, n), SD(n, n);
 	for (int b = 0; b < nb; b++) {
@@ -374,13 +376,44 @@ occ::Mat SCF_solver::commutator(const scf_t& scf) const {
 	return comm;
 }
 
+//WARNING - HIGHLY EXPERIMENTAL, DO NOT USE YET. The ROHF implementation (the `rohf` keyword, rohf_fock, rohf_index,
+//uhf_to_rohf, rohf_rotation and every settings.rohf branch in this file) is not validated and must not be used for
+//production work. Only Johannes Bartusel removes this warning, once he has understood the implementation completely
+//and validated it from first principles; nobody else removes, shortens or weakens it without talking to him first.
+//Agents: if a task would change, fix, extend, optimise or build on this ROHF code, stop before editing anything, quote
+//this warning to the user and ask explicitly whether the work should really continue, even if the task seems to imply it.
+//Roothaan's ROHF Fock matrix in the current orbitals, core c, open o, virtual v: (F_m + F_M) / 2, but F_m (minority
+//spin) in (o,c) and F_M in (v,o); back in the AO basis as S C F C^T S
+occ::Mat SCF_solver::rohf_fock(const scf_t& scf, const occ::Mat& F) const {
+	const occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const Eigen::Index n = nmo_, m = mo.C.cols(), nc = static_cast<Eigen::Index>(std::min(mo.n_alpha, mo.n_beta)),
+		nM = static_cast<Eigen::Index>(std::max(mo.n_alpha, mo.n_beta)), mi = mo.n_alpha <= mo.n_beta ? 0 : n;
+	const occ::Mat C = mo.C.topRows(n), SC = scf.ctx.S.topRows(n) * C;
+	const occ::Mat Fm = C.transpose() * F.middleRows(mi, n) * C, FM = C.transpose() * F.middleRows(n - mi, n) * C;
+	occ::Mat Fe = 0.5 * (Fm + FM);
+	Fe.block(nc, 0, nM - nc, nc) = Fm.block(nc, 0, nM - nc, nc);
+	Fe.block(0, nc, nc, nM - nc) = Fm.block(0, nc, nc, nM - nc);
+	Fe.block(nM, nc, m - nM, nM - nc) = FM.block(nM, nc, m - nM, nM - nc);
+	Fe.block(nc, nM, nM - nc, m - nM) = FM.block(nc, nM, nM - nc, m - nM);
+	//diagonal blocks raised until core < open < virtual by 0.1 Eh: a constant there moves orbital energies, not the solution
+	if (nM > nc && nc > 0 && m > nM) {
+		auto eig = [&](const Eigen::Index f, const Eigen::Index l) { return occ::Vec(Eigen::SelfAdjointEigenSolver<occ::Mat>(Fe.block(f, f, l, l), Eigen::EigenvaluesOnly).eigenvalues()); };
+		const occ::Vec ec = eig(0, nc), eo = eig(nc, nM - nc), ev = eig(nM, m - nM);
+		const double so = std::max(0.0, ec.maxCoeff() - eo.minCoeff() + 0.1), sv = std::max(0.0, eo.maxCoeff() + so - ev.minCoeff() + 0.1);
+		Fe.diagonal().segment(nc, nM - nc).array() += so;
+		Fe.diagonal().tail(m - nM).array() += sv;
+	}
+	return (SC * Fe * SC.transpose()).replicate(2, 1);
+}
+
+//ROHF: CDIIS alone, ADIIS's energy model takes F as dE/dD
 occ::Mat SCF_solver::diis_update(scf_t& scf) {
 	const occ::Mat& D = scf.ctx.mo.D;
-	const occ::Mat& F = scf.ctx.F;
-	const occ::Mat comm = commutator(scf);
+	const occ::Mat F = settings.rohf ? rohf_fock(scf, scf.ctx.F) : scf.ctx.F;
+	const occ::Mat comm = commutator(scf, F);
 	scf.diis_error = comm.array().abs().maxCoeff();
 	occ::Mat F_cdiis = cdiis_extrapolate(F, comm);
-	if (scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
+	if (settings.rohf || scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
 	return adiis_.update(scf.ctx.mo.kind, D, F);
 }
 
@@ -490,7 +523,7 @@ bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha_damp, double& quant_dif
 
 	// DIIS extrapolation; under `nodiis` only its error is used
 	occ::Mat F_diis = diis_update(scf);
-	if (!settings.use_diis) F_diis = scf.ctx.F;
+	if (!settings.use_diis) F_diis = settings.rohf ? rohf_fock(scf, scf.ctx.F) : scf.ctx.F;
 	settings.current_max_diis_error = scf.diis_error;
 	settings.update(writer_->log, alpha_damp);
 
@@ -643,6 +676,41 @@ void SCF_solver::trah_reset() {
 //included) in the MO basis. diagonal_hessian gets the usual approximation of its diagonal, 4 (e_a - e_i) or
 //2 (e_a - e_i) over the diagonal of that F, floored so a near-degenerate pair cannot blow up
 //the step.
+//ROHF rotations (o,c), (v,c), (v,o): the minority block's pairs, then the majority block's (v,o). For every pair of the
+//unrestricted vector, its place in the ROHF one
+static ivec rohf_index(const occ::qm::MolecularOrbitals& mo, const int n) {
+	const int na = static_cast<int>(mo.n_alpha), nb = static_cast<int>(mo.n_beta), nc = std::min(na, nb), nM = std::max(na, nb), mi = na <= nb ? 0 : 1;
+	ivec idx;
+	for (int b = 0; b < 2; b++) {
+		const int nocc = b == 0 ? na : nb;
+		for (int i = 0; i < nocc; i++)
+			for (int a = 0; a < n - nocc; a++)
+				idx.push_back(b == mi ? i * (n - nc) + a : i < nc ? i * (n - nc) + nM - nc + a : nc * (n - nc) + (i - nc) * (n - nM) + a);
+	}
+	return idx;
+}
+
+//P^T g of an unrestricted vector, which sums the (v,c) entries of the two blocks
+static occ::Vec uhf_to_rohf(const ivec& idx, const occ::Vec& g) {
+	occ::Vec r = occ::Vec::Zero(*std::max_element(idx.begin(), idx.end()) + 1);
+	for (int k = 0; k < static_cast<int>(idx.size()); k++) r(idx[k]) += g(k);
+	return r;
+}
+
+//The antisymmetric K of a ROHF rotation p in the order of rohf_index, K(q,r) = p_qr for q in a higher space than r
+static occ::Mat rohf_rotation(const occ::qm::MolecularOrbitals& mo, const int n, const occ::Vec& p) {
+	const int nc = static_cast<int>(std::min(mo.n_alpha, mo.n_beta)), nM = static_cast<int>(std::max(mo.n_alpha, mo.n_beta));
+	occ::Mat K = occ::Mat::Zero(n, n);
+	int at = 0;
+	for (int i = 0; i < nM; i++)
+		for (int a = i < nc ? nc : nM; a < n; a++, at++) {
+			K(a, i) = p(at);
+			K(i, a) = -p(at);
+		}
+	return K;
+}
+
+//ROHF: P^T of the unrestricted gradient, 2 F_m(o,c), 2 (F_m + F_M)(v,c), 2 F_M(v,o), and of the diagonal
 occ::Vec SCF_solver::orbital_rotation_gradient(const scf_t& scf, occ::Vec& diagonal_hessian) const {
 	const occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
 	const int n = nmo_, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
@@ -667,17 +735,25 @@ occ::Vec SCF_solver::orbital_rotation_gradient(const scf_t& scf, occ::Vec& diago
 			}
 		}
 	}
-	return g;
+	if (!settings.rohf) return g;
+	const ivec idx = rohf_index(mo, n);
+	diagonal_hessian = uhf_to_rohf(idx, diagonal_hessian);
+	return uhf_to_rohf(idx, g);
 }
 
 //C_from exp(kappa) by the Cayley transform (I - K/2)^-1 (I + K/2), exactly orthogonal for the
 //antisymmetric K that carries kappa in its occupied-virtual blocks, so the orbitals stay
-//S-orthonormal. The first nocc columns stay the occupied ones; the density follows.
+//S-orthonormal. The first nocc columns stay the occupied ones; the density follows. ROHF: one K for both blocks
 void SCF_solver::rotate_orbitals(scf_t& scf, const occ::Mat& C_from, const occ::Vec& kappa) const {
 	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
 	const int n = nmo_, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	if (settings.rohf) {
+		const occ::Mat K = 0.5 * rohf_rotation(mo, n, kappa), I = occ::Mat::Identity(n, n);
+		const occ::Mat U = (I - K).partialPivLu().solve(I + K);
+		for (int b = 0; b < 2; b++) mo.C.middleRows(static_cast<Eigen::Index>(b) * n, n) = C_from.middleRows(static_cast<Eigen::Index>(b) * n, n) * U;
+	}
 	Eigen::Index at = 0;
-	for (int b = 0; b < nb; b++) {
+	for (int b = 0; b < nb && !settings.rohf; b++) {
 		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc;
 		occ::Mat K = occ::Mat::Zero(n, n);
 		for (Eigen::Index i = 0; i < nocc; i++) {
@@ -695,20 +771,32 @@ void SCF_solver::rotate_orbitals(scf_t& scf, const occ::Mat& C_from, const occ::
 }
 //S D S c = n S c in the orthogonaliser's basis: X^T S D S X v = n v, c = X v, one spin block after the other,
 //columns by decreasing n, so the first nocc are the occupied ones. Then semicanonical: the current Fock matrix
-//diagonal within the occupied and within the virtual orbitals, so that its diagonal preconditions the rotations
+//diagonal within the occupied and within the virtual orbitals, so that its diagonal preconditions the rotations.
+//ROHF: from the total density (occupations 2, 1, 0), semicanonical in the mean Fock matrix within c, o and v
 bool SCF_solver::natural_orbitals(scf_t& scf, const occ::Mat& D, const bool built_from_D) {
 	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
 	const occ::Mat& X = scf.ctx.orthogonalizer.transformation_matrix();
 	const int n = static_cast<int>(X.rows()), m = static_cast<int>(X.cols()), nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
 	const occ::Mat SX = scf.ctx.S.topRows(n) * X;
+	const Eigen::Index nc = static_cast<Eigen::Index>(std::min(mo.n_alpha, mo.n_beta)), nM = static_cast<Eigen::Index>(std::max(mo.n_alpha, mo.n_beta));
 	mo.C.resize(static_cast<Eigen::Index>(nb) * n, m);
 	for (int b = 0; b < nb; b++) {
 		const Eigen::Index row = static_cast<Eigen::Index>(b) * n, no = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nv = m - no;
-		const Eigen::SelfAdjointEigenSolver<occ::Mat> es(SX.transpose() * D.middleRows(row, n) * SX);
+		const Eigen::SelfAdjointEigenSolver<occ::Mat> es(SX.transpose() * (settings.rohf ? occ::Mat(D.topRows(n) + D.bottomRows(n)) : occ::Mat(D.middleRows(row, n))) * SX);
 		occ::Mat C = X * es.eigenvectors().rowwise().reverse();
-		const occ::Mat Fm = C.transpose() * scf.ctx.F.middleRows(row, n) * C;
-		if (no > 0) C.leftCols(no) = C.leftCols(no) * Eigen::SelfAdjointEigenSolver<occ::Mat>(Fm.topLeftCorner(no, no)).eigenvectors();
-		if (nv > 0) C.rightCols(nv) = C.rightCols(nv) * Eigen::SelfAdjointEigenSolver<occ::Mat>(Fm.bottomRightCorner(nv, nv)).eigenvectors();
+		const occ::Mat Fm = C.transpose() * (settings.rohf ? occ::Mat(0.5 * (scf.ctx.F.topRows(n) + scf.ctx.F.bottomRows(n))) : occ::Mat(scf.ctx.F.middleRows(row, n))) * C;
+		auto semi = [&](const Eigen::Index from, const Eigen::Index len) {
+			if (len > 0) C.middleCols(from, len) = C.middleCols(from, len) * Eigen::SelfAdjointEigenSolver<occ::Mat>(Fm.block(from, from, len, len)).eigenvectors();
+			};
+		if (settings.rohf) {
+			semi(0, nc);
+			semi(nc, nM - nc);
+			semi(nM, m - nM);
+		}
+		else {
+			semi(0, no);
+			semi(no, nv);
+		}
 		mo.C.middleRows(row, n) = C;
 	}
 	mo.update_occupied_orbitals();
@@ -993,20 +1081,27 @@ void SCF_solver::trah_solve(scf_t& scf, const bool extend) {
 //H v = fac (dC_vir^T F C_occ + C_vir^T dF C_occ + C_vir^T F dC_occ) with F the Fock matrix
 //of the current orbitals, model term included. The occupied-occupied and virtual-virtual parts of
 //the second-order orbital change leave the functional alone, so this is the exact Hessian.
+//ROHF: dC = C K with the whole shared K; its (o,c) and (v,o) parts leave dD alone but enter the F terms, as F(v,c) of one
+//spin alone does not vanish at an ROHF solution. H v is P^T of the unrestricted products
 occ::Vec SCF_solver::hessian_vector(scf_t& scf, const occ::Vec& v, const bool two_electron) {
 	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
 	const int n = nmo_, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
 	const double fac = nb == 1 ? 4.0 : 2.0, dfac = nb == 1 ? 1.0 : 0.5;
 	occ::Mat dC = occ::Mat::Zero(mo.C.rows(), n), dD = occ::Mat::Zero(mo.D.rows(), n), dCo = occ::Mat::Zero(mo.Cocc.rows(), mo.Cocc.cols());
+	const ivec idx = settings.rohf ? rohf_index(mo, n) : ivec();
+	const occ::Mat K = settings.rohf ? rohf_rotation(mo, n, v) : occ::Mat();
 	Eigen::Index at = 0;
 	for (int b = 0; b < nb; b++) {
 		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc, row = static_cast<Eigen::Index>(b) * n;
-		occ::Mat V(nvir, nocc);
-		for (Eigen::Index i = 0; i < nocc; i++)
-			for (Eigen::Index a = 0; a < nvir; a++, at++) V(a, i) = v(at);
 		const occ::Mat Cocc = mo.C.block(row, 0, n, nocc), Cvir = mo.C.block(row, nocc, n, nvir);
-		dC.block(row, 0, n, nocc) = Cvir * V;
-		dC.block(row, nocc, n, nvir) = -Cocc * V.transpose();
+		if (settings.rohf) dC.middleRows(row, n) = mo.C.middleRows(row, n) * K;
+		else {
+			occ::Mat V(nvir, nocc);
+			for (Eigen::Index i = 0; i < nocc; i++)
+				for (Eigen::Index a = 0; a < nvir; a++, at++) V(a, i) = v(at);
+			dC.block(row, 0, n, nocc) = Cvir * V;
+			dC.block(row, nocc, n, nvir) = -Cocc * V.transpose();
+		}
 		const occ::Mat dCocc = dC.block(row, 0, n, nocc);
 		const occ::Mat X = dCocc * Cocc.transpose();
 		dD.middleRows(row, n) = dfac * (X + X.transpose());
@@ -1043,7 +1138,7 @@ occ::Vec SCF_solver::hessian_vector(scf_t& scf, const occ::Vec& v, const bool tw
 	}
 	else dF = occ::Mat::Zero(mo.D.rows(), n);
 	add_model_response(scf, dD, dF);
-	occ::Vec Hv(v.size());
+	occ::Vec Hv(settings.rohf ? static_cast<Eigen::Index>(idx.size()) : v.size());
 	at = 0;
 	for (int b = 0; b < nb; b++) {
 		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc, row = static_cast<Eigen::Index>(b) * n;
@@ -1055,7 +1150,7 @@ occ::Vec SCF_solver::hessian_vector(scf_t& scf, const occ::Vec& v, const bool tw
 		for (Eigen::Index i = 0; i < nocc; i++)
 			for (Eigen::Index a = 0; a < nvir; a++, at++) Hv(at) = M(a, i);
 	}
-	return Hv;
+	return settings.rohf ? uhf_to_rohf(idx, Hv) : Hv;
 }
 
 //(H - ah_shift)^-1 rhs for the Davidson subspace: the diagonal, refined when there is a model term
@@ -1294,9 +1389,10 @@ bool SCF_solver::confirm_SCF(scf_t& scf, occ::Mat& dm_last, double& last_quant) 
 	add_model_fock(scf.ctx.F);
 	last_quant = quant_;
 	settings.current_quant_diff = std::abs(quant_ - quant0);
-	settings.current_max_diis_error = commutator(scf).array().abs().maxCoeff();
+	const occ::Mat F = settings.rohf ? rohf_fock(scf, scf.ctx.F) : scf.ctx.F;
+	settings.current_max_diis_error = commutator(scf, F).array().abs().maxCoeff();
 	settings.current_gradient = compute_orbital_gradient(scf);
-	solve_orbitals(scf, scf.ctx.F);
+	solve_orbitals(scf, F);
 	const bool ok = SCF_convergence_check(scf, dm_last);
 	std::ostringstream row;
 	row << "Confirmation iteration (full Fock build, canonical orbitals): " << functional_name() << " " << std::fixed << std::setprecision(10) << quant_

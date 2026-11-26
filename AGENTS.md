@@ -311,6 +311,13 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-11-26 (ROHF, highly experimental, do not use yet - see the warning above `SCF_solver::rohf_fock` and ask Johannes
+Bartusel before working on it), the XCW keyword `rohf` runs ROHF in the unrestricted containers with shared orbitals; on P1 sto-3g
+it reproduces three ORCA 6.1 ROHF states to 1e-7 Eh with `<S^2>` exact and its Hessian product matches the finite difference
+to 2.3e-10. `XcwScfTests.RohfCationIsAPureDoubletOnOrcasState` and `XcwSettingsTests.RohfIsUnrestrictedWithSharedOrbitals` are
+new. `ctest --preset release-windows -j 8` on a CPU-only build reports **1488 passed, 0 failed, 23 skipped** (2 disabled) of 1513.
+See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-25 (libcint g-shell norm), `Int_Params` undoes ORCA's g-over-sqrt(3) convention for gbw, molden and fchk
 shells, so their libcint g, h and i functions have self-overlap 1 instead of 1/3, 1/945, 1/10395; `FittingIoCoverageIntegratorTests.GbwShellsUpToGAreNormalisedForLibcint`
 and `GbwShellsUpToIAreNormalisedForLibcint` (h and i, `tests/water_pv6z`) are new. `ctest` on a CUDA `release-windows-tests` build (GPU present)

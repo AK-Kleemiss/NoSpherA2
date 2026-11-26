@@ -102,7 +102,10 @@ private:
 
 	// The Roothaan step and the DIIS of OCC's SCF with their matrix products on MKL
 	void solve_orbitals(scf_t& scf, const occ::Mat& F) const;
-	occ::Mat commutator(const scf_t& scf) const;
+	occ::Mat commutator(const scf_t& scf, const occ::Mat& F) const;
+	// `rohf` (the same orbitals in both blocks): Roothaan's effective Fock matrix of F in the current orbitals, in both blocks.
+	// HIGHLY EXPERIMENTAL, DO NOT USE YET: read the warning above SCF_solver::rohf_fock before touching any ROHF code
+	occ::Mat rohf_fock(const scf_t& scf, const occ::Mat& F) const;
 	occ::Mat diis_update(scf_t& scf);
 	// CDIIS over the last settings.diis_size Fock matrices and their commutators, see cdiis_extrapolate
 	occ::Mat cdiis_extrapolate(const occ::Mat& F, const occ::Mat& E);

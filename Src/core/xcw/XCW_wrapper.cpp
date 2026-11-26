@@ -12,7 +12,7 @@
 
 XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
-	if (opt_in.xcw_settings.broken_symmetry > 0 && (opt_in.xcw_settings.hf_type != occ::qm::SpinorbitalKind::Unrestricted || opt_in.xcw_settings.multiplicity != 1))
+	if (opt_in.xcw_settings.broken_symmetry > 0 && (opt_in.xcw_settings.hf_type != occ::qm::SpinorbitalKind::Unrestricted || opt_in.xcw_settings.rohf || opt_in.xcw_settings.multiplicity != 1))
 		std::cout << "A broken-symmetry guess was requested but applies to closed-shell UHF only; the guess is left as it is." << std::endl;
 	writer.WAEmpiRe();
 	sf.weight_log_ = &writer.log;

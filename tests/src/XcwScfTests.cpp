@@ -491,6 +491,29 @@ TEST(XcwScfTests, ClosedShellUhfLeavesTheRhfSaddlePoint)
 	std::filesystem::remove_all(dir);
 }
 
+//ROHF of the P1 cation: a pure doublet, the same state by DIIS with SOSCF, TRAH and DIIS alone, and the energy ORCA 6.1
+//reaches from its HCore guess (-1961.654402851 Eh, 1.1e-7 below as for RHF and UHF); the closed shell is the RHF solution
+TEST(XcwScfTests, RohfCationIsAPureDoubletOnOrcasState)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const std::string tail = " start 0 step_size 0.01 end 0" + read_shared_eri(dir);
+	const std::string kinds[3] = { "f2 rohf charge 1 mult 2", "f2 rohf charge 1 mult 2 nososcf", "f2 rohf charge 1 mult 2 notrah nososcf" };
+	for (int k = 0; k < 3; k++) {
+		const p1_run run = run_on_p1(dir, common + kinds[k] + tail);
+		ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << kinds[k] << "\n" << run.log;
+		EXPECT_NE(run.log.find("<S^2>: expected 0.7500, found 0.7500"), std::string::npos) << run.log;
+		const auto rows = lambda_rows(run.out);
+		ASSERT_EQ(rows.size(), 1u) << run.out;
+		EXPECT_NEAR(rows[0].d(rows[0].energy), -1961.654402851, 1e-6) << kinds[k];
+	}
+	const p1_run closed = run_on_p1(dir, common + "f2 rohf" + tail);
+	const auto rows = lambda_rows(closed.out);
+	ASSERT_EQ(rows.size(), 1u) << closed.out;
+	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
+	std::filesystem::remove_all(dir);
+}
+
 //`fast_conv` runs DIIS alone: nothing to switch off, so the log never says so, and the
 //weighted criterion is announced and used. The preset sets neither damping nor shift;
 //SCF_settings defaults both to 0.
@@ -858,7 +881,7 @@ TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const std::pair<std::string, double> kinds[] = { { "f rhf", 1e-4 }, { "f2 uhf", 1e-4 },
-		{ "f rhf extinction bc_lorentzian fixed 0.05", 1e-8 }, { "f2 uhf extinction bc_gaussian 0.01", 1e-5 } };
+		{ "f rhf extinction bc_lorentzian fixed 0.05", 1e-8 }, { "f2 uhf extinction bc_gaussian 0.01", 1e-5 }, { "f2 rohf charge 1 mult 2", 1e-4 } };
 	for (const auto& [kind, tol] : kinds) {
 		const auto dir = scratch_dir();
 		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double check_hessian" + read_shared_eri(dir));

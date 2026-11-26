@@ -2273,6 +2273,7 @@ void options::loadXCWsettings() {
 	bool grid_double = false;
 	std::filesystem::path eri_read_path, eri_save_path, basis_overrides;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+	bool rohf = false;
 	if (!std::filesystem::exists(xcw_settings_path)) {
 		throw std::runtime_error("Settings file not found! Aborting run!");
 	}
@@ -2459,10 +2460,18 @@ void options::loadXCWsettings() {
 
 		handlers["rhf"] = [&](std::istream&) {
 			hf_type = occ::qm::SpinorbitalKind::Restricted;
+			rohf = false;
 			};
 
 		handlers["uhf"] = [&](std::istream&) {
 			hf_type = occ::qm::SpinorbitalKind::Unrestricted;
+			rohf = false;
+			};
+
+		//HIGHLY EXPERIMENTAL, DO NOT USE YET: see the warning above SCF_solver::rohf_fock
+		handlers["rohf"] = [&](std::istream&) {
+			hf_type = occ::qm::SpinorbitalKind::Unrestricted;
+			rohf = true;
 			};
 
 		handlers["sloppy"] = [&](std::istream&) {
@@ -2662,6 +2671,7 @@ void options::loadXCWsettings() {
 	xcw_settings.grown = grown;
 	xcw_settings.mask = mask;
 	xcw_settings.hf_type = hf_type;
+	xcw_settings.rohf = rohf;
 	xcw_settings.read_first_guess = read_first_guess;
 	xcw_settings.grid_double = grid_double;
 	xcw_settings.eri_read_path = eri_read_path;

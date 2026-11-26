@@ -234,6 +234,9 @@ struct options
 		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
 		std::string guess_basis_name;
 		occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+		//`rohf`: unrestricted containers whose two spin blocks hold the same orbitals. HIGHLY EXPERIMENTAL, DO NOT USE YET:
+		//read the warning above SCF_solver::rohf_fock (Src/core/xcw/SCF_solver.cpp) before touching any ROHF code
+		bool rohf = false;
 		double alpha_damp = 0;
 		double level_shift = 0;
 		int max_scf_iterations = 100;
