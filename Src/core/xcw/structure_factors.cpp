@@ -1275,14 +1275,25 @@ void structure_factors::build_grid_blocks(const std::vector<ao_data>& ao_data_sh
 	std::cout << "AO values calculated for all grids." << std::endl;
 	if (!(opt->no_date))
 		std::cout << "Time taken for AO values computation: " << get_msec(start_AOs, get_time()) << " ms" << std::endl;
-	//Morton order makes a run of consecutive points a compact ball rather than a spherical shell, so that a block keeps
-	//few AOs; the work is sum over blocks of n_active^2 points. Sums over points do not depend on the order, and only
-	//an AO threshold that can prune makes the reordering worth it
+	//Morton order of the directions inside radial slabs of NOSPHERA2_XCW_GRID_SLAB points (4 chunks, 0: of the positions
+	//over the whole grid) makes a run of consecutive points a compact patch rather than a spherical shell, so that a block
+	//keeps few AOs; the work is sum over blocks of n_active^2 points. Sums over points do not depend on the order, and
+	//only an AO threshold that can prune makes the reordering worth it
 	const double ao_block_threshold = [&] {
 		const char* e = tuning("NOSPHERA2_XCW_GRID_AO_TOL");
 		return e ? std::max(0.0, std::atof(e)) : cutoff(opt->accuracy);
 	}();
 	const bool morton_applied = !tuning("NOSPHERA2_XCW_GRID_NO_MORTON") && ao_block_threshold >= 1e-20;
+	//Blocks of about NOSPHERA2_XCW_GRID_CHUNK points (512, 0: the three radial bands), each keeping the AOs above
+	//ao_block_threshold somewhere on it; the threshold is the -acc ladder the scattering factors screen on
+	const int chunk = [] {
+		const char* e = tuning("NOSPHERA2_XCW_GRID_CHUNK");
+		return e ? std::atoi(e) : 512;
+	}();
+	const int slab = [&] {
+		const char* e = tuning("NOSPHERA2_XCW_GRID_SLAB");
+		return e ? std::atoi(e) : 4 * std::max(chunk, 0);
+	}();
 	if (morton_applied) {
 #pragma omp parallel for schedule(dynamic)
 		for (int g = 0; g < n_atom_grids; g++) {
@@ -1292,7 +1303,19 @@ void structure_factors::build_grid_blocks(const std::vector<ao_data>& ao_data_sh
 			double* xs = grid[GridData::GridIndex::X].data();
 			double* ys = grid[GridData::GridIndex::Y].data();
 			double* zs = grid[GridData::GridIndex::Z].data();
-			const ivec perm = morton_order(npts, xs, ys, zs);
+			ivec perm = slab > 0 ? ivec(npts) : morton_order(npts, xs, ys, zs);
+			for (int s0 = 0; slab > 0 && s0 < npts; s0 += slab) {
+				const int n = std::min(slab, npts - s0);
+				vec u(3 * n);
+				for (int p = 0; p < n; p++) {
+					const double r = std::max(grid_radial_distances[g][s0 + p], 1e-12);
+					u[p] = (xs[s0 + p] - asym_atoms[g].pos[0]) / r;
+					u[n + p] = (ys[s0 + p] - asym_atoms[g].pos[1]) / r;
+					u[2 * n + p] = (zs[s0 + p] - asym_atoms[g].pos[2]) / r;
+				}
+				const ivec sub = morton_order(n, u.data(), u.data() + n, u.data() + 2 * n);
+				for (int p = 0; p < n; p++) perm[s0 + p] = s0 + sub[p];
+			}
 			auto apply = [&](double* a) {
 				vec tmp(npts);
 				for (int p = 0; p < npts; p++) tmp[p] = a[perm[p]];
@@ -1332,12 +1355,6 @@ void structure_factors::build_grid_blocks(const std::vector<ao_data>& ao_data_sh
 			grid_ao_values[g].insert(grid_ao_values[g].end(), mu_vals[mu][g].begin(), mu_vals[mu][g].end());
 		}
 	vec3().swap(mu_vals);
-	//Blocks of about NOSPHERA2_XCW_GRID_CHUNK points (1024, 0: the three radial bands), each keeping the AOs above
-	//ao_block_threshold somewhere on it; the threshold is the -acc ladder the scattering factors screen on
-	const int chunk = [] {
-		const char* e = tuning("NOSPHERA2_XCW_GRID_CHUNK");
-		return e ? std::atoi(e) : 1024;
-	}();
 	XG.blocks.assign(n_atom_grids, {});
 	long long ao_slots_carrying = 0, ao_slots_kept = 0;
 #pragma omp parallel for schedule(dynamic) reduction(+:ao_slots_carrying, ao_slots_kept)
@@ -1357,7 +1374,9 @@ void structure_factors::build_grid_blocks(const std::vector<ao_data>& ao_data_sh
 			for (int p0 = from; p0 < to; p0 += per) out.emplace_back(p0, std::min(p0 + per, to));
 		};
 		std::vector<std::pair<int, int>> spans;
-		if (morton_applied)
+		if (morton_applied && slab > 0)
+			for (int s0 = 0; s0 < points[g]; s0 += slab) cut(s0, std::min(s0 + slab, points[g]), spans);
+		else if (morton_applied)
 			cut(0, points[g], spans);
 		else
 			for (int band = 0; band < 3; band++) cut(band_bounds[band], band_bounds[band + 1], spans);
@@ -1388,14 +1407,18 @@ void structure_factors::build_grid_blocks(const std::vector<ao_data>& ao_data_sh
 	}
 	//-gflops: the work of one evaluation, sum over blocks of n_active^2 points, so a chunk size can be judged
 	if (throughput::enabled()) {
-		double work = 0.0;
+		double work = 0.0, bytes = 0.0, max_bytes = 0.0;
 		long long nblocks = 0;
 		for (int g = 0; g < n_atom_grids; g++)
 			for (const GridBlock& b : XG.blocks[g]) {
-				work += static_cast<double>(b.active_aos.size()) * b.active_aos.size() * b.point_count;
+				const double n = static_cast<double>(b.active_aos.size());
+				work += n * n * b.point_count;
+				const double set = 8.0 * n * (b.point_count + n);
+				bytes += set;
+				max_bytes = std::max(max_bytes, set);
 				nblocks++;
 			}
-		std::fprintf(stderr, "XCW grid blocks: %lld, sum n_active^2 * points = %.3e\n", nblocks, work);
+		std::fprintf(stderr, "XCW grid blocks: %lld, sum n_active^2 * points = %.3e, working set mean %.0f kB max %.0f kB\n", nblocks, work, bytes / std::max(1LL, nblocks) / 1024, max_bytes / 1024);
 	}
 	//the integration weights alone, before any density-following share multiplies them in
 	XG.w0.clear();
