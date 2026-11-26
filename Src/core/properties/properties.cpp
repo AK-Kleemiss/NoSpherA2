@@ -612,6 +612,48 @@ void Calc_Rho_spherical_harmonics(
 	print_time(start, end, file);
 };
 
+//Strips of 4x4 lines are gathered in 4x4x4 tiles, so each 64-point block of compute_dens_batch is a compact cube of space
+void Calc_Rho(cube &CubeRho, const WFN &wavy, double radius, std::ostream &file, bool wrap)
+{
+	if (wrap) {
+		Calc_Cube(CubeRho, wavy, [&](const d3 &pos) { return wavy.compute_dens(pos); }, radius, file, wrap);
+		return;
+	}
+	_time_point start = get_time();
+	const double r = constants::ang2bohr(radius);
+	const std::vector<d3> centres = source_positions(wavy);
+	const i3 n = CubeRho.get_sizes();
+	CubeRho.set_zero();
+	const int nt = (n[1] + 3) / 4, U = (n[0] + 3) / 4 * nt, G = std::max(1, 65536 / std::max(1, 16 * n[2]));
+	std::vector<std::vector<i3>> keep(G);
+	std::vector<i3> idx;
+	vec x, y, z, rho;
+	for (int s0 = 0; s0 < U; s0 += G) {
+		const int ng = std::min(G, U - s0);
+#pragma omp parallel for schedule(dynamic)
+		for (int g = 0; g < ng; g++) {
+			keep[g].clear();
+			const int a = 4 * ((s0 + g) / nt), b = 4 * ((s0 + g) % nt);
+			for (int c = 0; c < n[2]; c += 4)
+				for (int i = a; i < std::min(a + 4, n[0]); i++)
+					for (int j = b; j < std::min(b + 4, n[1]); j++)
+						for (int k = c; k < std::min(c + 4, n[2]); k++)
+							if (near_any(CubeRho.get_pos(i, j, k), centres, r)) keep[g].push_back({ i, j, k });
+		}
+		idx.clear(), x.clear(), y.clear(), z.clear();
+		for (int g = 0; g < ng; g++) idx.insert(idx.end(), keep[g].begin(), keep[g].end());
+		for (int p = 0; p < (int)idx.size(); p++) {
+			const d3 pos = CubeRho.get_pos(idx[p][0], idx[p][1], idx[p][2]);
+			x.push_back(pos[0]), y.push_back(pos[1]), z.push_back(pos[2]);
+		}
+		rho.resize(idx.size());
+		wavy.compute_dens_batch((int)idx.size(), x.data(), y.data(), z.data(), rho.data());
+		for (int p = 0; p < (int)idx.size(); p++) CubeRho.set_value(idx[p][0], idx[p][1], idx[p][2], rho[p]);
+	}
+	_time_point end = get_time();
+	print_time(start, end, file);
+}
+
 void Calc_MO_spherical_harmonics(
 	cube &CubeMO,
 	const WFN &wavy,

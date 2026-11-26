@@ -308,6 +308,7 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
 
 	// Prune grid based on cutoff criteria
 	pruneGrid();
+	if (config_.spatial_order) sortGridSpatially();
 	addTimingPoint("Grid Pruning");
 
 	// Calculate non-spherical densities
@@ -1475,13 +1476,41 @@ void GridManager::calculateNonSphericalDensities(const WFN &wave, const cell &un
 	vec2 *grids = helper ? grid_data_.helper_grids.data() : grid_data_.atomic_grids.data();
 	const int n_grids = helper ? grid_data_.helper_grids.size() : grid_data_.atomic_grids.size();
 	const DensityBatch density = density_ ? density_ : density_batch(wave);
-
+	vec X, Y, Z, R;
 	for (int g = 0; g < n_grids; g++) {
-		vec2 &atom_grid = grids[g];
-		density(points[g], atom_grid[GridData::GridIndex::X].data(), atom_grid[GridData::GridIndex::Y].data(),
-			atom_grid[GridData::GridIndex::Z].data(), atom_grid[GridData::GridIndex::WFN_DENSITY].data());
+		X.insert(X.end(), grids[g][GridData::GridIndex::X].begin(), grids[g][GridData::GridIndex::X].begin() + points[g]);
+		Y.insert(Y.end(), grids[g][GridData::GridIndex::Y].begin(), grids[g][GridData::GridIndex::Y].begin() + points[g]);
+		Z.insert(Z.end(), grids[g][GridData::GridIndex::Z].begin(), grids[g][GridData::GridIndex::Z].begin() + points[g]);
+	}
+	R.resize(X.size());
+	density((int)X.size(), X.data(), Y.data(), Z.data(), R.data());
+	size_t o = 0;
+	for (int g = 0; g < n_grids; g++) {
+		std::copy_n(R.data() + o, points[g], grids[g][GridData::GridIndex::WFN_DENSITY].data());
+		o += points[g];
 	}
 	non_spherical_densities_calculated_ = true;
+}
+
+void GridManager::sortGridSpatially() {
+	vec3 &grids = needs_helper_grids_ ? grid_data_.helper_grids : grid_data_.atomic_grids;
+	const ivec &n = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom : grid_data_.num_points_per_atom;
+#pragma omp parallel for schedule(dynamic)
+	for (int g = 0; g < (int)grids.size(); g++) {
+		vec2 &grid = grids[g];
+		const ivec perm = morton_order(n[g], grid[GridData::X].data(), grid[GridData::Y].data(), grid[GridData::Z].data());
+		vec t(n[g]);
+		for (int c = 0; c < grid_data_.grid_data_size; c++) {
+			if ((int)grid[c].size() < n[g]) continue;
+			for (int p = 0; p < n[g]; p++) t[p] = grid[c][perm[p]];
+			std::copy(t.begin(), t.end(), grid[c].begin());
+		}
+		if (g < (int)grid_pidx_.size() && (int)grid_pidx_[g].size() == n[g]) {
+			ivec q(n[g]);
+			for (int p = 0; p < n[g]; p++) q[p] = grid_pidx_[g][perm[p]];
+			grid_pidx_[g].swap(q);
+		}
+	}
 }
 
 void GridManager::calculateNonSphericalg(const WFN &wave, const cell &unit_cell) {

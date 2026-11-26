@@ -1100,6 +1100,7 @@ void structure_factors::setup_grid(const occ::gto::AOBasis& aobasis) {
 	config.accuracy = opt->accuracy;
 	config.partition_type = share ? PartitionType::Hirshfeld : opt->partition_type;
 	config.no_density_eval = true;
+	config.spatial_order = false;
 	config.pbc = opt->pbc;
 	config.debug = opt->debug;
 	config.all_charges = opt->all_charges;
@@ -1291,36 +1292,7 @@ void structure_factors::build_grid_blocks(const std::vector<ao_data>& ao_data_sh
 			double* xs = grid[GridData::GridIndex::X].data();
 			double* ys = grid[GridData::GridIndex::Y].data();
 			double* zs = grid[GridData::GridIndex::Z].data();
-			std::array<double, 3> lo{ 1e30, 1e30, 1e30 }, hi{ -1e30, -1e30, -1e30 };
-			for (int p = 0; p < npts; p++) {
-				lo[0] = std::min(lo[0], xs[p]); hi[0] = std::max(hi[0], xs[p]);
-				lo[1] = std::min(lo[1], ys[p]); hi[1] = std::max(hi[1], ys[p]);
-				lo[2] = std::min(lo[2], zs[p]); hi[2] = std::max(hi[2], zs[p]);
-			}
-			//21 bits per axis, interleaved to a 63-bit key
-			auto spread = [](const unsigned int v) {
-				unsigned long long x = v & 0x1fffffu;
-				x = (x | (x << 32)) & 0x1f00000000ffffull;
-				x = (x | (x << 16)) & 0x1f0000ff0000ffull;
-				x = (x | (x << 8))  & 0x100f00f00f00f00full;
-				x = (x | (x << 4))  & 0x10c30c30c30c30c3ull;
-				x = (x | (x << 2))  & 0x1249249249249249ull;
-				return x;
-			};
-			std::vector<std::pair<unsigned long long, int>> keyed(npts);
-			for (int p = 0; p < npts; p++) {
-				unsigned int c[3];
-				const double v[3] = { xs[p], ys[p], zs[p] };
-				for (int d = 0; d < 3; d++) {
-					const double span = hi[d] - lo[d];
-					const double t = span > 1e-12 ? (v[d] - lo[d]) / span : 0.0;
-					c[d] = static_cast<unsigned int>(std::min(2097151.0, std::max(0.0, t * 2097151.0)));
-				}
-				keyed[p] = { spread(c[0]) | (spread(c[1]) << 1) | (spread(c[2]) << 2), p };
-			}
-			std::sort(keyed.begin(), keyed.end());
-			ivec perm(npts);
-			for (int p = 0; p < npts; p++) perm[p] = keyed[p].second;
+			const ivec perm = morton_order(npts, xs, ys, zs);
 			auto apply = [&](double* a) {
 				vec tmp(npts);
 				for (int p = 0; p < npts; p++) tmp[p] = a[perm[p]];
