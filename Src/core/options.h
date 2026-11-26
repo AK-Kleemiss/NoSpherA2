@@ -277,7 +277,7 @@ struct options
 		//`hessian_df_basis <name>`: density fitting of the TRAH Hessian products only, iterations keep exact Fock builds.
 		//Unset, def2-universal-jkfit is used by itself when the ERIs do not fit in memory; `none` keeps them exact
 		std::string hessian_df_basis_name;
-		//`scf_backend occ|dusk` (or -scf_backend): the SCF of the fit, occ's XCW_solver or molscf (dusk_scf.h)
+		//`scf_backend occ|dusk` (or -scf_backend): the SCF of the fit, occ's XCW_solver or dusk (dusk_scf.h)
 		std::string scf_backend = "occ";
 		double xcw_start_value;
 		int num_xcw_steps;

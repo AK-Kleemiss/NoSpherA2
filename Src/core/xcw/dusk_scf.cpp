@@ -3,8 +3,8 @@
 #ifdef NOSPHERA2_USE_DUSK
 #include "basis_set.h"
 
-molscf::Molecule dusk::molecule(const occ::core::Molecule& mol) {
-	molscf::Molecule m;
+dusk::Molecule dusk_occ::molecule(const occ::core::Molecule& mol) {
+	dusk::Molecule m;
 	for (const occ::core::Atom& a : mol.atoms())
 		m.atoms.push_back({ a.atomic_number, { a.x, a.y, a.z } });
 	m.charge = mol.charge();
@@ -12,8 +12,8 @@ molscf::Molecule dusk::molecule(const occ::core::Molecule& mol) {
 	return m;
 }
 
-gtoint::Basis dusk::basis(const BasisSet& set, const std::vector<occ::core::Atom>& atoms) {
-	std::vector<gtoint::Shell> shells;
+bite::Basis dusk_occ::basis(const BasisSet& set, const std::vector<occ::core::Atom>& atoms) {
+	std::vector<bite::Shell> shells;
 	for (int a = 0; a < static_cast<int>(atoms.size()); a++) {
 		const std::span<const SimplePrimitive> p = set[atoms[a].atomic_number - 1];
 		for (int i = 0; i < static_cast<int>(p.size()); i++) {
@@ -23,23 +23,23 @@ gtoint::Basis dusk::basis(const BasisSet& set, const std::vector<occ::core::Atom
 			shells.back().coefficients.push_back(p[i].coefficient);
 		}
 	}
-	return gtoint::Basis(std::move(shells), gtoint::Angular::Spherical);
+	return bite::Basis(std::move(shells), bite::Angular::Spherical);
 }
 
-molscf::Matrix dusk::to_dusk(const occ::Mat& A) {
-	molscf::Matrix M(A.rows(), A.cols());
+dusk::Matrix dusk_occ::to_dusk(const occ::Mat& A) {
+	dusk::Matrix M(A.rows(), A.cols());
 	Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(M.data(), A.rows(), A.cols()) = A;
 	return M;
 }
 
-occ::Mat dusk::to_occ(const molscf::Matrix& A) {
+occ::Mat dusk_occ::to_occ(const dusk::Matrix& A) {
 	return Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A.data(), A.rows, A.cols);
 }
 
-molscf::Wavefunction dusk::to_dusk(const occ::qm::Wavefunction& wfn) {
+dusk::Wavefunction dusk_occ::to_dusk(const occ::qm::Wavefunction& wfn) {
 	const occ::qm::MolecularOrbitals& mo = wfn.mo;
 	const Eigen::Index n = static_cast<Eigen::Index>(mo.n_ao), m = mo.C.cols();
-	molscf::Wavefunction w;
+	dusk::Wavefunction w;
 	w.nbf = n;
 	w.nmo = m;
 	w.nalpha = static_cast<int>(mo.n_alpha);
@@ -52,8 +52,8 @@ molscf::Wavefunction dusk::to_dusk(const occ::qm::Wavefunction& wfn) {
 	return w;
 }
 
-void dusk::to_occ(const molscf::Result& r, occ::qm::Wavefunction& wfn) {
-	const molscf::Wavefunction& w = r.wfn;
+void dusk_occ::to_occ(const dusk::Result& r, occ::qm::Wavefunction& wfn) {
+	const dusk::Wavefunction& w = r.wfn;
 	const Eigen::Index n = static_cast<Eigen::Index>(w.nbf), m = static_cast<Eigen::Index>(w.nmo);
 	const int ns = w.unrestricted ? 2 : 1;
 	err_checkf(m == n, "scf_backend dusk: the basis is linearly dependent, which occ's wavefunction cannot hold", std::cout);
@@ -77,20 +77,20 @@ void dusk::to_occ(const molscf::Result& r, occ::qm::Wavefunction& wfn) {
 	wfn.converged = r.converged;
 }
 
-molscf::Options dusk::scf_options(const options::SCF_settings& s) {
-	molscf::Options o;
-	o.reference = s.hf_type == occ::qm::SpinorbitalKind::Unrestricted ? molscf::Reference::Unrestricted : molscf::Reference::Restricted;
+dusk::Options dusk_occ::scf_options(const options::SCF_settings& s) {
+	dusk::Options o;
+	o.reference = s.hf_type == occ::qm::SpinorbitalKind::Unrestricted ? dusk::Reference::Unrestricted : dusk::Reference::Restricted;
 	o.convergence = { s.quant_diff, s.max_diis_error, s.gradient, s.RMSP_diff, s.MaxP_diff };
 	o.max_iterations = s.max_scf_iterations;
 	if (!s.guess_basis_name.empty()) {
-		o.guess = molscf::Guess::SmallBasis;
+		o.guess = dusk::Guess::SmallBasis;
 		o.guess_basis = s.guess_basis_name;
 	}
 	o.verbosity = 0;
 	return o;
 }
 
-double xcw_perturbation::evaluate(const molscf::Matrix& D, molscf::Matrix& F) {
+double xcw_perturbation::evaluate(const dusk::Matrix& D, dusk::Matrix& F) {
 	const int n = static_cast<int>(D.rows);
 	dMatrix2 dm(n, n);
 	for (int i = 0; i < n; i++)
@@ -101,43 +101,50 @@ double xcw_perturbation::evaluate(const molscf::Matrix& D, molscf::Matrix& F) {
 	if (lambda != 0) {
 		occ::Mat P;
 		coupling_->perturbation_matrix(P, false, lambda, false);
-		F = dusk::to_dusk(P);
+		F = dusk_occ::to_dusk(P);
 	}
 	return fit.criterion;
 }
 
-bool xcw_perturbation::response(const molscf::Matrix& D, const molscf::Matrix& dD, molscf::Matrix& F1) {
+bool xcw_perturbation::response(const dusk::Matrix& D, const dusk::Matrix& dD, dusk::Matrix& F1) {
 	const int n = static_cast<int>(dD.rows);
 	dMatrix2 dm(n, n);
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++) dm(i, j) = 0.5 * dD(i, j);
-	F1 = dusk::to_dusk(coupling_->perturbation_matrix_response(dm, 1.0));
+	F1 = dusk_occ::to_dusk(coupling_->perturbation_matrix_response(dm, 1.0));
 	return true;
 }
 
-dusk_solver::dusk_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& occ_basis, const BasisSet& orbital, const molscf::Options& o,
+dusk_solver::dusk_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& occ_basis, const BasisSet& orbital, const dusk::Options& o,
 	XCW_log_writer& writer, SCF_coupling& coupling)
-	: scf(dusk::molecule(mol), dusk::basis(orbital, mol.atoms()), o), xcw(std::make_shared<xcw_perturbation>(coupling)),
+	: scf(dusk_occ::molecule(mol), dusk_occ::basis(orbital, mol.atoms()), o), xcw(std::make_shared<xcw_perturbation>(coupling)),
 	basis_(occ_basis), atoms_(mol.atoms()), writer_(&writer) {
 	index_ = scf.add_perturbation(xcw, 0.0);
+	//XCW_solver::log_iteration's row: the fit of the density this Fock build evaluated, E_total without lambda * criterion
+	scf.set_iteration_callback([this](const dusk::IterationInfo& i) {
+		const fit_quality& f = xcw->fit;
+		const double penalty = xcw->lambda * i.perturbation_energies[0];
+		writer_->v = { i.iteration, xcw->lambda, f.criterion, f.GooF2, f.R1, i.energy - penalty, penalty, i.energy, f.criterion_all, f.R1_all, 0.0, false, f.wR2, f.wR2_all };
+		writer_->iteration_line();
+		});
 }
 
 bool dusk_solver::run(const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess) {
 	writer_->start_lambda(lambda);
-	xcw->lambda = lambda;
 	scf.set_strength(index_, lambda);
-	if (use_guess) scf.set_guess(dusk::to_dusk(wfn));
+	if (use_guess) scf.set_guess(dusk_occ::to_dusk(wfn));
 	const int evaluations = xcw->evaluations;
-	const molscf::Result r = scf.run();
+	const dusk::Result r = scf.run();
 	wfn.basis = basis_;
 	wfn.atoms = atoms_;
-	dusk::to_occ(r, wfn);
+	dusk_occ::to_occ(r, wfn);
 	std::ostringstream s;
-	s << "***SCF " << (r.converged ? "converged" : "did not converge") << " in " << r.iterations << " iterations (molscf)***";
+	s << "***SCF " << (r.converged ? "converged" : "did not converge") << " in " << r.iterations << " iterations (dusk)***";
 	print_centered_message(s.str(), 100, writer_->log);
-	writer_->log << "molscf: E " << std::fixed << std::setprecision(10) << wfn.energy.total << " Eh, lambda criterion " << r.components.at("perturbation")
-		<< ", criterion " << xcw->fit.criterion << ", " << xcw->evaluations - evaluations << " perturbation evaluations";
-	if (r.components.count("lowest_hessian_eigenvalue")) writer_->log << ", lowest Hessian eigenvalue " << std::scientific << r.components.at("lowest_hessian_eigenvalue");
+	writer_->log << "dusk: E " << std::fixed << std::setprecision(10) << wfn.energy.total << " Eh, lambda criterion " << r.components.at("perturbation")
+		<< ", criterion " << xcw->fit.criterion << ", " << xcw->evaluations - evaluations << " perturbation evaluations, "
+		<< r.fock_builds << " Fock builds, " << r.response_builds << " response builds";
+	if (!std::isnan(r.lowest_hessian_eigenvalue)) writer_->log << ", lowest Hessian eigenvalue " << std::scientific << r.lowest_hessian_eigenvalue;
 	writer_->log << std::defaultfloat << std::endl;
 	writer_->v.lambda = lambda;
 	writer_->v.E_total = wfn.energy.total;
@@ -148,7 +155,7 @@ bool dusk_solver::run(const double lambda, occ::qm::Wavefunction& wfn, const boo
 void dusk_solver::fd_check(const occ::qm::Wavefunction& wfn, std::ostream& out) {
 	const Eigen::Index n = static_cast<Eigen::Index>(wfn.mo.n_ao);
 	const occ::Mat Dt = 2.0 * (wfn.mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? occ::Mat(wfn.mo.D.topRows(n) + wfn.mo.D.bottomRows(n)) : wfn.mo.D);
-	const molscf::Matrix D = dusk::to_dusk(Dt);
+	const dusk::Matrix D = dusk_occ::to_dusk(Dt);
 	const double keep = xcw->lambda, h = 1e-4;
 	xcw->lambda = keep == 0 ? 1.0 : keep;
 	std::mt19937 gen(7);
@@ -159,16 +166,16 @@ void dusk_solver::fd_check(const occ::qm::Wavefunction& wfn, std::ostream& out) 
 		for (Eigen::Index i = 0; i < n; i++)
 			for (Eigen::Index j = 0; j <= i; j++) X(i, j) = X(j, i) = nd(gen);
 		X /= X.cwiseAbs().maxCoeff();
-		molscf::Matrix F0(n, n), F1(n, n), Fp(n, n), Fm(n, n);
+		dusk::Matrix F0(n, n), F1(n, n), Fp(n, n), Fm(n, n);
 		xcw->evaluate(D, F0);
-		xcw->response(D, dusk::to_dusk(X), F1);
-		const double Ep = xcw->evaluate(dusk::to_dusk(Dt + h * X), Fp), Em = xcw->evaluate(dusk::to_dusk(Dt - h * X), Fm);
-		const double fd = (Ep - Em) / (2 * h), an = (dusk::to_occ(F0).array() * X.array()).sum();
-		const occ::Mat dF = (dusk::to_occ(Fp) - dusk::to_occ(Fm)) / (2 * h);
+		xcw->response(D, dusk_occ::to_dusk(X), F1);
+		const double Ep = xcw->evaluate(dusk_occ::to_dusk(Dt + h * X), Fp), Em = xcw->evaluate(dusk_occ::to_dusk(Dt - h * X), Fm);
+		const double fd = (Ep - Em) / (2 * h), an = (dusk_occ::to_occ(F0).array() * X.array()).sum();
+		const occ::Mat dF = (dusk_occ::to_occ(Fp) - dusk_occ::to_occ(Fm)) / (2 * h);
 		out << "dusk FD check " << k << ": dE_p/dD.X " << an << " central difference " << fd << " rel " << std::abs(an - fd) / std::abs(fd)
-			<< "; response max|F1 - dF| / max|dF| " << (dusk::to_occ(F1) - dF).cwiseAbs().maxCoeff() / dF.cwiseAbs().maxCoeff() << std::endl;
+			<< "; response max|F1 - dF| / max|dF| " << (dusk_occ::to_occ(F1) - dF).cwiseAbs().maxCoeff() / dF.cwiseAbs().maxCoeff() << std::endl;
 	}
-	molscf::Matrix F(n, n);
+	dusk::Matrix F(n, n);
 	xcw->evaluate(D, F);
 	xcw->lambda = keep;
 	out << std::defaultfloat;

@@ -500,19 +500,29 @@ occ::qm::HartreeFock XCW_wrapper::setup_system() {
 	scf_solver = XCW_solver(mol, occ_basis_set, scf_settings, writer, *this);
 	if (dusk) {
 #ifdef NOSPHERA2_USE_DUSK
-		molscf::Options o = dusk::scf_options(scf_settings);
+		dusk::Options o = dusk_occ::scf_options(scf_settings);
 		o.incremental_fock = opt->xcw_incremental;
 		if (opt->xcw_int_precision > 0.0) o.integral_threshold = opt->xcw_int_precision;
-		o.threads = opt->threads;
+		o.threads = std::max(0, opt->threads); //NoSpherA2's -1 (unset) is dusk's 0, the OpenMP default
+		//save_eri / read_eri: dusk reads <path>.dusk when it holds the integrals of this basis and geometry, else builds and
+		//writes it. Its format is bite's, occ's files are not interchangeable with it, hence the suffix: neither overwrites the other
+		const std::filesystem::path& eri = scf_settings.eri_save_path.empty() ? scf_settings.eri_read_path : scf_settings.eri_save_path;
+		if (!eri.empty()) o.eri_file = eri.string() + ".dusk";
+		//NOSPHERA2_DUSK_WARM_TRAH: a warm-started lambda goes straight to the second-order solver, as occ's path does
+		o.warm_start_second_order = tuning("NOSPHERA2_DUSK_WARM_TRAH") != nullptr;
 		dusk_ = std::make_unique<dusk_solver>(mol, occ_basis_set, *sf.orbital_basis, o, writer, static_cast<SCF_coupling&>(*this));
+		if (!scf_settings.guess_basis_name.empty())
+			dusk_->scf.set_guess_basis(dusk_occ::basis(*BasisSetLibrary::get_basis_set(scf_settings.guess_basis_name), mol.atoms()));
 		if (!opt->xcw_settings.df_basis_name.empty()) {
-			dusk_->scf.set_aux_basis(dusk::basis(*fitting_set(opt->xcw_settings.df_basis_name, mol.atoms(), *sf.orbital_basis), mol.atoms()));
-			dusk_->scf.options().jk = molscf::JKMethod::RI;
+			dusk_->scf.set_aux_basis(dusk_occ::basis(*fitting_set(opt->xcw_settings.df_basis_name, mol.atoms(), *sf.orbital_basis), mol.atoms()));
+			dusk_->scf.options().jk = dusk::JKMethod::RI;
 		}
-		std::cout << "XCW SCF backend: dusk (molscf)" << std::endl;
-		writer.log << "XCW SCF backend: dusk (molscf); occ-only settings are ignored: damp, shift, diis_damping, diis_shift, check_hessian, hessian_df_basis, save_eri, read_eri" << std::endl;
+		std::cout << "XCW SCF backend: dusk" << std::endl;
+		writer.log << "XCW SCF backend: dusk; occ-only settings are ignored: damp, shift, diis_damping, diis_shift, check_hessian, hessian_df_basis";
+		if (!eri.empty()) writer.log << "; stored integrals in " << o.eri_file << (opt->xcw_settings.df_basis_name.empty() ? "" : " (unused: df_basis fits them)");
+		writer.log << std::endl;
 #else
-		err_checkf(false, "scf_backend dusk: this NoSpherA2 was built without molscf (configure with NOSPHERA2_DUSK_DIR)", std::cout);
+		err_checkf(false, "scf_backend dusk: this NoSpherA2 was built without dusk (configure with NOSPHERA2_DUSK_DIR)", std::cout);
 #endif
 	}
 	return hf;
@@ -859,7 +869,7 @@ void XCW_wrapper::run() {
 		sf.write_F_calc("rcheck_Fcalc.txt");
 		return;
 	}
-	//the stored two-electron integrals and the density-fitted Hessian products of the SCF; molscf makes its own
+	//the stored two-electron integrals and the density-fitted Hessian products of the SCF; dusk makes its own
 	if (!dusk_) setup_scf_integrals(hf);
 	occ::qm::Wavefunction last_wfn, prev_wfn;
 	bool has_guess = read_start_guess(last_wfn);

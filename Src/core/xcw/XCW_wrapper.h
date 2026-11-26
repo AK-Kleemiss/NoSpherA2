@@ -109,7 +109,7 @@ private:
 	// The lambda row of the last converged step, for the final model summary
 	XCW_log_writer::values last_row_{};
 	XCW_solver scf_solver;
-	// `scf_backend dusk`: molscf's SCF in scf_solver's place, which then only holds lambda for the weights
+	// `scf_backend dusk`: dusk's SCF in scf_solver's place, which then only holds lambda for the weights
 	std::unique_ptr<dusk_solver> dusk_;
 
 };

@@ -366,7 +366,7 @@ target_link_libraries(
         occ_main
         featomic::static
 )
-if(TARGET molscf)
-    target_link_libraries(NoSpherA2Core PUBLIC molscf)
+if(TARGET dusk)
+    target_link_libraries(NoSpherA2Core PUBLIC dusk::dusk)
     target_compile_definitions(NoSpherA2Core PUBLIC NOSPHERA2_USE_DUSK)
 endif()

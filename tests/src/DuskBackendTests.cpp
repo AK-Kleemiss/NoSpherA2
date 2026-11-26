@@ -1,5 +1,5 @@
 //scf_backend dusk at the boundary to occ: the basis and its function order (the overlap of each library in the other's
-//order), and molscf's plain Hartree-Fock against occ's, as ScfSolverTests does for SCF_solver
+//order), and dusk's plain Hartree-Fock against occ's, as ScfSolverTests does for SCF_solver
 #include "pch.h"
 #include <gtest/gtest.h>
 
@@ -23,7 +23,7 @@ namespace
 		double max_dD = 0;
 	};
 
-	//occ's SCF at an energy threshold of 1e-10 and molscf's at its tight preset, then molscf again from its own orbitals
+	//occ's SCF at an energy threshold of 1e-10 and dusk's at its tight preset, then dusk again from its own orbitals
 	pair_run solve(const char* xyz, const std::string& basis_name, const occ::qm::SpinorbitalKind kind, const int multiplicity) {
 		spdlog::set_level(spdlog::level::err);
 		occ::core::Molecule mol = occ::io::molecule_from_xyz_string(xyz);
@@ -35,26 +35,26 @@ namespace
 		reference.convergence_settings.energy_threshold = 1e-10;
 		pair_run r;
 		r.occ_energy = reference.compute_scf_energy();
-		molscf::Options o;
-		o.reference = kind == occ::qm::SpinorbitalKind::Unrestricted ? molscf::Reference::Unrestricted : molscf::Reference::Restricted;
-		o.convergence = molscf::Convergence::tight();
+		dusk::Options o;
+		o.reference = kind == occ::qm::SpinorbitalKind::Unrestricted ? dusk::Reference::Unrestricted : dusk::Reference::Restricted;
+		o.convergence = dusk::Convergence::tight();
 		o.integral_threshold = 1e-14;
 		o.verbosity = 0;
-		molscf::SCF scf(dusk::molecule(mol), dusk::basis(*BasisSetLibrary::get_basis_set(basis_name), mol.atoms()), o);
-		const molscf::Result first = scf.run();
+		dusk::SCF scf(dusk_occ::molecule(mol), dusk_occ::basis(*BasisSetLibrary::get_basis_set(basis_name), mol.atoms()), o);
+		const dusk::Result first = scf.run();
 		r.converged = first.converged;
 		r.energy = first.energy;
 		occ::qm::Wavefunction wfn;
 		wfn.basis = basis;
 		wfn.atoms = mol.atoms();
-		dusk::to_occ(first, wfn);
+		dusk_occ::to_occ(first, wfn);
 		occ::qm::MolecularOrbitals ref = reference.ctx.mo;
 		ref.update_occupied_orbitals();
 		ref.update_density_matrix();
-		//the total density: occ puts a doublet's unpaired electron in beta (n_alpha 4, n_beta 5 for CH3), molscf in alpha
+		//the total density: occ puts a doublet's unpaired electron in beta (n_alpha 4, n_beta 5 for CH3), dusk in alpha
 		r.max_dD = (wfn.mo.total_density_matrix() - ref.total_density_matrix()).cwiseAbs().maxCoeff();
-		scf.set_guess(dusk::to_dusk(wfn));
-		const molscf::Result warm = scf.run();
+		scf.set_guess(dusk_occ::to_dusk(wfn));
+		const dusk::Result warm = scf.run();
 		r.warm_converged = warm.converged;
 		r.warm_energy = warm.energy;
 		r.warm_iterations = warm.iterations;
@@ -62,7 +62,7 @@ namespace
 	}
 }
 
-//The overlap molscf computes over the converted basis equals occ's, element by element: same functions, same order and phases
+//The overlap dusk computes over the converted basis equals occ's, element by element: same functions, same order and phases
 TEST(DuskBackendTests, OverlapMatchesOccThroughF)
 {
 	spdlog::set_level(spdlog::level::err);
@@ -71,12 +71,12 @@ TEST(DuskBackendTests, OverlapMatchesOccThroughF)
 	ASSERT_EQ(basis.l_max(), 3);
 	occ::qm::HartreeFock hf(basis);
 	const occ::Mat S_occ = hf.compute_overlap_matrix();
-	const molscf::SCF scf(dusk::molecule(mol), dusk::basis(*BasisSetLibrary::get_basis_set("def2-tzvp"), mol.atoms()));
+	const dusk::SCF scf(dusk_occ::molecule(mol), dusk_occ::basis(*BasisSetLibrary::get_basis_set("def2-tzvp"), mol.atoms()));
 	ASSERT_EQ(scf.basis().nbf(), basis.nbf());
-	const occ::Mat S = dusk::to_occ(scf.overlap());
+	const occ::Mat S = dusk_occ::to_occ(scf.overlap());
 	EXPECT_LT((S - S_occ).cwiseAbs().maxCoeff(), 1e-12);
 	//and back: the storage change is its own inverse
-	EXPECT_EQ(dusk::to_occ(dusk::to_dusk(S_occ)), S_occ);
+	EXPECT_EQ(dusk_occ::to_occ(dusk_occ::to_dusk(S_occ)), S_occ);
 }
 
 TEST(DuskBackendTests, RestrictedHartreeFockMatchesOcc)

@@ -40,6 +40,7 @@ first two columns are also the table `-tune list` prints (`documented_knobs` in
 | `NOSPHERA2_ERI_DYNAMIC` | off | The stored-integral Fock build hands rows out dynamically, longest first. J and K then vary at round-off (1e-15 relative) between runs; the default fixed cyclic order is bit for bit reproducible at a given thread count. No gain measured. | `stored_eri.cpp` |
 | `NOSPHERA2_XCW_ADJOINT_CHECK` | off | Check the grid transform against its adjoint at a random symmetric D, after the first converged step. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_DUSK_FD_CHECK` | off | With `scf_backend dusk`: dE_p/dD and the response of the XCW perturbation against central differences along four random symmetric directions, after the first converged step. | `XCW_wrapper.cpp` |
+| `NOSPHERA2_DUSK_WARM_TRAH` | off | With `scf_backend dusk`: a lambda step started from the previous orbitals goes straight to the second-order solver (occ's behaviour) instead of DIIS. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_XCW_TSHB_FIT` | off | With `-xcw_partition ri -tshb`: fit the density anew for the `.tshb` instead of reusing the partition's own fit. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_XCW_TSHB_TABLE` | off | Write the `.tscb` table beside the `.tshb`, to compare the two. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_XCW_TSCB_BY_F` | off | Match the grid route's table columns to the scatterers by the closest f instead of by atom id or label. | `structure_factors.cpp` |
