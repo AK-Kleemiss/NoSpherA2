@@ -508,8 +508,9 @@ occ::qm::HartreeFock XCW_wrapper::setup_system() {
 		//writes it. Its format is bite's, occ's files are not interchangeable with it, hence the suffix: neither overwrites the other
 		const std::filesystem::path& eri = scf_settings.eri_save_path.empty() ? scf_settings.eri_read_path : scf_settings.eri_save_path;
 		if (!eri.empty()) o.eri_file = eri.string() + ".dusk";
-		//NOSPHERA2_DUSK_WARM_TRAH: a warm-started lambda goes straight to the second-order solver, as occ's path does
-		o.warm_start_second_order = tuning("NOSPHERA2_DUSK_WARM_TRAH") != nullptr;
+		//NOSPHERA2_DUSK_WARM_TRAH: a warm-started lambda goes straight to the second-order solver, as occ's path does;
+		//unset keeps dusk's default (on), =0 starts it under DIIS
+		if (const char* e = tuning("NOSPHERA2_DUSK_WARM_TRAH")) o.warm_start_second_order = std::string(e) != "0";
 		dusk_ = std::make_unique<dusk_solver>(mol, occ_basis_set, *sf.orbital_basis, o, writer, static_cast<SCF_coupling&>(*this));
 		if (!scf_settings.guess_basis_name.empty())
 			dusk_->scf.set_guess_basis(dusk_occ::basis(*BasisSetLibrary::get_basis_set(scf_settings.guess_basis_name), mol.atoms()));
