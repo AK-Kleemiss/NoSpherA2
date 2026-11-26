@@ -35,7 +35,7 @@ jobs:
       - name: bootstrap
         run: cmake -DNOSPHERA2_BOOTSTRAP_GPU=OFF -P scripts/BootstrapMicromamba.cmake
       - name: configure
-        run: cmake --preset release-linux -DNOSPHERA2_BUILD_TESTS=ON
+        run: cmake --preset release-linux --fresh -DNOSPHERA2_BUILD_TESTS=ON
       # /tmp/pi-heavy.lock is shared with the nightly Olex2 release tests: never a compile and a test run together
       - name: build
         env:
