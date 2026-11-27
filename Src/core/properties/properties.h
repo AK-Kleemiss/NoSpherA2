@@ -350,6 +350,7 @@ void Calc_Cube(cube &Cube, const S &src, F &&f, double radius, std::ostream &fil
 		print_time(start, end, file);
 	}
 }
+void Calc_Rho(cube &CubeRho, const WFN &wavy, double radius, std::ostream &file, bool wrap);
 template <class S>
 void Calc_Rho(cube &CubeRho, const S &src, double radius, std::ostream &file, bool wrap)
 {

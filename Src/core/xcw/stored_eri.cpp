@@ -215,8 +215,8 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 
 //With off-diagonal D pairs doubled, J is the packed symmetric matrix times that vector, a dot and an
 //axpy per segment. K's four scatters per integral run along segment c (second index pair_b()): two
-//dots against columns of D, two axpys into columns of the symmetrised K, directly on d = 0..c, else
-//through the index list. The diagonal cd == ab has half weight and is taken back with its segment.
+//dots against columns of D, two axpys into columns of the symmetrised K, over the segment's runs of
+//consecutive d. The diagonal cd == ab has half weight and is taken back with its segment.
 //With two densities (UHF) one pass over the integrals gives J of their sum and K of each, so the
 //bandwidth-bound stream is read once per Fock build, not once per spin.
 //Per-thread partials merge in thread order; with -tune NOSPHERA2_ERI_DYNAMIC the sums are reproducible to round-off only.
@@ -240,6 +240,15 @@ void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Ma
 			for (int a = 0; a < n; a++) rm[a] = std::max(rm[a], D[i]->row(a).cwiseAbs().maxCoeff());
 		for (int a = 0; a < n; a++) rmax = std::max(rmax, rm[a]);
 	}
+	//Kept pairs of a segment fall in runs of consecutive d, each a contiguous stretch of the D and K columns
+	std::vector<int> rs, rf(n + 1);
+	for (int c = 0; c < n; c++) {
+		rf[c] = static_cast<int>(rs.size());
+		for (int k = first[c]; k < first[c + 1]; k++)
+			if (k == first[c] || pb[k] != pb[k - 1] + 1) rs.push_back(k);
+	}
+	rf[n] = static_cast<int>(rs.size());
+	rs.push_back(npk);
 	std::vector<std::vector<double>> Jp(nthr);
 	std::vector<occ::Mat> Kp((size_t)nthr * nd);
 	//Fixed cyclic rows: J and K are bit for bit the same on every run with the same thread count, which the XCW
@@ -269,26 +278,20 @@ void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Ma
 				Jl[k] += vm.dot(Eigen::Map<const Eigen::VectorXd>(dp.data() + o, m));
 				Eigen::Map<Eigen::VectorXd> tm(t.data(), m);
 				tm = vm.cwiseProduct(Eigen::Map<const Eigen::VectorXd>(fp.data() + o, m));
-				const bool direct = pb[o] == 0 && pb[o + m - 1] == m - 1;
 				for (int s = 0; s < nd; s++) {
 					const double *Da = Dd[s] + a * n, *Db = Dd[s] + b * n;
 					double *Ks = Kd[s], *Ka = Ks + a * n, *Kb = Ks + b * n;
 					const double kca = fab * Da[c], kcb = fab * Db[c];
-					if (direct) {
-						Ks[c + a * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Db, m));
-						Ks[c + b * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Da, m));
-						Eigen::Map<Eigen::VectorXd>(Ka, m) += kcb * tm;
-						Eigen::Map<Eigen::VectorXd>(Kb, m) += kca * tm;
+					double sa = 0.0, sb = 0.0;
+					for (int r = rf[c]; r < rf[c + 1] && rs[r] < o + m; r++) {
+						const int d = pb[rs[r]], l = std::min(rs[r + 1], o + m) - rs[r];
+						const auto ts = tm.segment(rs[r] - o, l);
+						sa += ts.dot(Eigen::Map<const Eigen::VectorXd>(Db + d, l));
+						sb += ts.dot(Eigen::Map<const Eigen::VectorXd>(Da + d, l));
+						Eigen::Map<Eigen::VectorXd>(Ka + d, l) += kcb * ts;
+						Eigen::Map<Eigen::VectorXd>(Kb + d, l) += kca * ts;
 					}
-					else {
-						double sa = 0.0, sb = 0.0;
-						for (int i = 0; i < m; i++) {
-							const int d = pb[o + i];
-							sa += t[i] * Db[d], sb += t[i] * Da[d];
-							Ka[d] += kcb * t[i], Kb[d] += kca * t[i];
-						}
-						Ks[c + a * n] += fab * sa, Ks[c + b * n] += fab * sb;
-					}
+					Ks[c + a * n] += fab * sa, Ks[c + b * n] += fab * sb;
 					if (c == a) {
 						const double h = fp[k] * fp[k] * v[k];
 						Ks[a + a * n] -= h * Db[b], Ks[a + b * n] -= h * Da[b];

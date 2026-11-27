@@ -153,66 +153,6 @@ void evaluate_cube_near_atom_mapped(
 		wrap);
 }
 
-struct PropValues {
-	double rho = 0.0;
-	double grad = 0.0;
-	double elf = 0.0;
-	double eli = 0.0;
-	double lap = 0.0;
-	double hess[9]{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-};
-
-PropValues compute_prop_values(const std::vector<cube> &cubes, const WFN &wavy, const d3 &pos)
-{
-	PropValues values;
-
-	const bool rdg_loaded = cubes[cube_type::RDG].get_loaded();
-	const bool lap_loaded = cubes[cube_type::Lap].get_loaded();
-	const bool elf_loaded = cubes[cube_type::Elf].get_loaded();
-	const bool eli_loaded = cubes[cube_type::Eli].get_loaded();
-
-	if (cubes[cube_type::ESP].get_loaded() && !rdg_loaded)
-		values.rho = wavy.compute_dens(pos);
-
-	if (rdg_loaded && lap_loaded && (elf_loaded || eli_loaded))
-		wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
-	else if (elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
-		wavy.computeELIELF(pos, values.elf, values.eli);
-	else if (elf_loaded && !eli_loaded && !rdg_loaded && !lap_loaded)
-		values.elf = wavy.computeELF(pos);
-	else if (!elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
-		values.eli = wavy.computeELI(pos);
-	else if (elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
-		wavy.computeLapELIELF(pos, values.elf, values.eli, values.lap);
-	else if (!elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
-		wavy.computeLapELI(pos, values.eli, values.lap);
-	else if (!elf_loaded && !eli_loaded && lap_loaded && !rdg_loaded)
-		values.lap = wavy.computeLap(pos);
-	else
-		wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
-
-	if (rdg_loaded)
-		values.rho = get_lambda_1(values.hess) < 0 ? -values.rho : values.rho;
-
-	return values;
-}
-
-void accumulate_prop_values(std::vector<cube> &cubes, const i3 &mapped_idx, const PropValues &values)
-{
-	const int x = mapped_idx[0];
-	const int y = mapped_idx[1];
-	const int z = mapped_idx[2];
-
-	if (cubes[cube_type::RDG].get_loaded())
-		cubes[cube_type::RDG].set_value(x, y, z, cubes[cube_type::RDG].get_value(x, y, z) + sanitize_finite(values.grad));
-	if (cubes[cube_type::Lap].get_loaded())
-		cubes[cube_type::Lap].set_value(x, y, z, cubes[cube_type::Lap].get_value(x, y, z) + sanitize_finite(values.lap));
-	if (cubes[cube_type::Elf].get_loaded())
-		cubes[cube_type::Elf].set_value(x, y, z, cubes[cube_type::Elf].get_value(x, y, z) + sanitize_finite(values.elf));
-	if (cubes[cube_type::Eli].get_loaded())
-		cubes[cube_type::Eli].set_value(x, y, z, cubes[cube_type::Eli].get_value(x, y, z) + sanitize_finite(values.eli));
-}
-
 //Per B^3 block of cube points (and `extra` more layers on the high side), the atoms (in input order) whose centre lies
 //within reach(b, a) of some point of block b
 template <class Reach>
@@ -612,6 +552,60 @@ void Calc_Rho_spherical_harmonics(
 	print_time(start, end, file);
 };
 
+//The grid points within r of a centre, strips of 4x4 lines gathered in 4x4x4 tiles, so each 64-point block of a batch
+//kernel is a compact cube of space; f(idx, x, y, z) per 65536 points or so. With wrap the points of the 27 periodic
+//images, idx mapped into the cell
+template <typename F>
+static void tiled_points(const cube &C, const WFN &wavy, const double radius, const bool wrap, F &&f)
+{
+	const double r = constants::ang2bohr(radius);
+	const std::vector<d3> centres = source_positions(wavy);
+	const i3 n = C.get_sizes(), o = wrap ? n : i3{ 0, 0, 0 }, N = wrap ? i3{ 3 * n[0], 3 * n[1], 3 * n[2] } : n;
+	const int nt = (N[1] + 3) / 4, U = (N[0] + 3) / 4 * nt, G = std::max(1, 65536 / std::max(1, 16 * N[2]));
+	std::vector<std::vector<i3>> keep(G);
+	std::vector<i3> idx;
+	vec x, y, z;
+	for (int s0 = 0; s0 < U; s0 += G) {
+		const int ng = std::min(G, U - s0);
+#pragma omp parallel for schedule(dynamic)
+		for (int g = 0; g < ng; g++) {
+			keep[g].clear();
+			const int a = 4 * ((s0 + g) / nt), b = 4 * ((s0 + g) % nt);
+			for (int c = 0; c < N[2]; c += 4)
+				for (int i = a; i < std::min(a + 4, N[0]); i++)
+					for (int j = b; j < std::min(b + 4, N[1]); j++)
+						for (int k = c; k < std::min(c + 4, N[2]); k++)
+							if (near_any(C.get_pos(i - o[0], j - o[1], k - o[2]), centres, r)) keep[g].push_back({ i, j, k });
+		}
+		idx.clear(), x.clear(), y.clear(), z.clear();
+		for (int g = 0; g < ng; g++)
+			for (int p = 0; p < (int)keep[g].size(); p++) {
+				const i3 &t = keep[g][p];
+				const d3 pos = C.get_pos(t[0] - o[0], t[1] - o[1], t[2] - o[2]);
+				x.push_back(pos[0]), y.push_back(pos[1]), z.push_back(pos[2]);
+				idx.push_back({ t[0] % n[0], t[1] % n[1], t[2] % n[2] });
+			}
+		f(idx, x, y, z);
+	}
+}
+
+void Calc_Rho(cube &CubeRho, const WFN &wavy, double radius, std::ostream &file, bool wrap)
+{
+	_time_point start = get_time();
+	CubeRho.set_zero();
+	vec rho;
+	tiled_points(CubeRho, wavy, radius, wrap, [&](const std::vector<i3> &idx, const vec &x, const vec &y, const vec &z) {
+		rho.resize(idx.size());
+		wavy.compute_dens_batch((int)idx.size(), x.data(), y.data(), z.data(), rho.data());
+		for (int p = 0; p < (int)idx.size(); p++) {
+			const i3 &i = idx[p];
+			CubeRho.set_value(i[0], i[1], i[2], CubeRho.get_value(i[0], i[1], i[2]) + rho[p]);
+		}
+	});
+	_time_point end = get_time();
+	print_time(start, end, file);
+}
+
 void Calc_MO_spherical_harmonics(
 	cube &CubeMO,
 	const WFN &wavy,
@@ -722,25 +716,38 @@ void Calc_Prop(
 	bool test,
 	bool wrap)
 {
-	using namespace std;
 	_time_point start = get_time();
-	const double radius_bohr = constants::ang2bohr(radius);
-	const vector<atom> atoms = wavy.get_atoms();
+	const bool rdg = Cubes[cube_type::RDG].get_loaded(), lap = Cubes[cube_type::Lap].get_loaded(), elf = Cubes[cube_type::Elf].get_loaded(), eli = Cubes[cube_type::Eli].get_loaded();
+	const bool hess = rdg || lap;
+	const int s = hess ? 11 : 5;
 	cube rho_contrib(Cubes[cube_type::Rho]);
-
-	rho_contrib.evaluate_on_grid(
-		[&](const d3 &pos_grid, const i3 &, const i3 &mapped_idx) {
-			if (!is_within_radius(pos_grid, atoms, radius_bohr))
-				return 0.0;
-
-			const PropValues values = compute_prop_values(Cubes, wavy, pos_grid);
-			accumulate_prop_values(Cubes, mapped_idx, values);
-			return values.rho;
-		},
-		wrap);
-
+	rho_contrib.set_zero();
+	vec F;
+	tiled_points(rho_contrib, wavy, radius, wrap, [&](const std::vector<i3> &idx, const vec &x, const vec &y, const vec &z) {
+		const int np = (int)idx.size();
+		F.resize((size_t)s * np);
+		wavy.compute_fields_batch(np, x.data(), y.data(), z.data(), hess, F.data());
+		for (int p = 0; p < np; p++) {
+			const double *q = F.data() + (size_t)s * p, rho = q[0], g2 = q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
+			const i3 &i = idx[p];
+			auto add = [&](cube &c, const double v) { c.set_value(i[0], i[1], i[2], c.get_value(i[0], i[1], i[2]) + sanitize_finite(v)); };
+			if (elf)
+				add(Cubes[cube_type::Elf], rho > 0 ? 1 / (1 + pow(constants::ctelf * pow(rho, constants::c_m53) * (q[4] * 0.5 - 0.125 * g2 / rho), 2)) : 0.0);
+			if (eli) {
+				const double g = rho * q[4] - 0.25 * g2;
+				add(Cubes[cube_type::Eli], rho > 0 && g > 0 ? 0.5 * rho * pow(48 / g, constants::c_38) : 0.0);
+			}
+			if (lap)
+				add(Cubes[cube_type::Lap], q[5] + q[6] + q[7]);
+			if (rdg) {
+				add(Cubes[cube_type::RDG], rho > 0 ? constants::alpha_coef * sqrt(g2) / pow(rho, constants::c_43) : 0.0);
+				double H[9] = { q[5], q[8], q[9], q[8], q[6], q[10], q[9], q[10], q[7] };
+				add(rho_contrib, get_lambda_1(H) < 0 ? -rho : rho);
+			}
+		}
+	});
 	// Calc_Rho already filled Rho; only the RDG run replaces it by sign(lambda2)*rho.
-	if (Cubes[cube_type::RDG].get_loaded())
+	if (rdg)
 		finish_signed_rho(Cubes, rho_contrib);
 
 	if (!test)

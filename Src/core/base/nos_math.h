@@ -205,6 +205,9 @@ void cholesky_solve(const vec& L, const size_t& n, vec& b, const size_t& nrhs = 
 void cholesky_unfactor(vec& A, const size_t& n, const vec& diag);
 //Half the flops of LU for a positive definite A, which then holds L; otherwise A is restored and LU solves it.
 int solve_spd_system(vec& A, const size_t& n, vec& b);
+//The order of n points along a Morton curve over their bounding box (21 bits per axis): consecutive points are neighbours
+//in space, so a block of them touches few basis functions
+ivec morton_order(const int n, const double* x, const double* y, const double* z);
 
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results

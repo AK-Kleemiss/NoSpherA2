@@ -490,6 +490,35 @@ NNLSResult nnls(dMatrix2& A,
 	return NNLSResult{ x, res, 0 };
 }
 
+ivec morton_order(const int n, const double* x, const double* y, const double* z)
+{
+	const double* v[3] = { x, y, z };
+	double lo[3] = { 1e300, 1e300, 1e300 }, hi[3] = { -1e300, -1e300, -1e300 };
+	for (int p = 0; p < n; p++)
+		for (int k = 0; k < 3; k++) lo[k] = std::min(lo[k], v[k][p]), hi[k] = std::max(hi[k], v[k][p]);
+	auto spread = [](uint64_t a) {
+		a &= 0x1fffff;
+		a = (a | a << 32) & 0x1f00000000ffffull;
+		a = (a | a << 16) & 0x1f0000ff0000ffull;
+		a = (a | a << 8) & 0x100f00f00f00f00full;
+		a = (a | a << 4) & 0x10c30c30c30c30c3ull;
+		return (a | a << 2) & 0x1249249249249249ull;
+	};
+	std::vector<std::pair<uint64_t, int>> key(n);
+	for (int p = 0; p < n; p++) {
+		uint64_t k = 0;
+		for (int d = 0; d < 3; d++) {
+			const double s = hi[d] - lo[d] > 1e-12 ? (v[d][p] - lo[d]) / (hi[d] - lo[d]) : 0.0;
+			k |= spread(static_cast<uint64_t>(std::clamp(s, 0.0, 1.0) * 2097151.0)) << d;
+		}
+		key[p] = { k, p };
+	}
+	std::sort(key.begin(), key.end());
+	ivec perm(n);
+	for (int p = 0; p < n; p++) perm[p] = key[p].second;
+	return perm;
+}
+
 
 // Remaining functions which were separated for readability
 #include "mat_nos_math.inl"
