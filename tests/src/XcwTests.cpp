@@ -1033,6 +1033,46 @@ namespace
 		EXPECT_DOUBLE_EQ(v.RMSP_diff, 7e-6);
 	}
 
+	// the SCF ladder: every method on and eight DIIS vectors by default, `DIIS_size` and the three switches
+	TEST(XcwSettingsTests, DiisSizeAndMethodSwitches)
+	{
+		const options::XCW_settings d = parsed("basis_set sto-3g");
+		EXPECT_EQ(d.diis_size, 8);
+		EXPECT_TRUE(d.use_diis && d.use_soscf && d.use_trah);
+		const options::XCW_settings s = parsed("basis_set sto-3g DIIS_size 5 nodiis NoSOSCF notrah soscf");
+		EXPECT_EQ(s.diis_size, 5);
+		EXPECT_FALSE(s.use_diis || s.use_soscf || s.use_trah);
+		EXPECT_EQ(parse_error("basis_set sto-3g DIIS_size 0"), "Expected a positive integer after 'DIIS_size'");
+		EXPECT_EQ(parse_error("basis_set sto-3g diis_size x"), "Expected a positive integer after 'DIIS_size'");
+	}
+
+	// `broken_symmetry` takes 45 degrees, or the number after it; the keyword after it is read as usual
+	TEST(XcwSettingsTests, BrokenSymmetryAngleAndStabilityCheck)
+	{
+		const options::XCW_settings d = parsed("basis_set sto-3g");
+		EXPECT_EQ(d.broken_symmetry, 0.0);
+		EXPECT_FALSE(d.stability_check);
+		const options::XCW_settings s = parsed("basis_set sto-3g broken_symmetry uhf stability_check");
+		EXPECT_EQ(s.broken_symmetry, 45.0);
+		EXPECT_EQ(s.hf_type, occ::qm::SpinorbitalKind::Unrestricted);
+		EXPECT_TRUE(s.stability_check);
+		EXPECT_EQ(parsed("basis_set sto-3g uhf broken_symmetry 30").broken_symmetry, 30.0);
+		EXPECT_EQ(parse_error("basis_set sto-3g broken_symmetry 0"), "Expected an angle above 0 and at most 90 degrees after 'broken_symmetry'");
+		EXPECT_EQ(parse_error("basis_set sto-3g broken_symmetry x"), "Could not read 'x' after 'broken_symmetry'");
+	}
+
+	// `rohf` runs in the unrestricted containers; the last of rhf, uhf, rohf wins
+	TEST(XcwSettingsTests, RohfIsUnrestrictedWithSharedOrbitals)
+	{
+		const options::XCW_settings r = parsed("basis_set sto-3g rohf");
+		EXPECT_EQ(r.hf_type, occ::qm::SpinorbitalKind::Unrestricted);
+		EXPECT_TRUE(r.rohf);
+		const options::XCW_settings u = parsed("basis_set sto-3g rohf uhf");
+		EXPECT_EQ(u.hf_type, occ::qm::SpinorbitalKind::Unrestricted);
+		EXPECT_FALSE(u.rohf);
+		EXPECT_FALSE(parsed("basis_set sto-3g rohf rhf").rohf);
+	}
+
 	// the switches and the keywords that carry a path, a model or a number
 	TEST(XcwSettingsTests, SwitchesPathsAndModels)
 	{

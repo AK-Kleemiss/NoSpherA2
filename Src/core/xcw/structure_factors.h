@@ -205,8 +205,8 @@ public:
 	// the anisotropic models only) the nr x 6 coefficients a_{r,p}
 	vec ext_c_, ext_cos2t_, ext_a_;
 	// Per-iteration shape, see update_extinction. ext_dyc_ is dy/dt * c_r * |Fc_r|^2, so that
-	// dy/dP_p = ext_dyc_[r] * a_{r,p}.
-	vec ext_y_, ext_sqrt_y_, ext_g_, ext_m_, ext_dyc_;
+	// dy/dP_p = ext_dyc_[r] * a_{r,p}; ext_dy_ and ext_d2y_ are dy/dt and d^2y/dt^2, for the second-order steps.
+	vec ext_y_, ext_sqrt_y_, ext_g_, ext_m_, ext_dyc_, ext_dy_, ext_d2y_;
 	// Ordered vector of hkl
 	std::vector<i3> hkl_ordered_;
 	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.

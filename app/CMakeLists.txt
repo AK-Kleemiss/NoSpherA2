@@ -49,6 +49,10 @@ set_target_properties(
 if(NOT ANDROID)
     add_dependencies(NoSpherA2 NoSpherA2Dll)
     target_link_libraries(NoSpherA2 PRIVATE ${CMAKE_DL_LIBS})
+    #its iostream init is GLIBCXX_3.4.32 under GCC 14; RHEL 9 stops at 3.4.29
+    if(LINUX)
+        target_link_options(NoSpherA2 PRIVATE -static-libstdc++)
+    endif()
     return()
 endif()
 

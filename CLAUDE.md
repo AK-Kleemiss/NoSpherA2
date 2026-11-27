@@ -253,6 +253,13 @@ code outside the target writes `core/<folder>/<file>`. The root keeps the CLI fr
 
 ## Current Validation Notes
 
+As of 2026-11-26 (ROHF, highly experimental, do not use yet - see the warning above `SCF_solver::rohf_fock` and ask Johannes
+Bartusel before working on it), the XCW keyword `rohf` runs ROHF in the unrestricted containers with shared orbitals; on P1 sto-3g
+it reproduces three ORCA 6.1 ROHF states to 1e-7 Eh with `<S^2>` exact and its Hessian product matches the finite difference
+to 2.3e-10. `XcwScfTests.RohfCationIsAPureDoubletOnOrcasState` and `XcwSettingsTests.RohfIsUnrestrictedWithSharedOrbitals` are
+new. `ctest --preset release-windows -j 8` on a CPU-only build reports **1488 passed, 0 failed, 23 skipped** (2 disabled) of 1513.
+See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-11-25 (libcint g-shell norm), `Int_Params` undoes ORCA's g-over-sqrt(3) convention for gbw, molden and fchk
 shells, so their libcint g, h and i functions have self-overlap 1 instead of 1/3, 1/945, 1/10395; `FittingIoCoverageIntegratorTests.GbwShellsUpToGAreNormalisedForLibcint`
 and `GbwShellsUpToIAreNormalisedForLibcint` (h and i, `tests/water_pv6z`) are new. `ctest` on a CUDA `release-windows-tests` build (GPU present)
@@ -281,6 +288,23 @@ matches `kernel_novelty_salted.py` to 5e-13 on cysteine and water; five tests ar
 `TomlIntegrationTests.SaltedDistance`). `ctest` on a CUDA `release-windows-tests` build (GPU present) reports **1436 passed,
 0 failed, 12 skipped** (2 disabled) of 1450; on Linux (AKL006, Slurm job 1828588, GCC 11.5 `release-linux-tests`, CPU only,
 one process per test) **1421 passed, 0 failed, 23 skipped** (2 disabled) of 1446. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-18 (broken symmetry), closed-shell UHF is known to start with alpha = beta, which no SCF method breaks, so it ends on
+the RHF solution even where that is a UHF saddle point (P1 sto-3g). `stability_check` now runs with TRAH too and `broken_symmetry
+[angle]` mixes the alpha HOMO and LUMO of the guess as ORCA's `GuessMix`; `XcwScfTests.ClosedShellUhfLeavesTheRhfSaddlePoint` and
+`XcwSettingsTests.BrokenSymmetryAngleAndStabilityCheck` are new. `ctest --preset release-windows -j 8` on a CPU-only build reports
+**1421 passed, 0 failed, 23 skipped** (2 disabled) of 1446. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-18 (stability check), a converged UHF step reports `<S^2>` (expected and found) in SCF.log, and the XCW keyword
+`stability_check` under `notrah` searches the lowest orbital Hessian eigenvalue and follows a saddle point (P1 sto-3g: the closed shell
+in UHF is the RHF saddle, followed 18 mEh lower); `XcwScfTests.ConvergedUhfDoubletReportsItsSpin` and `StabilityCheckRunsOnlyWithoutTrah`
+are new. `ctest --preset release-windows -j 8` on a CPU-only build reports **1420 passed, 0 failed, 23 skipped** (2 disabled) of
+1445. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-11-16 (SCF ladder), XCW's SCF runs Roothaan < DIIS < SOSCF < TRAH with `nodiis`/`nososcf`/`notrah` and `DIIS_size`,
+SOSCF and TRAH start from semicanonical natural orbitals of the best density, and the TRAH Hessian product carries the exact extinction
+response; `XcwSettingsTests.DiisSizeAndMethodSwitches` and `XcwScfTests.MethodSwitchesReachTheSameSteps` are new. `ctest --preset
+release-windows -j 8` on a CPU-only build reports **1400 passed, 0 failed, 23 skipped** (2 disabled) of 1427. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-11-16 (merge of the equicomb branch at `814e9a9c` into `salted-relpower-norm`), the rel_power normalisation and the
 symmetric-site zeroing run with PR #242's ECP cores and the size_t trace index of `plan_norms`. `ctest` on a CUDA

@@ -2255,7 +2255,9 @@ void options::digest_options()
 
 void options::loadXCWsettings() {
 	std::string conv_preset = "normal";
-	bool check_hessian = false;
+	bool check_hessian = false, use_diis = true, use_soscf = true, use_trah = true, stability_check = false;
+	double broken_symmetry = 0;
+	int diis_size = 8;
 	std::string speed_preset = "normal_conv";
 
 	/* 1: Classical Jayatilaka XWR
@@ -2273,6 +2275,7 @@ void options::loadXCWsettings() {
 	bool grid_double = false;
 	std::filesystem::path eri_read_path, eri_save_path, basis_overrides;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+	bool rohf = false;
 	if (!std::filesystem::exists(xcw_settings_path)) {
 		throw std::runtime_error("Settings file not found! Aborting run!");
 	}
@@ -2459,10 +2462,18 @@ void options::loadXCWsettings() {
 
 		handlers["rhf"] = [&](std::istream&) {
 			hf_type = occ::qm::SpinorbitalKind::Restricted;
+			rohf = false;
 			};
 
 		handlers["uhf"] = [&](std::istream&) {
 			hf_type = occ::qm::SpinorbitalKind::Unrestricted;
+			rohf = false;
+			};
+
+		//HIGHLY EXPERIMENTAL, DO NOT USE YET: see the warning above SCF_solver::rohf_fock
+		handlers["rohf"] = [&](std::istream&) {
+			hf_type = occ::qm::SpinorbitalKind::Unrestricted;
+			rohf = true;
 			};
 
 		handlers["sloppy"] = [&](std::istream&) {
@@ -2489,9 +2500,31 @@ void options::loadXCWsettings() {
 			speed_preset = "normal_conv";
 			};
 
-		//`soscf` is accepted and ignored: cold DIIS + warm TRAH is fixed (ccb566ce), and the key
-		//turned the cold start second-order, which costs Fock builds (P1 lambda 0: 14 -> 26)
+		//`soscf` is accepted and ignored: SOSCF is on unless `nososcf`
 		handlers["soscf"] = [&](std::istream&) {};
+		handlers["nodiis"] = [&](std::istream&) { use_diis = false; };
+		handlers["nososcf"] = [&](std::istream&) { use_soscf = false; };
+		handlers["notrah"] = [&](std::istream&) { use_trah = false; };
+		handlers["stability_check"] = [&](std::istream&) { stability_check = true; };
+		//`broken_symmetry [angle]`: a number after it is the angle, the next settings keyword is read as usual
+		handlers["broken_symmetry"] = [&](std::istream& is) {
+			broken_symmetry = 45.0;
+			std::string token;
+			if (!(is >> token)) return;
+			const std::string low = to_lower(token);
+			if (handlers.count(low)) {
+				handlers.at(low)(is);
+				return;
+			}
+			try { broken_symmetry = std::stod(token); }
+			catch (const std::exception&) { throw std::runtime_error("Could not read '" + token + "' after 'broken_symmetry'"); }
+			if (!(broken_symmetry > 0 && broken_symmetry <= 90))
+				throw std::runtime_error("Expected an angle above 0 and at most 90 degrees after 'broken_symmetry'");
+			};
+		handlers["diis_size"] = [&](std::istream& is) {
+			if (!(is >> diis_size) || diis_size < 1)
+				throw std::runtime_error("Expected a positive integer after 'DIIS_size'");
+			};
 
 		handlers["check_hessian"] = [&](std::istream&) {
 			check_hessian = true;
@@ -2645,6 +2678,7 @@ void options::loadXCWsettings() {
 	xcw_settings.grown = grown;
 	xcw_settings.mask = mask;
 	xcw_settings.hf_type = hf_type;
+	xcw_settings.rohf = rohf;
 	xcw_settings.read_first_guess = read_first_guess;
 	xcw_settings.grid_double = grid_double;
 	xcw_settings.eri_read_path = eri_read_path;
@@ -2654,6 +2688,12 @@ void options::loadXCWsettings() {
 	xcw_settings.hessian_df_basis_name = hessian_df_basis_name;
 	xcw_settings.guess_basis_name = guess_basis_name;
 	xcw_settings.check_hessian = check_hessian;
+	xcw_settings.diis_size = diis_size;
+	xcw_settings.use_diis = use_diis;
+	xcw_settings.use_soscf = use_soscf;
+	xcw_settings.use_trah = use_trah;
+	xcw_settings.stability_check = stability_check;
+	xcw_settings.broken_symmetry = broken_symmetry;
 	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
 	xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
 }

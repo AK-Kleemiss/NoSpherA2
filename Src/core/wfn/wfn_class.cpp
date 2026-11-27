@@ -129,6 +129,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 	basis_set_name = occ_WF.basis.name();
 	has_ECPs = occ_WF.basis.have_ecps();
 	charge = occ_WF.charge();
+	total_energy = occ_WF.energy.total;
 	const occ::Mat3N atom_positions = occ_WF.positions();
 	for (long i = 0; i < occ_WF.atoms.size(); i++) {
 		push_back_atom(constants::atnr2letter(occ_WF.atoms[i].atomic_number), atom_positions(0, i), atom_positions(1, i), atom_positions(2, i), static_cast<int>(occ_WF.nuclear_charges()(i)), {});

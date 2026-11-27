@@ -214,6 +214,17 @@ struct options
 		//second-order step, reported in SCF.log; it enters TRAH once the DIIS error is below
 		//trah_.start_threshold, so a cold start has a step to check
 		bool check_hessian = false;
+		//`DIIS_size n`: the Fock matrices CDIIS and ADIIS extrapolate over
+		int diis_size = 8;
+		//`nodiis`, `nososcf`, `notrah`: the method never steers, the next lower one (Roothaan < DIIS < SOSCF < TRAH)
+		//takes its place; the DIIS error is still measured for the convergence check
+		bool use_diis = true, use_soscf = true, use_trah = true;
+		//`stability_check`: the lowest eigenvalue of the orbital Hessian at a converged run, followed downhill when
+		//negative. TRAH too: from a symmetric start (closed-shell UHF) it never leaves the symmetric subspace
+		bool stability_check = false;
+		//`broken_symmetry [angle]`: the alpha HOMO and LUMO of a closed-shell UHF guess rotated by angle degrees (45 without
+		//one), as ORCA's GuessMix; 0 is off
+		double broken_symmetry = 0;
 		bool apply_shift = true;
 		bool method_apply_shift = true;
 		double diis_stop_shift = 0;
@@ -223,6 +234,9 @@ struct options
 		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
 		std::string guess_basis_name;
 		occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+		//`rohf`: unrestricted containers whose two spin blocks hold the same orbitals. HIGHLY EXPERIMENTAL, DO NOT USE YET:
+		//read the warning above SCF_solver::rohf_fock (Src/core/xcw/SCF_solver.cpp) before touching any ROHF code
+		bool rohf = false;
 		double alpha_damp = 0;
 		double level_shift = 0;
 		int max_scf_iterations = 100;

@@ -418,6 +418,7 @@ TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 
 	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
 	EXPECT_EQ(occurrences(run.log, "***Turned off level shift***"), 1u);
+	EXPECT_NE(run.log.find("<S^2>: expected 0.0000, found 0.0000"), std::string::npos) << run.log;
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 1u) << run.out;
 	EXPECT_NEAR(rows[0].d(rows[0].criterion), rows[0].d(rows[0].goof2) * rows[0].d(rows[0].goof2), 1e-4 * rows[0].d(rows[0].goof2) + 1e-4);
@@ -431,6 +432,85 @@ TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 	ASSERT_EQ(rows_rhf.size(), 1u) << rhf.out;
 	EXPECT_EQ(rows_rhf[0].goof2, rows[0].goof2);
 	EXPECT_NEAR(rows_rhf[0].d(rows_rhf[0].energy), rows[0].d(rows[0].energy), 1e-6);
+	std::filesystem::remove_all(dir);
+}
+
+//<S^2> of a converged UHF doublet: S_z(S_z + 1) = 0.75 expected, the found value never below it
+TEST(XcwScfTests, ConvergedUhfDoubletReportsItsSpin)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 100 charge 1 mult 2 f2 uhf start 0 step_size 0.01 end 0" + read_shared_eri(dir));
+	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
+	const size_t at = run.log.find("<S^2>: expected 0.7500, found ");
+	ASSERT_NE(at, std::string::npos) << run.log;
+	const double s2 = std::stod(run.log.substr(at + 30));
+	EXPECT_GE(s2, 0.75);
+	std::filesystem::remove_all(dir);
+}
+
+//The closed shell in UHF starts from the spin-averaged guess with alpha = beta, which nothing in the SCF breaks: it ends on
+//the RHF solution, here a saddle point of the UHF energy (lowest Hessian eigenvalue about -0.13), TRAH included.
+//`stability_check` finds it and follows it into a broken-symmetry minimum below the RHF energy, with TRAH and with SOSCF
+//alone; `broken_symmetry` starts from the alpha HOMO and LUMO rotated by 45 degrees and reaches that minimum directly.
+//Without either the run stays on the saddle point
+TEST(XcwScfTests, ClosedShellUhfLeavesTheRhfSaddlePoint)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const std::string tail = " start 0 step_size 0.01 end 0" + read_shared_eri(dir);
+	double energy[3];
+	const std::string kinds[3] = { "f2 uhf stability_check", "f2 uhf notrah stability_check", "f2 uhf broken_symmetry" };
+	for (int k = 0; k < 3; k++) {
+		const p1_run run = run_on_p1(dir, common + kinds[k] + tail);
+		ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << kinds[k] << "\n" << run.log;
+		if (k < 2) {
+			const size_t followed = run.log.find("***Saddle point: on from the orbitals");
+			ASSERT_NE(run.log.find("Hessian products): a saddle point"), std::string::npos) << run.log;
+			ASSERT_NE(followed, std::string::npos) << run.log;
+			EXPECT_NE(run.log.find("Hessian products): a minimum", followed), std::string::npos) << run.log;
+		}
+		else EXPECT_NE(run.log.find("Broken-symmetry guess: alpha HOMO and LUMO rotated by 45.0 degrees"), std::string::npos) << run.log;
+		const size_t at = run.log.find("<S^2>: expected 0.0000, found ");
+		ASSERT_NE(at, std::string::npos) << run.log;
+		EXPECT_GT(std::stod(run.log.substr(at + 30)), 0.5) << kinds[k];
+		const auto rows = lambda_rows(run.out);
+		ASSERT_EQ(rows.size(), 1u) << run.out;
+		energy[k] = rows[0].d(rows[0].energy);
+		EXPECT_LT(energy[k], golden_energy - 1e-2) << kinds[k];
+	}
+	EXPECT_NEAR(energy[1], energy[0], 1e-6);
+	EXPECT_NEAR(energy[2], energy[0], 1e-6);
+	const p1_run plain = run_on_p1(dir, common + "f2 uhf" + tail);
+	EXPECT_EQ(plain.log.find("Stability analysis:"), std::string::npos) << plain.log;
+	EXPECT_EQ(plain.log.find("Broken-symmetry guess"), std::string::npos) << plain.log;
+	EXPECT_NE(plain.log.find("<S^2>: expected 0.0000, found 0.0000"), std::string::npos) << plain.log;
+	const p1_run rhf = run_on_p1(dir, common + "f2 rhf broken_symmetry" + tail);
+	EXPECT_NE(rhf.out.find("A broken-symmetry guess was requested but applies to closed-shell UHF only; the guess is left as it is."), std::string::npos) << rhf.out;
+	EXPECT_EQ(rhf.log.find("Broken-symmetry guess"), std::string::npos) << rhf.log;
+	std::filesystem::remove_all(dir);
+}
+
+//ROHF of the P1 cation: a pure doublet, the same state by DIIS with SOSCF, TRAH and DIIS alone, and the energy ORCA 6.1
+//reaches from its HCore guess (-1961.654402851 Eh, 1.1e-7 below as for RHF and UHF); the closed shell is the RHF solution
+TEST(XcwScfTests, RohfCationIsAPureDoubletOnOrcasState)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const std::string tail = " start 0 step_size 0.01 end 0" + read_shared_eri(dir);
+	const std::string kinds[3] = { "f2 rohf charge 1 mult 2", "f2 rohf charge 1 mult 2 nososcf", "f2 rohf charge 1 mult 2 notrah nososcf" };
+	for (int k = 0; k < 3; k++) {
+		const p1_run run = run_on_p1(dir, common + kinds[k] + tail);
+		ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << kinds[k] << "\n" << run.log;
+		EXPECT_NE(run.log.find("<S^2>: expected 0.7500, found 0.7500"), std::string::npos) << run.log;
+		const auto rows = lambda_rows(run.out);
+		ASSERT_EQ(rows.size(), 1u) << run.out;
+		EXPECT_NEAR(rows[0].d(rows[0].energy), -1961.654402851, 1e-6) << kinds[k];
+	}
+	const p1_run closed = run_on_p1(dir, common + "f2 rohf" + tail);
+	const auto rows = lambda_rows(closed.out);
+	ASSERT_EQ(rows.size(), 1u) << closed.out;
+	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
 	std::filesystem::remove_all(dir);
 }
 
@@ -766,20 +846,49 @@ TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
 	std::filesystem::remove_all(dir);
 }
 
+//The ladder Roothaan < DIIS < SOSCF < TRAH: by default the cold lambda 0 hands DIIS's orbitals to SOSCF and the warm
+//step goes to TRAH; `notrah` takes the warm step with SOSCF, `nososcf` the cold one from DIIS to TRAH, and with
+//`notrah nososcf` DIIS (Roothaan under `nodiis`) finishes both. Every route reaches the same two steps
+TEST(XcwScfTests, MethodSwitchesReachTheSameSteps)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const std::string scan = "f rhf start 0 step_size 0.01 end 0.01";
+	std::vector<lambda_row> ref;
+	for (const std::string sw : { "", " notrah", " nososcf", " notrah nososcf", " nodiis", " DIIS_size 4" }) {
+		const auto dir = scratch_dir();
+		const p1_run run = run_on_p1(dir, common + scan + sw + read_shared_eri(dir));
+		const auto rows = lambda_rows(run.out);
+		ASSERT_EQ(rows.size(), 2u) << sw << run.out;
+		EXPECT_EQ(occurrences(run.log, "***SCF converged in "), 2u) << sw;
+		const bool soscf = run.log.find("SOSCF: |g|") != std::string::npos, trah = run.log.find("TRAH: ") != std::string::npos;
+		EXPECT_EQ(soscf, sw.find("nososcf") == std::string::npos) << sw;
+		EXPECT_EQ(trah, sw.find("notrah") == std::string::npos) << sw;
+		if (ref.empty()) ref = rows;
+		for (size_t i = 0; i < 2; i++)
+			EXPECT_NEAR(rows[i].d(rows[i].quant), ref[i].d(ref[i].quant), 2e-6) << sw << " lambda " << rows[i].lambda;
+		std::filesystem::remove_all(dir);
+	}
+}
+
 //The exact Hessian-vector product behind the second-order steps (Fock response plus the
 //response of the perturbation with the scale moving) against a central finite difference of
 //the gradient, at a lambda where the perturbation is on, for both spin treatments; the
-//grid in double so the difference quotient is not limited by fp32 noise in the gradient
+//grid in double so the difference quotient is not limited by fp32 noise in the gradient.
+//With extinction the shape y(t) moves with |Fc| and the refined coefficients with the scale:
+//a strong fixed coefficient is exact to the difference quotient (the frozen shape gave 3e-4),
+//refined ones to how stationary eval_scale leaves them (frozen: 9e-5)
 TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
-	for (const std::string kind : { "f rhf", "f2 uhf" }) {
+	const std::pair<std::string, double> kinds[] = { { "f rhf", 1e-4 }, { "f2 uhf", 1e-4 },
+		{ "f rhf extinction bc_lorentzian fixed 0.05", 1e-8 }, { "f2 uhf extinction bc_gaussian 0.01", 1e-5 }, { "f2 rohf charge 1 mult 2", 1e-4 } };
+	for (const auto& [kind, tol] : kinds) {
 		const auto dir = scratch_dir();
 		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double check_hessian" + read_shared_eri(dir));
 		const size_t at = run.log.find("Hessian check: |Hv - FD| / |FD| = ");
 		ASSERT_NE(at, std::string::npos) << run.log;
 		const double rel = std::stod(run.log.substr(at + std::string("Hessian check: |Hv - FD| / |FD| = ").size()));
-		EXPECT_LT(rel, 1e-4) << kind << ": " << run.log.substr(at, 160);
+		EXPECT_LT(rel, tol) << kind << ": " << run.log.substr(at, 160);
 		std::cout << kind << ": " << run.log.substr(at, 130) << std::endl;
 		std::filesystem::remove_all(dir);
 	}

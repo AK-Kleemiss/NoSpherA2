@@ -46,6 +46,9 @@ first two columns are also the table `-tune list` prints (`documented_knobs` in
 | `NOSPHERA2_XCW_TSCB_BY_F` | off | Match the grid route's table columns to the scatterers by the closest f instead of by atom id or label. | `structure_factors.cpp` |
 | `NOSPHERA2_DEBUG_ASYMFACT` | off | Print the deleted symmetry operations, the surviving ones and every atom's symmetry factor. | `structure_factors.cpp` |
 | `NOSPHERA2_NO_INVERSION_SCREENING` | off | Integrate both h and -h instead of taking -h as the conjugate. | `structure_factors.cpp` |
+| `NOSPHERA2_SOSCF_START` | `3.3e-3` | DIIS error below which a cold start hands its orbitals to SOSCF (or TRAH under `nososcf`). | `SCF_solver.cpp` |
+| `NOSPHERA2_TRAH_FIRST_TRUST` | unset | Trust radius of the first TRAH step of a run, instead of the one the last run reached. | `SCF_solver.cpp` |
+| `NOSPHERA2_TRAH_FIRST_TOL` | `1` | Factor on the micro-iteration tolerance of the first TRAH step of a run. | `SCF_solver.cpp` |
 
 ### XCW grid partition
 
