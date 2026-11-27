@@ -234,32 +234,7 @@ void WFN::compute_dens_batch(const int n, const double* x, const double* y, cons
 			if (runs.empty() || runs.back() != mo) { runs.push_back(mo); runs.push_back(mo + 1); }
 			else runs.back() = mo + 1;
 		}
-	std::vector<std::pair<uint64_t, int>> ord(n); //Morton key, point
-	{
-		double lo[3] = { 1e300, 1e300, 1e300 }, hi[3] = { -1e300, -1e300, -1e300 };
-		for (int p = 0; p < n; p++) {
-			const double v[3] = { x[p], y[p], z[p] };
-			for (int k = 0; k < 3; k++) lo[k] = std::min(lo[k], v[k]), hi[k] = std::max(hi[k], v[k]);
-		}
-		auto spread = [](uint64_t v) { //21 bits to every third bit
-			v &= 0x1fffff;
-			v = (v | v << 32) & 0x1f00000000ffffull;
-			v = (v | v << 16) & 0x1f0000ff0000ffull;
-			v = (v | v << 8) & 0x100f00f00f00f00full;
-			v = (v | v << 4) & 0x10c30c30c30c30c3ull;
-			return (v | v << 2) & 0x1249249249249249ull;
-		};
-		for (int p = 0; p < n; p++) {
-			const double v[3] = { x[p], y[p], z[p] };
-			uint64_t key = 0;
-			for (int k = 0; k < 3; k++) {
-				const double s = hi[k] - lo[k] > 1e-12 ? (v[k] - lo[k]) / (hi[k] - lo[k]) : 0.0;
-				key |= spread(static_cast<uint64_t>(std::clamp(s, 0.0, 1.0) * 2097151.0)) << k;
-			}
-			ord[p] = { key, p };
-		}
-		std::sort(ord.begin(), ord.end());
-	}
+	const ivec ord = morton_order(n, x, y, z);
 	const int ng = (n + B - 1) / B;
 #pragma omp parallel for schedule(dynamic, 8)
 	for (int g = 0; g < ng; g++) {
@@ -275,7 +250,7 @@ void WFN::compute_dens_batch(const int n, const double* x, const double* y, cons
 		const int p0 = g * B, nb = std::min(B, n - p0);
 		bool ascending = nb == B;
 		for (int b = 0; b < nb; b++) {
-			const int p = ord[p0 + b].second;
+			const int p = ord[p0 + b];
 			batch_ao = &ao[b];
 			compute_dens_cartesian(d3{ x[p], y[p], z[p] }, d, phi1);
 			batch_ao = nullptr;
@@ -311,7 +286,7 @@ void WFN::compute_dens_batch(const int n, const double* x, const double* y, cons
 			const double* pb = phi.data() + (size_t)b * nmo;
 			double Rho = 0.0;
 			for (int mo = 0; mo < nmo; mo++) Rho += MOs_data[mo].get_occ() * pb[mo] * pb[mo];
-			rho[ord[p0 + b].second] = Rho;
+			rho[ord[p0 + b]] = Rho;
 		}
 	}
 }

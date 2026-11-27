@@ -46,6 +46,8 @@ struct GridConfiguration {
 	bool debug = false;
 	bool all_charges = false;
 	bool no_density_eval = false;
+	//Morton-order each atom's points after pruning; XCW's AO cutoffs need them radially ordered
+	bool spatial_order = true;
 
 	double getCutoff() const;
 	std::string getPartitionName() const;
@@ -111,6 +113,7 @@ private:
 	std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, std::ostream &file = std::cout);
 	void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid, std::ostream &file = std::cout);
 	void pruneGrid();
+	void sortGridSpatially();
 
 	void addTimingPoint(const std::string &label) {
 		timing_points_.emplace_back(label, std::chrono::high_resolution_clock::now());

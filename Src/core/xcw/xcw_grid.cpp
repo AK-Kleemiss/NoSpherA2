@@ -382,21 +382,36 @@ void structure_factors::plan_grid_fb(const sf_shell_layout& layout)
 			}
 		}
 	}
-	//|k| nodes: the Lagrange table when it is shorter than the entries, else every entry its own node
-	const int nq = static_cast<int>(qmax / h) + 4;
-	const bool table = nq < nc;
-	F.nn = table ? nq : nc;
+	//|k| nodes: the Lagrange table or one exact node per distinct |k|, whichever takes fewer flops
+	vec qs(qk);
+	std::sort(qs.begin(), qs.end());
+	const std::vector<long long> run = fb_runs(qs);
+	const int nq = static_cast<int>(qmax / h) + 4, nd = static_cast<int>(run.size()) - 1;
+	ivec mem(F.protos.size(), 0);
+	for (int g = 0; g < ng; g++) if (!F.off[g]) mem[F.proto_of[g]]++;
+	double ct = 0, ce = 0;
+	for (size_t P = 0; P < F.protos.size(); P++) {
+		const xcw_fb::proto& Q = F.protos[P];
+		double rad = 0;
+		for (int s = 0; s < Q.ns; s++) rad += double(Q.Ls[s] + 1) * (Q.Ls[s] + 1);
+		ct += mem[P] * (nq * rad + 4.0 * nc * Q.nl());
+		ce += mem[P] * (nd * rad + double(nc) * Q.nl());
+	}
+	const bool table = ct < ce;
+	F.nn = table ? nq : nd;
 	F.S = table ? 4 : 1;
 	F.L = L; F.h = h;
 	F.ne = fb_n_even(L); F.no = fb_n_odd(L);
-	if (!table) F.qn = qk;
+	if (!table) {
+		F.qn.resize(nd);
+		for (int n = 0; n < nd; n++) F.qn[n] = qs[run[n]];
+	}
 	vec kx(nc), ky(nc), kz(nc);
 	for (int c = 0; c < nc; c++) {
 		const int i = XG.inversion_link[c][0];
 		kx[c] = k_pt[0][i]; ky[c] = k_pt[1][i]; kz[c] = k_pt[2][i];
 	}
 	F.place(kx, ky, kz, F.n0, F.wt, F.Ye, F.Yo);
-	if (!table) for (int c = 0; c < nc; c++) F.n0[c] = c;
 	for (size_t P = 0; P < F.protos.size(); P++) {
 		xcw_fb::proto& Q = F.protos[P];
 		Q.J.assign(static_cast<size_t>(Q.L + 1) * F.nn * Q.ns, 0.0);
@@ -405,7 +420,7 @@ void structure_factors::plan_grid_fb(const sf_shell_layout& layout)
 			vec jl(Q.L + 1);
 #pragma omp for schedule(static)
 			for (int n = 0; n < F.nn; n++) {
-				const double q = table ? n * h : qk[n];
+				const double q = table ? n * h : F.qn[n];
 				for (int s = 0; s < Q.ns; s++) {
 					fb_sph_bessel(Q.Ls[s], q * rs[P][s], jl.data());
 					for (int l = 0; l <= Q.Ls[s]; l++)
@@ -414,7 +429,7 @@ void structure_factors::plan_grid_fb(const sf_shell_layout& layout)
 			}
 		}
 	}
-	std::cout << "XCW grid transform: Fourier-Bessel, L " << L << ", " << F.nn << (table ? " table" : " entry") << " nodes, "
+	std::cout << "XCW grid transform: Fourier-Bessel, L " << L << ", " << F.nn << (table ? " table" : " |k|") << " nodes, "
 		<< F.protos.size() << " prototypes" << std::endl;
 	XG.fb = std::move(fb);
 }

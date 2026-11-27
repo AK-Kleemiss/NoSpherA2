@@ -280,6 +280,11 @@ std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, con
 	std::vector<long long> ko(nk);
 	std::iota(ko.begin(), ko.end(), 0LL);
 	std::sort(ko.begin(), ko.end(), [&](const long long u, const long long v) { return qk[u] < qk[v]; });
+	vec qs(nk);
+	for (long long k = 0; k < nk; k++)
+		qs[k] = qk[ko[k]];
+	const std::vector<long long> run = fb_runs(qs);
+	const long long nd = static_cast<long long>(run.size()) - 1;
 	double ms_shells = 0.0, ms_proj = 0.0, ms_tab = 0.0, ms_asm = 0.0; //-gflops phase split
 	constexpr size_t FB_MEM = size_t(1) << 24; //doubles per work array (128 MB): sets the atoms per column block
 	constexpr int FB_BIN = 256, FB_ROWS = 64, FB_PB = 512; //reflections per assembly GEMM, table nodes per radial GEMM,
@@ -290,7 +295,7 @@ std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, con
 	//A prototype's atoms are GEMM columns; it keeps its own shells, cut and Lebedev rules. All prototypes share the
 	//|k| nodes (the finest any asks for) and Y(k^) up to the largest L, so the assembly evaluates Y once per reflection
 	struct fb_rule { int s0, n, Lr; ivec sh; }; //first shell, points, largest Ls of its shells, its shells
-	struct fb_part { int P = 0, ns = 0, L = 0; ivec mem, Ls, sl, rule_of; vec r; std::vector<fb_rule> rules; };
+	struct fb_part { int P = 0, ns = 0, L = 0; double as = 0.0, rad = 0.0; ivec mem, Ls, sl, rule_of; vec r; std::vector<fb_rule> rules; };
 	std::vector<fb_part> parts;
 	int L = 0;
 	double h = 0.025;
@@ -326,18 +331,21 @@ std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, con
 		//4-point Lagrange in |k|: error ~ (h r)^4 on a shell's term, so h shrinks with the outermost shell
 		const double hP = std::min(0.025, 0.25 / std::max(F.r[ns - 1], 1e-3));
 		const int nqP = static_cast<int>(qmax / hP) + 4;
-		const bool tabP = !exact && nk >= nqP;
 		//j_l(x) < 1e-12 j_0 past x + 9.4 x^(1/3) + 6 (Debye's asymptotics, the 12-digit rule of fast multipole codes),
 		//so a shell keeps only the l its |k| range can reach: exact to that level, and inner shells drop most of L
 		F.Ls.resize(ns);
-		double flops = 2.0 * double(nk) * (tabP ? 4 : 1) * double(F.L + 1) * (F.L + 1);
+		F.as = 2.0 * double(nk) * double(F.L + 1) * (F.L + 1);
+		double flops = 0.0;
 		for (int s = 0; s < ns; s++)
 		{
 			const double x = qmax * F.r[s];
 			F.Ls[s] = std::min(F.L, static_cast<int>(std::ceil(x + 9.4 * std::cbrt(x))) + 6);
 			const double nls = double(F.Ls[s] + 1) * (F.Ls[s] + 1);
-			flops += 2.0 * nls * (double(ss[s + 1] - ss[s]) + double(tabP ? nqP : nk));
+			F.rad += 2.0 * nls;
+			flops += 2.0 * nls * double(ss[s + 1] - ss[s]);
 		}
+		//table: 4 nodes per reflection on nqP; exact: one per distinct |k|
+		flops += std::min(exact ? 1e300 : 4.0 * F.as + F.rad * nqP, F.as + F.rad * double(nd));
 		//the direct sum keeps a prototype it does faster; asking for L or exact forces Fourier-Bessel
 		if (!force && L_override < 0 && !exact && FB_STEP_PER_FLOP * flops * double(F.mem.size()) > direct)
 			continue;
@@ -349,10 +357,16 @@ std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, con
 		return done;
 	const int ne = fb_n_even(L), no = fb_n_odd(L), nl = ne + no;
 	const int nq = static_cast<int>(qmax / h) + 4;
-	const bool table = !exact && nk >= nq;
-	const int S = table ? 4 : 1; //nodes per reflection; exact: the reflections are the nodes
-	const long long nn = table ? nq : nk;
-	const int NC = table ? static_cast<int>(nn) : static_cast<int>(std::min<long long>(nk, 2048));
+	double ct = 0.0, ce = 0.0;
+	for (const fb_part& F : parts)
+	{
+		ct += double(F.mem.size()) * (4.0 * F.as + F.rad * nq);
+		ce += double(F.mem.size()) * (F.as + F.rad * double(nd));
+	}
+	const bool table = !exact && ct < ce;
+	const int S = table ? 4 : 1; //nodes per reflection; exact: the distinct |k| are the nodes
+	const long long nn = table ? nq : nd;
+	const int NC = table ? static_cast<int>(nn) : static_cast<int>(std::min<long long>(nd, 2048));
 	const fb_ylm Y(L);
 	int Mtot = 0;
 	size_t widest = size_t(NC) * nl;
@@ -411,7 +425,7 @@ std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, con
 #pragma omp for schedule(static)
 			for (int n = 0; n < cnt; n++)
 			{
-				const double q = table ? double(n_lo + n) * h : qk[ko[n_lo + n]];
+				const double q = table ? double(n_lo + n) * h : qs[run[n_lo + n]];
 				for (int s = 0; s < ns; s++)
 				{
 					fb_sph_bessel(F.Ls[s], q * F.r[s], jl.data());
@@ -541,7 +555,8 @@ std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, con
 			{
 				bins.clear();
 				for (int j = 0; j < cnt; j++)
-					bins.push_back({ n_lo + j, 1, j });
+					for (long long k = run[n_lo + j]; k < run[n_lo + j + 1]; k += FB_BIN)
+						bins.push_back({ k, static_cast<int>(std::min<long long>(FB_BIN, run[n_lo + j + 1] - k)), j });
 			}
 			//T[lm][n][atom] = sum_{s >= sl[l]} J_l[n][s] c_s,lm[atom]: one GEMM per l, block of nodes and segment, scattered
 			//so that a reflection's S nodes are S mc consecutive columns of row lm. Zero past a prototype's own L.
