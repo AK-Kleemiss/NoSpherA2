@@ -502,8 +502,9 @@ occ::qm::HartreeFock XCW_wrapper::setup_system() {
 	scf_solver = XCW_solver(mol, occ_basis_set, scf_settings, writer, *this);
 	if (dusk) {
 #ifdef NOSPHERA2_USE_DUSK
-		dusk::Options o = dusk_occ::scf_options(scf_settings);
-		o.incremental_fock = opt->xcw_incremental;
+		dusk::Input in = dusk_occ::input(mol, *sf.orbital_basis);
+		dusk::Options& o = in.options;
+		o = dusk_occ::scf_options(scf_settings, writer.log);
 		if (opt->xcw_int_precision > 0.0) o.integral_threshold = opt->xcw_int_precision;
 		o.threads = std::max(0, opt->threads); //NoSpherA2's -1 (unset) is dusk's 0, the OpenMP default
 		//save_eri / read_eri: dusk reads <path>.dusk when it holds the integrals of this basis and geometry, else builds and
@@ -513,17 +514,19 @@ occ::qm::HartreeFock XCW_wrapper::setup_system() {
 		//NOSPHERA2_DUSK_WARM_TRAH: a warm-started lambda goes straight to the second-order solver, as occ's path does;
 		//unset keeps dusk's default (on), =0 starts it under DIIS
 		if (const char* e = tuning("NOSPHERA2_DUSK_WARM_TRAH")) o.warm_start_second_order = std::string(e) != "0";
-		dusk_ = std::make_unique<dusk_solver>(mol, occ_basis_set, *sf.orbital_basis, o, writer, static_cast<SCF_coupling&>(*this));
-		if (!scf_settings.guess_basis_name.empty())
-			dusk_->scf.set_guess_basis(dusk_occ::basis(*BasisSetLibrary::get_basis_set(scf_settings.guess_basis_name), mol.atoms()));
+		//NOSPHERA2_DUSK_VERBOSE: dusk's own iteration lines and solver messages on the console
+		if (const char* e = tuning("NOSPHERA2_DUSK_VERBOSE")) o.verbosity = std::atoi(e);
+		if (!scf_settings.guess_basis_name.empty()) in.guess_basis = dusk_occ::basis(*BasisSetLibrary::get_basis_set(scf_settings.guess_basis_name), mol.atoms());
 		if (!opt->xcw_settings.df_basis_name.empty()) {
-			dusk_->scf.set_aux_basis(dusk_occ::basis(*fitting_set(opt->xcw_settings.df_basis_name, mol.atoms(), *sf.orbital_basis), mol.atoms()));
-			dusk_->scf.options().jk = dusk::JKMethod::RI;
+			in.aux_basis = dusk_occ::basis(*fitting_set(opt->xcw_settings.df_basis_name, mol.atoms(), *sf.orbital_basis), mol.atoms());
+			o.jk = dusk::JKMethod::RI;
 		}
 		std::cout << "XCW SCF backend: dusk" << std::endl;
-		writer.log << "XCW SCF backend: dusk; occ-only settings are ignored: damp, shift, diis_damping, diis_shift, check_hessian, hessian_df_basis";
+		writer.log << "XCW SCF backend: dusk";
+		if (!opt->xcw_settings.hessian_df_basis_name.empty()) writer.log << "; hessian_df_basis is occ-only, dusk's Hessian products use its J/K method";
 		if (!eri.empty()) writer.log << "; stored integrals in " << o.eri_file << (opt->xcw_settings.df_basis_name.empty() ? "" : " (unused: df_basis fits them)");
 		writer.log << std::endl;
+		dusk_ = std::make_unique<dusk_solver>(std::move(in), mol, occ_basis_set, writer, static_cast<SCF_coupling&>(*this));
 #else
 		err_checkf(false, "scf_backend dusk: this NoSpherA2 was built without dusk (configure with NOSPHERA2_DUSK_DIR)", std::cout);
 #endif

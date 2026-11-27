@@ -27,6 +27,7 @@ static const std::vector<std::pair<std::string, std::string>> documented_knobs =
 	{"NOSPHERA2_XCW_ADJOINT_CHECK", "off"},
 	{"NOSPHERA2_DUSK_FD_CHECK", "off"},
 	{"NOSPHERA2_DUSK_WARM_TRAH", "on (dusk default)"},
+	{"NOSPHERA2_DUSK_VERBOSE", "0 (silent)"},
 	{"NOSPHERA2_XCW_TSHB_FIT", "off"},
 	{"NOSPHERA2_XCW_TSHB_TABLE", "off"},
 	{"NOSPHERA2_XCW_TSCB_BY_F", "off"},

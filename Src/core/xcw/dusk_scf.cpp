@@ -3,27 +3,33 @@
 #ifdef NOSPHERA2_USE_DUSK
 #include "basis_set.h"
 
-dusk::Molecule dusk_occ::molecule(const occ::core::Molecule& mol) {
-	dusk::Molecule m;
-	for (const occ::core::Atom& a : mol.atoms())
-		m.atoms.push_back({ a.atomic_number, { a.x, a.y, a.z } });
-	m.charge = mol.charge();
-	m.multiplicity = mol.multiplicity();
-	return m;
-}
-
-bite::Basis dusk_occ::basis(const BasisSet& set, const std::vector<occ::core::Atom>& atoms) {
-	std::vector<bite::Shell> shells;
+dusk::BasisInput dusk_occ::basis(const BasisSet& set, const std::vector<occ::core::Atom>& atoms) {
+	dusk::BasisInput b;
 	for (int a = 0; a < static_cast<int>(atoms.size()); a++) {
-		const std::span<const SimplePrimitive> p = set[atoms[a].atomic_number - 1];
+		const int Z = atoms[a].atomic_number;
+		if (b.elements.count(Z)) continue;
+		std::vector<dusk::BasisShell>& shells = b.elements[Z];
+		const std::span<const SimplePrimitive> p = set[Z - 1];
 		for (int i = 0; i < static_cast<int>(p.size()); i++) {
 			if (i == 0 || p[i].shell != p[i - 1].shell)
-				shells.push_back({ p[i].type, { atoms[a].x, atoms[a].y, atoms[a].z }, {}, {}, 1, a });
+				shells.push_back({ p[i].type, {}, {}, 1 });
 			shells.back().exponents.push_back(p[i].exp);
 			shells.back().coefficients.push_back(p[i].coefficient);
 		}
 	}
-	return bite::Basis(std::move(shells), bite::Angular::Spherical);
+	return b;
+}
+
+dusk::Input dusk_occ::input(const occ::core::Molecule& mol, const BasisSet& orbital) {
+	dusk::Input in;
+	for (const occ::core::Atom& a : mol.atoms()) {
+		in.atomic_numbers.push_back(a.atomic_number);
+		in.positions.push_back({ a.x, a.y, a.z });
+	}
+	in.charge = mol.charge();
+	in.multiplicity = mol.multiplicity();
+	in.basis = basis(orbital, mol.atoms());
+	return in;
 }
 
 dusk::Matrix dusk_occ::to_dusk(const occ::Mat& A) {
@@ -77,16 +83,35 @@ void dusk_occ::to_occ(const dusk::Result& r, occ::qm::Wavefunction& wfn) {
 	wfn.converged = r.converged;
 }
 
-dusk::Options dusk_occ::scf_options(const options::SCF_settings& s) {
+dusk::Options dusk_occ::scf_options(const options::SCF_settings& s, std::ostream& log) {
 	dusk::Options o;
-	o.reference = s.hf_type == occ::qm::SpinorbitalKind::Unrestricted ? dusk::Reference::Unrestricted : dusk::Reference::Restricted;
-	o.convergence = { s.quant_diff, s.max_diis_error, s.gradient, s.RMSP_diff, s.MaxP_diff };
+	o.verbosity = 0;
+	o.convergence = { s.quant_diff, s.max_diis_error, s.gradient, s.RMSP_diff, s.MaxP_diff, true, true };
 	o.max_iterations = s.max_scf_iterations;
+	o.reference = s.rohf ? dusk::Reference::RestrictedOpen
+		: s.hf_type == occ::qm::SpinorbitalKind::Unrestricted ? dusk::Reference::Unrestricted : dusk::Reference::Restricted;
+	//`nodiis`: one stored Fock matrix, Roothaan steps that dusk shortens to the minimum of the energy's quadratic model
+	o.diis_size = s.use_diis ? s.diis_size : 1;
+	o.soscf = s.use_soscf;
+	o.second_order = s.use_trah ? dusk::SecondOrder::Auto : dusk::SecondOrder::Off;
+	//`nososcf`: TRAH takes SOSCF's place at the same DIIS error
+	if (!s.use_soscf && s.use_trah) o.second_order_start = o.soscf_start;
+	o.rescues = 3;
+	o.confirm_convergence = true;
+	o.stability_check = s.stability_check;
+	o.broken_symmetry = s.broken_symmetry;
+	o.check_hessian = s.check_hessian;
+	o.damping = s.method_apply_damping ? s.alpha_damp : 0.0;
+	o.damping_off = s.diis_stop_damping;
+	o.level_shift = s.method_apply_shift ? s.level_shift : 0.0;
+	o.level_shift_off = s.diis_stop_shift;
+	o.incremental_fock = s.incremental;
+	o.full_rebuild_drop = 10;
 	if (!s.guess_basis_name.empty()) {
 		o.guess = dusk::Guess::SmallBasis;
 		o.guess_basis = s.guess_basis_name;
 	}
-	o.verbosity = 0;
+	if (s.rohf) log << "dusk: rohf is HIGHLY EXPERIMENTAL, not for use yet (dusk::Reference::RestrictedOpen)\n";
 	return o;
 }
 
@@ -95,12 +120,12 @@ double xcw_perturbation::evaluate(const dusk::Matrix& D, dusk::Matrix& F) {
 	dMatrix2 dm(n, n);
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++) dm(i, j) = 0.5 * D(i, j);
-	coupling_->evaluate_cryst_crit(dm, false);
+	coupling_->evaluate_cryst_crit(dm, incremental);
 	fit = coupling_->cryst_crit();
 	evaluations++;
 	if (lambda != 0) {
 		occ::Mat P;
-		coupling_->perturbation_matrix(P, false, lambda, false);
+		coupling_->perturbation_matrix(P, false, lambda, incremental);
 		F = dusk_occ::to_dusk(P);
 	}
 	return fit.criterion;
@@ -115,11 +140,15 @@ bool xcw_perturbation::response(const dusk::Matrix& D, const dusk::Matrix& dD, d
 	return true;
 }
 
-dusk_solver::dusk_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& occ_basis, const BasisSet& orbital, const dusk::Options& o,
-	XCW_log_writer& writer, SCF_coupling& coupling)
-	: scf(dusk_occ::molecule(mol), dusk_occ::basis(orbital, mol.atoms()), o), xcw(std::make_shared<xcw_perturbation>(coupling)),
+//the input with the criterion as its first term (index 0), for the member initialiser of scf
+static dusk::Input with_term(dusk::Input in, const std::shared_ptr<xcw_perturbation>& xcw) {
+	in.perturbations.insert(in.perturbations.begin(), { xcw, 0.0 });
+	return in;
+}
+
+dusk_solver::dusk_solver(dusk::Input in, const occ::core::Molecule& mol, const occ::qm::AOBasis& occ_basis, XCW_log_writer& writer, SCF_coupling& coupling)
+	: xcw(std::make_shared<xcw_perturbation>(coupling)), scf(dusk::make_scf(with_term(std::move(in), xcw))),
 	basis_(occ_basis), atoms_(mol.atoms()), writer_(&writer) {
-	index_ = scf.add_perturbation(xcw, 0.0);
 	//XCW_solver::log_iteration's row: the fit of the density this Fock build evaluated, E_total without lambda * criterion
 	scf.set_iteration_callback([this](const dusk::IterationInfo& i) {
 		const fit_quality& f = xcw->fit;
@@ -157,6 +186,7 @@ void dusk_solver::fd_check(const occ::qm::Wavefunction& wfn, std::ostream& out) 
 	const occ::Mat Dt = 2.0 * (wfn.mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? occ::Mat(wfn.mo.D.topRows(n) + wfn.mo.D.bottomRows(n)) : wfn.mo.D);
 	const dusk::Matrix D = dusk_occ::to_dusk(Dt);
 	const double keep = xcw->lambda, h = 1e-4;
+	xcw->incremental = false;
 	xcw->lambda = keep == 0 ? 1.0 : keep;
 	std::mt19937 gen(7);
 	std::normal_distribution<double> nd;

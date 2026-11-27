@@ -41,6 +41,7 @@ first two columns are also the table `-tune list` prints (`documented_knobs` in
 | `NOSPHERA2_XCW_ADJOINT_CHECK` | off | Check the grid transform against its adjoint at a random symmetric D, after the first converged step. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_DUSK_FD_CHECK` | off | With `scf_backend dusk`: dE_p/dD and the response of the XCW perturbation against central differences along four random symmetric directions, after the first converged step. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_DUSK_WARM_TRAH` | on (dusk default) | With `scf_backend dusk`: a lambda step started from the previous orbitals goes straight to the second-order solver (occ's behaviour); `=0` starts it under DIIS. | `XCW_wrapper.cpp` |
+| `NOSPHERA2_DUSK_VERBOSE` | 0 (silent) | With `scf_backend dusk`: dusk's verbosity, 1 its iteration lines and solver messages (hand-overs, damping, confirmation, stability) on the console, 2 also its timers. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_XCW_TSHB_FIT` | off | With `-xcw_partition ri -tshb`: fit the density anew for the `.tshb` instead of reusing the partition's own fit. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_XCW_TSHB_TABLE` | off | Write the `.tscb` table beside the `.tshb`, to compare the two. | `XCW_wrapper.cpp` |
 | `NOSPHERA2_XCW_TSCB_BY_F` | off | Match the grid route's table columns to the scatterers by the closest f instead of by atom id or label. | `structure_factors.cpp` |
