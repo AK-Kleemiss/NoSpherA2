@@ -438,6 +438,111 @@ void WFN::computeRhoELI(
 	out_Rho = Rho;
 };
 
+//A primitive x^l y^m z^n e^(-a r^2) and its derivatives at d_ (dx dy dz) with ex = e^(-a r^2), ex2 = 2a:
+//0 value, 1-3 x y z, 4-6 xx yy zz, 7 xy, 8 xz, 9 yz; false for a type outside 1..286 (l > 10)
+static inline bool prim_derivatives(const int type, const double *d_, const double ex2, const double ex, double *chi)
+{
+	int l[3]{ 0, 0, 0 };
+	constants::type2vector(type, l);
+	if (l[0] < 0) return false;
+	//per axis f = x^l e^(-a x^2) without the exponential: f, f', f''
+	double f[3], f1[3], f2[3];
+	for (int k = 0; k < 3; k++)
+	{
+		double p[13];
+		p[0] = 1.0;
+		for (int n = 1; n <= l[k] + 2; n++) p[n] = p[n - 1] * d_[k];
+		f[k] = p[l[k]];
+		f1[k] = (l[k] ? l[k] * p[l[k] - 1] : 0.0) - ex2 * p[l[k] + 1];
+		f2[k] = (l[k] > 1 ? l[k] * (l[k] - 1) * p[l[k] - 2] : 0.0) - ex2 * (2 * l[k] + 1) * p[l[k]] + ex2 * ex2 * p[l[k] + 2];
+	}
+	chi[0] = f[0] * f[1] * f[2] * ex;
+	chi[1] = f1[0] * f[1] * f[2] * ex, chi[2] = f[0] * f1[1] * f[2] * ex, chi[3] = f[0] * f[1] * f1[2] * ex;
+	chi[4] = f2[0] * f[1] * f[2] * ex, chi[5] = f[0] * f2[1] * f[2] * ex, chi[6] = f[0] * f[1] * f2[2] * ex;
+	chi[7] = f1[0] * f1[1] * f[2] * ex, chi[8] = f1[0] * f[1] * f1[2] * ex, chi[9] = f[0] * f1[1] * f1[2] * ex;
+	return true;
+}
+
+//rho, its gradient, tau and (hess) the Hessian at n points into out[s * p + k], s = 11 (hess) or 5: 0 rho, 1-3 gradient,
+//4 tau, 5-10 xx yy zz xy xz yz. As compute_dens_batch: per 64-point block the functions the exponent cutoff keeps go
+//into a column-major table, one row block per derivative, and one dgemm takes the table into the occupied MOs
+void WFN::compute_fields_batch(const int n, const double *x, const double *y, const double *z, const bool hess, double *out) const
+{
+	const int nc = hess ? 10 : 4, s = hess ? 11 : 5;
+	std::fill(out, out + (size_t)s * std::max(n, 0), 0.0);
+	if (n <= 0 || !get_coef_primitive_major()) return;
+	const int nao = (int)(coef_ao_major.size() / nmo);
+	ivec occ_mo;
+	vec occ;
+	for (int mo = 0; mo < nmo; mo++)
+		if (MOs[mo].get_occ() != 0.0) occ_mo.push_back(mo), occ.push_back(MOs[mo].get_occ());
+	const int nocc = (int)occ_mo.size();
+	if (nocc == 0) return;
+	vec C((size_t)nao * nocc);
+	for (int a = 0; a < nao; a++)
+		for (int m = 0; m < nocc; m++) C[(size_t)a * nocc + m] = coef_ao_major[(size_t)a * nmo + occ_mo[m]];
+	constexpr int B = 64;
+	const int nblk = (n + B - 1) / B, L = nc * B;
+#pragma omp parallel
+	{
+		vec d((size_t)ncen * 16), exps(group_exponent.size()), X((size_t)L * nao), Cg, Phi((size_t)L * nocc);
+		Cg.reserve((size_t)nao * nocc);
+		ivec col(nao, -1), cols;
+		const int *group = prim_exp_group.data();
+#pragma omp for schedule(dynamic)
+		for (int b = 0; b < nblk; b++) {
+			const int p0 = b * B, nb = std::min(B, n - p0);
+			cols.clear();
+			for (int p = 0; p < nb; p++) {
+				const d3 Pos{ x[p0 + p], y[p0 + p], z[p0 + p] };
+				for (int c = 0; c < ncen; c++) cart_powers(d.data() + 16 * c, Pos, atoms[c]);
+				exp_table([&d](const int c) { return d[16 * c + 3]; }, exps.data());
+				for (int j = 0; j < nex; j++) {
+					const double ex = exps[group[j]];
+					const int a = prim_ao[j];
+					double chi[10];
+					if (ex == 0.0 || a < 0 || !prim_derivatives(types[j], d.data() + 16 * (centers[j] - 1), 2 * exponents[j], ex, chi)) continue;
+					if (col[a] < 0) {
+						col[a] = (int)cols.size();
+						cols.push_back(a);
+						std::fill_n(X.data() + (size_t)L * col[a], L, 0.0);
+					}
+					double *xa = X.data() + (size_t)L * col[a] + p;
+					for (int k = 0; k < nc; k++) xa[k * B] += prim_ao_scale[j] * chi[k];
+				}
+			}
+			const int ncol = (int)cols.size();
+			if (ncol == 0) continue;
+			Cg.resize((size_t)ncol * nocc);
+			for (int c = 0; c < ncol; c++) {
+				std::copy_n(C.data() + (size_t)cols[c] * nocc, nocc, Cg.data() + (size_t)c * nocc);
+				col[cols[c]] = -1;
+			}
+			cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans, L, nocc, ncol, 1.0, X.data(), L, Cg.data(), nocc, 0.0, Phi.data(), L);
+			double *o = out + (size_t)s * p0;
+			for (int m = 0; m < nocc; m++) {
+				const double *f = Phi.data() + (size_t)m * L, w = occ[m], w2 = 2 * w;
+				for (int p = 0; p < nb; p++) {
+					double *q = o + (size_t)s * p;
+					const double v = f[p], gx = f[B + p], gy = f[2 * B + p], gz = f[3 * B + p];
+					q[0] += w * v * v;
+					q[1] += w2 * v * gx;
+					q[2] += w2 * v * gy;
+					q[3] += w2 * v * gz;
+					q[4] += w * (gx * gx + gy * gy + gz * gz);
+					if (!hess) continue;
+					q[5] += w2 * (v * f[4 * B + p] + gx * gx);
+					q[6] += w2 * (v * f[5 * B + p] + gy * gy);
+					q[7] += w2 * (v * f[6 * B + p] + gz * gz);
+					q[8] += w2 * (v * f[7 * B + p] + gx * gy);
+					q[9] += w2 * (v * f[8 * B + p] + gx * gz);
+					q[10] += w2 * (v * f[9 * B + p] + gy * gz);
+				}
+			}
+		}
+	}
+}
+
 bool WFN::eli_orbital_pass(const d3 &PosGrid, vec &phi) const
 {
 	const int _nmo = get_nmo(false);
@@ -463,28 +568,8 @@ bool WFN::eli_orbital_pass(const d3 &PosGrid, vec &phi) const
 		const double ex = exps[group[j]];
 		if (ex == 0.0 || prim_ao[j] < 0)
 			continue;
-		const double *d_ = d.data() + 4 * (centers[j] - 1);
-		const double ex2 = 2 * exponents[j];
-		int l[3]{ 0, 0, 0 };
-		constants::type2vector(types[j], l);
-		if (l[0] < 0) continue; //type outside 1..286 (l > 10)
-		//per axis f = x^l e^(-a x^2) without the exponential: f, f', f''
-		double f[3], f1[3], f2[3];
-		for (int k = 0; k < 3; k++)
-		{
-			double p[13];
-			p[0] = 1.0;
-			for (int n = 1; n <= l[k] + 2; n++) p[n] = p[n - 1] * d_[k];
-			f[k] = p[l[k]];
-			f1[k] = (l[k] ? l[k] * p[l[k] - 1] : 0.0) - ex2 * p[l[k] + 1];
-			f2[k] = (l[k] > 1 ? l[k] * (l[k] - 1) * p[l[k] - 2] : 0.0) - ex2 * (2 * l[k] + 1) * p[l[k]] + ex2 * ex2 * p[l[k] + 2];
-		}
-		//0 value, 1-3 x y z, 4-6 xx yy zz, 7 xy, 8 xz, 9 yz
-		const double chi[10] = {
-			f[0] * f[1] * f[2] * ex,
-			f1[0] * f[1] * f[2] * ex, f[0] * f1[1] * f[2] * ex, f[0] * f[1] * f1[2] * ex,
-			f2[0] * f[1] * f[2] * ex, f[0] * f2[1] * f[2] * ex, f[0] * f[1] * f2[2] * ex,
-			f1[0] * f1[1] * f[2] * ex, f1[0] * f[1] * f1[2] * ex, f[0] * f1[1] * f1[2] * ex };
+		double chi[10];
+		if (!prim_derivatives(types[j], d.data() + 4 * (centers[j] - 1), 2 * exponents[j], ex, chi)) continue;
 		ao.add(prim_ao[j], prim_ao_scale[j], chi);
 	}
 	//Component-major, as in computeGrad: ten unit-stride accumulations per function

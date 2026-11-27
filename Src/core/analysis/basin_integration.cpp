@@ -972,6 +972,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	config.angular_boost = grid_boost - 1;
 	config.partition_type = PartitionType::Becke;
 	config.no_density_eval = true;
+	config.spatial_order = false;
 	const char *rot_env = tuning("NOS_BASIN_ROTATE");
 	config.rotate_angular = rot_env == nullptr || std::string(rot_env) != "0";
 	GridManager grids(config);

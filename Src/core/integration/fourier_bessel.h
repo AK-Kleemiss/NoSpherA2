@@ -124,3 +124,15 @@ inline int fb_lebedev_degree(const long long n)
 			return i < 15 ? 2 * i + 3 : 35 + 6 * (i - 15);
 	return 131;
 }
+
+//First index of each run of equal |k| (to 1e-10 relative) in ascending q, closed by q.size(): a lattice's reflections
+//take few distinct |k| (Laue images, Friedel mates, cubic h^2 + k^2 + l^2), each of them one exact node
+inline std::vector<long long> fb_runs(const vec& q)
+{
+	std::vector<long long> r;
+	for (long long i = 0; i < static_cast<long long>(q.size()); i++)
+		if (r.empty() || q[i] - q[r.back()] > 1e-10 * q[r.back()])
+			r.push_back(i);
+	r.push_back(static_cast<long long>(q.size()));
+	return r;
+}

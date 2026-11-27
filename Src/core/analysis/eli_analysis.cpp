@@ -222,6 +222,26 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 	if (!warn.empty()) std::cout << "  WARNING: " << warn << std::endl;
 }
 
+//put(k, rho, ELI-D) at P(k) for k < n, as computeRhoELI gives them, from compute_fields_batch over the points in Morton order
+template <class Pos, class Put>
+static void rho_eli_batch(const WFN &w, const size_t n, const Pos &P, const Put &put)
+{
+	vec x(n), y(n), z(n);
+	for (size_t k = 0; k < n; k++) { const d3 p = P(k); x[k] = p[0]; y[k] = p[1]; z[k] = p[2]; }
+	const ivec o = morton_order(static_cast<int>(n), x.data(), y.data(), z.data());
+	constexpr int C = 1 << 16;
+	vec q(3 * C), F(5 * C);
+	for (size_t c = 0; c < n; c += C) {
+		const int m = static_cast<int>(std::min<size_t>(C, n - c));
+		for (int k = 0; k < m; k++) q[k] = x[o[c + k]], q[C + k] = y[o[c + k]], q[2 * C + k] = z[o[c + k]];
+		w.compute_fields_batch(m, q.data(), q.data() + C, q.data() + 2 * C, false, F.data());
+		for (int k = 0; k < m; k++) {
+			const double *f = F.data() + 5 * k, g = f[0] * f[4] - 0.25 * (f[1] * f[1] + f[2] * f[2] + f[3] * f[3]);
+			put(static_cast<size_t>(o[c + k]), f[0], g > 0 ? 0.5 * f[0] * pow(48 / g, constants::c_38) : 0.0);
+		}
+	}
+}
+
 //-eli_basin_cube: ELI-D inside the "A-B bond" basins, zero outside, on a box cropped to them. The voxels climb the
 //gridded field to a terminal (a grid maximum, or a box-face maximum), only the terminals and the voxels on the basin
 //surface walk the analytic field with classify (the integrator's own climb), so the surface is the integrator's.
@@ -262,8 +282,7 @@ static void write_eli_basin_cube(WFN &l_w, const std::vector<d4> &maxima, const 
 		for (int i = 0; i < 3; i++) n[i] = static_cast<int>(std::ceil((hi[i] - lo[i]) / h)) + 1;
 		const size_t N = static_cast<size_t>(n[0]) * n[1] * n[2];
 		val.assign(N, 0.0); rho.assign(N, 0.0);
-#pragma omp parallel for schedule(dynamic, 1024)
-		for (long long i = 0; i < static_cast<long long>(N); i++) l_w.computeRhoELI(pos(i), rho[i], val[i]);
+		rho_eli_batch(l_w, N, pos, [&](const size_t i, const double r, const double e) { rho[i] = r; val[i] = e; });
 		//Steepest ascent on the grid: up = the neighbour with the largest rise per bohr, -1 a terminal, -2 below the density cutoff
 		std::vector<long long> up(N, -2);
 #pragma omp parallel for schedule(static)
@@ -380,8 +399,9 @@ static void write_eli_basin_cube(WFN &l_w, const std::vector<d4> &maxima, const 
 		log << "  h " << std::setprecision(4) << h * s << " bohr: " << pend.size() << " points in cells cut by the surface walked the field" << std::endl;
 	}
 	val.assign(NF, 0.0); rho.assign(NF, 0.0);
-#pragma omp parallel for schedule(dynamic, 1024)
-	for (long long i = 0; i < static_cast<long long>(NF); i++) if (lab[i] == 1) l_w.computeRhoELI(pos(i), rho[i], val[i]);
+	std::vector<size_t> at;
+	for (size_t i = 0; i < NF; i++) if (lab[i] == 1) at.push_back(i);
+	rho_eli_batch(l_w, at.size(), [&](const size_t k) { return pos(at[k]); }, [&](const size_t k, const double r, const double e) { rho[at[k]] = r; val[at[k]] = e; });
 	in.assign(lab.begin(), lab.end());
 	double vol = 0.0, pop = 0.0;
 	const double dv = h * h * h;
@@ -421,16 +441,10 @@ static void write_eli_mask_cube(WFN &l_w, const std::filesystem::path &mask_path
 	out.calc_dv();
 	const double dv = out.get_dv();
 	double vol = 0.0, pop = 0.0;
-#pragma omp parallel for reduction(+:vol, pop) schedule(dynamic)
-	for (int x = 0; x < n[0]; x++) for (int y = 0; y < n[1]; y++) for (int z = 0; z < n[2]; z++) {
-		if (mask.get_value(x, y, z) == 0.0) continue;
-		d3 p;
-		for (int k = 0; k < 3; k++) p[k] = o[k] + x * v[0][k] + y * v[1][k] + z * v[2][k];
-		double rho, eli;
-		l_w.computeRhoELI(p, rho, eli);
-		out.set_value(x, y, z, eli);
-		vol += dv; pop += rho * dv;
-	}
+	std::vector<i3> at;
+	for (int x = 0; x < n[0]; x++) for (int y = 0; y < n[1]; y++) for (int z = 0; z < n[2]; z++) if (mask.get_value(x, y, z) != 0.0) at.push_back({ x, y, z });
+	auto P = [&](const size_t k) { d3 p; for (int i = 0; i < 3; i++) p[i] = o[i] + at[k][0] * v[0][i] + at[k][1] * v[1][i] + at[k][2] * v[2][i]; return p; };
+	rho_eli_batch(l_w, at.size(), P, [&](const size_t k, const double r, const double e) { out.set_value(at[k][0], at[k][1], at[k][2], e); vol += dv; pop += r * dv; });
 	out.set_comment1("ELI-D inside the region of " + mask_path.filename().string() + ", zero outside");
 	out.set_comment2("NoSpherA2 -eli_mask_cube");
 	std::filesystem::path p = l_w.get_path();

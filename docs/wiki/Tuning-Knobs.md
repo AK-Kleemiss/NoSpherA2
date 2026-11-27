@@ -60,7 +60,8 @@ first two columns are also the table `-tune list` prints (`documented_knobs` in
 | `NOSPHERA2_XCW_GRID_TIME` | off | Wall time of each grid stage, printed per call. | `xcw_grid.cpp` |
 | `NOSPHERA2_XCW_GRID_AO_TOL` | `-acc` cutoff | AO value below which a block drops an AO; below 1e-20 also turns the Morton reordering off. | `structure_factors.cpp` |
 | `NOSPHERA2_XCW_GRID_NO_MORTON` | off | Keep the grid points in shell order instead of Morton order. Sums do not depend on the order; only the speed does. | `structure_factors.cpp` |
-| `NOSPHERA2_XCW_GRID_CHUNK` | `1024` | Points per AO block; `0` uses the three radial bands. | `structure_factors.cpp` |
+| `NOSPHERA2_XCW_GRID_CHUNK` | `512` | Points per AO block; `0` uses the three radial bands. | `structure_factors.cpp` |
+| `NOSPHERA2_XCW_GRID_SLAB` | 4 chunks | Points per radial slab inside which the Morton order sorts the directions, so that a block is a patch of a thin shell; `0` sorts the positions over the whole atom grid. | `structure_factors.cpp` |
 | `NOSPHERA2_XCW_GRID_TSCB_OLD` | off | Build every step's `.tscb` on the tsc route instead of the grid's own per-atom transform. | `structure_factors.cpp` |
 | `NOSPHERA2_XCW_GRID_FCHECK` | off | F_calc from the written table against the one the SCF used at the same density. | `XCW_wrapper.cpp` |
 
